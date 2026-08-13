@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as AuthLoginRouteImport } from './routes/auth.login'
+import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
+import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +31,81 @@ const TermosRoute = TermosRouteImport.update({
   path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/auth/login',
+  path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRecuperarRoute = AuthRecuperarRouteImport.update({
+  id: '/auth/recuperar',
+  path: '/auth/recuperar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRegistoRoute = AuthRegistoRouteImport.update({
+  id: '/auth/registo',
+  path: '/auth/registo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/recuperar': typeof AuthRecuperarRoute
+  '/auth/registo': typeof AuthRegistoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/recuperar': typeof AuthRecuperarRoute
+  '/auth/registo': typeof AuthRegistoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/recuperar': typeof AuthRecuperarRoute
+  '/auth/registo': typeof AuthRegistoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/privacidade' | '/termos'
+  fullPaths:
+    | '/'
+    | '/privacidade'
+    | '/termos'
+    | '/auth/login'
+    | '/auth/recuperar'
+    | '/auth/registo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/privacidade' | '/termos'
-  id: '__root__' | '/' | '/privacidade' | '/termos'
+  to:
+    | '/'
+    | '/privacidade'
+    | '/termos'
+    | '/auth/login'
+    | '/auth/recuperar'
+    | '/auth/registo'
+  id:
+    | '__root__'
+    | '/'
+    | '/privacidade'
+    | '/termos'
+    | '/auth/login'
+    | '/auth/recuperar'
+    | '/auth/registo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   TermosRoute: typeof TermosRoute
+  AuthLoginRoute: typeof AuthLoginRoute
+  AuthRecuperarRoute: typeof AuthRecuperarRoute
+  AuthRegistoRoute: typeof AuthRegistoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +131,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/login': {
+      id: '/auth/login'
+      path: '/auth/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/recuperar': {
+      id: '/auth/recuperar'
+      path: '/auth/recuperar'
+      fullPath: '/auth/recuperar'
+      preLoaderRoute: typeof AuthRecuperarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/registo': {
+      id: '/auth/registo'
+      path: '/auth/registo'
+      fullPath: '/auth/registo'
+      preLoaderRoute: typeof AuthRegistoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +159,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   TermosRoute: TermosRoute,
+  AuthLoginRoute: AuthLoginRoute,
+  AuthRecuperarRoute: AuthRecuperarRoute,
+  AuthRegistoRoute: AuthRegistoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
