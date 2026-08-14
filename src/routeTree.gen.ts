@@ -13,7 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
@@ -37,9 +40,24 @@ const TermosRoute = TermosRouteImport.update({
   path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedContactosRoute = AuthenticatedContactosRouteImport.update({
+  id: '/contactos',
+  path: '/contactos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
@@ -62,7 +80,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
+  '/contactos': typeof AuthenticatedContactosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inbox': typeof AuthenticatedInboxRoute
+  '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
@@ -71,7 +92,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
+  '/contactos': typeof AuthenticatedContactosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/inbox': typeof AuthenticatedInboxRoute
+  '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
@@ -82,7 +106,10 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
+  '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
@@ -93,7 +120,10 @@ export interface FileRouteTypes {
     | '/'
     | '/privacidade'
     | '/termos'
+    | '/contactos'
     | '/dashboard'
+    | '/inbox'
+    | '/whatsapp'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
@@ -102,7 +132,10 @@ export interface FileRouteTypes {
     | '/'
     | '/privacidade'
     | '/termos'
+    | '/contactos'
     | '/dashboard'
+    | '/inbox'
+    | '/whatsapp'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
@@ -112,7 +145,10 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/privacidade'
     | '/termos'
+    | '/_authenticated/contactos'
     | '/_authenticated/dashboard'
+    | '/_authenticated/inbox'
+    | '/_authenticated/whatsapp'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
@@ -158,11 +194,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/contactos': {
+      id: '/_authenticated/contactos'
+      path: '/contactos'
+      fullPath: '/contactos'
+      preLoaderRoute: typeof AuthenticatedContactosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/inbox': {
+      id: '/_authenticated/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof AuthenticatedInboxRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/whatsapp': {
+      id: '/_authenticated/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/auth/login': {
@@ -190,11 +247,17 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedContactosRoute: typeof AuthenticatedContactosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedContactosRoute: AuthenticatedContactosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
