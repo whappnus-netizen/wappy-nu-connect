@@ -17,9 +17,11 @@ import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDefinicoesRouteImport } from './routes/_authenticated/definicoes'
 import { Route as AuthenticatedEquipaRouteImport } from './routes/_authenticated/equipa'
 import { Route as AuthenticatedIaRouteImport } from './routes/_authenticated/ia'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
@@ -64,6 +66,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDefinicoesRoute = AuthenticatedDefinicoesRouteImport.update({
+  id: '/definicoes',
+  path: '/definicoes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedEquipaRoute = AuthenticatedEquipaRouteImport.update({
   id: '/equipa',
   path: '/equipa',
@@ -77,6 +84,11 @@ const AuthenticatedIaRoute = AuthenticatedIaRouteImport.update({
 const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   id: '/inbox',
   path: '/inbox',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
@@ -108,9 +120,11 @@ export interface FileRoutesByFullPath {
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/definicoes': typeof AuthenticatedDefinicoesRoute
   '/equipa': typeof AuthenticatedEquipaRoute
   '/ia': typeof AuthenticatedIaRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -124,9 +138,11 @@ export interface FileRoutesByTo {
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/definicoes': typeof AuthenticatedDefinicoesRoute
   '/equipa': typeof AuthenticatedEquipaRoute
   '/ia': typeof AuthenticatedIaRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -142,9 +158,11 @@ export interface FileRoutesById {
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/definicoes': typeof AuthenticatedDefinicoesRoute
   '/_authenticated/equipa': typeof AuthenticatedEquipaRoute
   '/_authenticated/ia': typeof AuthenticatedIaRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -160,9 +178,11 @@ export interface FileRouteTypes {
     | '/contactos'
     | '/crm'
     | '/dashboard'
+    | '/definicoes'
     | '/equipa'
     | '/ia'
     | '/inbox'
+    | '/onboarding'
     | '/whatsapp'
     | '/auth/login'
     | '/auth/recuperar'
@@ -176,9 +196,11 @@ export interface FileRouteTypes {
     | '/contactos'
     | '/crm'
     | '/dashboard'
+    | '/definicoes'
     | '/equipa'
     | '/ia'
     | '/inbox'
+    | '/onboarding'
     | '/whatsapp'
     | '/auth/login'
     | '/auth/recuperar'
@@ -193,9 +215,11 @@ export interface FileRouteTypes {
     | '/_authenticated/contactos'
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
+    | '/_authenticated/definicoes'
     | '/_authenticated/equipa'
     | '/_authenticated/ia'
     | '/_authenticated/inbox'
+    | '/_authenticated/onboarding'
     | '/_authenticated/whatsapp'
     | '/auth/login'
     | '/auth/recuperar'
@@ -270,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/definicoes': {
+      id: '/_authenticated/definicoes'
+      path: '/definicoes'
+      fullPath: '/definicoes'
+      preLoaderRoute: typeof AuthenticatedDefinicoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/equipa': {
       id: '/_authenticated/equipa'
       path: '/equipa'
@@ -289,6 +320,13 @@ declare module '@tanstack/react-router' {
       path: '/inbox'
       fullPath: '/inbox'
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/whatsapp': {
@@ -327,9 +365,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedContactosRoute: typeof AuthenticatedContactosRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDefinicoesRoute: typeof AuthenticatedDefinicoesRoute
   AuthenticatedEquipaRoute: typeof AuthenticatedEquipaRoute
   AuthenticatedIaRoute: typeof AuthenticatedIaRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
 }
 
@@ -338,9 +378,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedContactosRoute: AuthenticatedContactosRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDefinicoesRoute: AuthenticatedDefinicoesRoute,
   AuthenticatedEquipaRoute: AuthenticatedEquipaRoute,
   AuthenticatedIaRoute: AuthenticatedIaRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
 }
 
