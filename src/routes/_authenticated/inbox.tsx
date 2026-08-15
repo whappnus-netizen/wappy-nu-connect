@@ -103,7 +103,7 @@ function InboxPage() {
                     </span>
                     <Badge variant="secondary" className="text-[10px]">{c.status}</Badge>
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{c.subject ?? "Sem assunto"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{c.contacts?.phone_e164 ?? "Sem contacto"}</p>
                 </button>
               ))
             )}
