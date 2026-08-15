@@ -39,25 +39,15 @@ function OnboardingPage() {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("organizations")
-      .insert({ name, slug: slugify(name), created_by: user.id })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      setLoading(false);
-      toast.error(error?.message ?? "Não foi possível criar a organização.");
-      return;
-    }
-
-    const { error: memberError } = await supabase
-      .from("memberships")
-      .insert({ organization_id: data.id, user_id: user.id, role: "OWNER" });
+    // Criação atómica (organização + OWNER) via função security definer no Supabase.
+    const { error } = await supabase.rpc("create_organization", {
+      _name: name,
+      _slug: slugify(name),
+    });
     setLoading(false);
 
-    if (memberError) {
-      toast.error(memberError.message);
+    if (error) {
+      toast.error(error.message ?? "Não foi possível criar a organização.");
       return;
     }
     toast.success("Organização criada.");
