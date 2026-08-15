@@ -11,11 +11,11 @@ import { createClient } from "@supabase/supabase-js";
  */
 export const SUPABASE_URL =
   (import.meta.env["VITE_SUPABASE_URL"] as string | undefined) ??
-  "https://nhpjqndkwynupwdjjryw.supabase.co";
+  "https://icqkoafhitudaqylnnfd.supabase.co";
 
 export const SUPABASE_ANON_KEY =
   (import.meta.env["VITE_SUPABASE_ANON_KEY"] as string | undefined) ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ocGpxbmRrd3ludXB3ZGpqcnl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1Njk4OTIsImV4cCI6MjEwMjE0NTg5Mn0.H7AYZhTke0lPZYX0Igw6UEN7-_0k9RLdYg3JbEVJqxk";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljcWtvYWZoaXR1ZGFxeWxubmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NDg4ODcsImV4cCI6MjEwMjMyNDg4N30.WJXVq331fm_aV222EJIWs3WXrYTMBxzoIgVsyA8rxao";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
