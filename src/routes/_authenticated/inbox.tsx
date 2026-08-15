@@ -24,7 +24,6 @@ export const Route = createFileRoute("/_authenticated/inbox")({
 
 type Conversation = {
   id: string;
-  subject: string | null;
   status: string;
   priority: string;
   last_message_at: string | null;
@@ -45,7 +44,7 @@ function InboxPage() {
     queryFn: async () => {
       let q = supabase
         .from("conversations")
-        .select("id, subject, status, priority, last_message_at, contacts(full_name, phone_e164)")
+        .select("id, status, priority, last_message_at, contacts(full_name, phone_e164)")
         .eq("organization_id", orgId!)
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(50);
@@ -58,7 +57,7 @@ function InboxPage() {
 
   const list = (conversations ?? []).filter((c) =>
     search
-      ? `${c.contacts?.full_name ?? ""} ${c.contacts?.phone_e164 ?? ""} ${c.subject ?? ""}`
+      ? `${c.contacts?.full_name ?? ""} ${c.contacts?.phone_e164 ?? ""}`
           .toLowerCase()
           .includes(search.toLowerCase())
       : true,
@@ -104,7 +103,7 @@ function InboxPage() {
                     </span>
                     <Badge variant="secondary" className="text-[10px]">{c.status}</Badge>
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{c.subject ?? "Sem assunto"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{c.contacts?.phone_e164 ?? "Sem contacto"}</p>
                 </button>
               ))
             )}
