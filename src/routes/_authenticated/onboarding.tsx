@@ -31,25 +31,54 @@ function slugify(value: string) {
 
 function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, membership } = useAuth();
+  const { user, membership, refreshMembership } = useAuth();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      toast.error("A sessão expirou. Entre novamente para continuar.");
+      return;
+    }
     setLoading(true);
-    // Criação atómica (organização + OWNER) via função security definer no Supabase.
-    const { error } = await supabase.rpc("create_organization", {
+    const { data, error } = await supabase.rpc("create_organization", {
       _name: name,
       _slug: slugify(name),
     });
-    setLoading(false);
 
     if (error) {
-      toast.error(error.message ?? "Não foi possível criar a organização.");
+      console.error("[Wappy Nus] create_organization falhou", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      setLoading(false);
+      toast.error("Não foi possível criar sua organização. Tente novamente.");
       return;
     }
+
+    const created = Array.isArray(data) ? data[0] : data;
+    const createdOrganizationId = created?.organization_id;
+    const confirmedMembership = await refreshMembership();
+
+    if (
+      !createdOrganizationId ||
+      !confirmedMembership ||
+      confirmedMembership.organization_id !== createdOrganizationId ||
+      confirmedMembership.role !== "OWNER"
+    ) {
+      console.error("[Wappy Nus] Onboarding incompleto após create_organization", {
+        createdOrganizationId,
+        confirmedMembership,
+      });
+      setLoading(false);
+      toast.error("A organização foi criada, mas não foi possível confirmar o acesso OWNER. Não avançámos para o Dashboard.");
+      return;
+    }
+
+    setLoading(false);
     toast.success("Organização criada.");
     navigate({ to: "/dashboard" });
   }

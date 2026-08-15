@@ -15,6 +15,9 @@ type AuthState = {
   session: Session | null;
   loading: boolean;
   membership: Membership | null;
+  membershipLoading: boolean;
+  membershipError: string | null;
+  refreshMembership: () => Promise<Membership | null>;
   signOut: () => Promise<void>;
 };
 
@@ -23,6 +26,9 @@ const AuthContext = createContext<AuthState>({
   session: null,
   loading: true,
   membership: null,
+  membershipLoading: true,
+  membershipError: null,
+  refreshMembership: async () => null,
   signOut: async () => {},
 });
 
@@ -30,6 +36,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [membership, setMembership] = useState<Membership | null>(null);
+  const [membershipLoading, setMembershipLoading] = useState(true);
+  const [membershipError, setMembershipError] = useState<string | null>(null);
+
+  async function refreshMembership(): Promise<Membership | null> {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setMembership(null);
+      setMembershipLoading(false);
+      return null;
+    }
+
+    setMembershipLoading(true);
+    setMembershipError(null);
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("organization_id, role, organizations(id, name, slug)")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    setMembershipLoading(false);
+    if (error) {
+      console.error("[Wappy Nus] Falha ao carregar membership", error);
+      setMembership(null);
+      setMembershipError(error.message);
+      return null;
+    }
+
+    const nextMembership = (data as unknown as Membership) ?? null;
+    setMembership(nextMembership);
+    return nextMembership;
+  }
 
   useEffect(() => {
     let active = true;
@@ -51,15 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session?.user) {
       setMembership(null);
+      setMembershipLoading(false);
+      setMembershipError(null);
       return;
     }
-    supabase
-      .from("memberships")
-      .select("organization_id, role, organizations(id, name, slug)")
-      .eq("user_id", session.user.id)
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setMembership((data as unknown as Membership) ?? null));
+    void refreshMembership();
   }, [session?.user?.id]);
 
   return (
@@ -69,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         membership,
+        membershipLoading,
+        membershipError,
+        refreshMembership,
         signOut: async () => {
           await supabase.auth.signOut();
         },

@@ -29,14 +29,15 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  const { membership } = useAuth();
+  const { membership, membershipLoading, membershipError } = useAuth();
   const orgId = membership?.organization_id;
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard", orgId],
     enabled: Boolean(orgId),
     queryFn: async () => {
-      const id = orgId!;
+      if (!orgId) throw new Error("Membership sem organization_id.");
+      const id = orgId;
       const [open, pending, active, contacts, deals, automations, numbers] = await Promise.all([
         countRows("conversations", id, { status: "open" }),
         countRows("conversations", id, { status: "pending" }),
@@ -60,6 +61,28 @@ function DashboardPage() {
     { icon: Workflow, label: "Automações activas", value: data?.automations },
     { icon: Sparkles, label: "Utilização da IA", value: null },
   ];
+
+  if (membershipLoading) {
+    return <AppShell title="Dashboard" description="A carregar organização…"><p className="text-sm text-muted-foreground">A confirmar o acesso à organização…</p></AppShell>;
+  }
+
+  if (!membership) {
+    return (
+      <AppShell title="Dashboard" description="Sem organização associada">
+        <div className="max-w-xl border-l-4 border-primary bg-card p-6">
+          <h2 className="font-display text-base font-semibold">Organização ainda não configurada</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {membershipError
+              ? "Não foi possível consultar a associação à organização. Tente novamente."
+              : "Conclua o onboarding para criar a organização e o acesso OWNER."}
+          </p>
+          <Button asChild size="sm" className="mt-4">
+            <Link to="/onboarding">Ir para o onboarding</Link>
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="Dashboard" description={membership?.organizations?.name ?? "Organização"}>
