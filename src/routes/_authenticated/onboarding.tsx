@@ -74,6 +74,12 @@ function OnboardingPage() {
       return;
     }
 
+    // Auto-reparação do profile (idempotente, apenas para o próprio utilizador).
+    const ensure = await supabase.rpc("ensure_my_profile");
+    if (ensure.error) {
+      console.warn("[Wappy Nus] ensure_my_profile falhou", ensure.error);
+    }
+
     const rpcResult = await supabase.rpc("create_organization", {
       _name: name,
       _slug: slugify(name),
