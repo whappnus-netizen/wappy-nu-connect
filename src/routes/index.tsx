@@ -21,10 +21,10 @@ export const Route = createFileRoute("/")({
         content:
           "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
       },
-      { property: "og:title", content: "Wappy Nus — WhatsApp, CRM e IA para Angola" },
+      { property: "og:title", content: "Wappy Nus — Atendimento WhatsApp para empresas angolanas" },
       {
         property: "og:description",
-        content: "Multiatendimento, CRM e automação sobre a WhatsApp Cloud API oficial da Meta.",
+        content: "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
       },
     ],
   }),
