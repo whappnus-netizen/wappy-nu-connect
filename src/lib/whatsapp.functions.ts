@@ -22,7 +22,16 @@ export const connectWhatsAppNumber = createServerFn({ method: "POST" })
     const { requireOrgRole, serviceClient, verifyMetaNumber } = await import("./whatsapp.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
 
-    const meta = await verifyMetaNumber(data.phoneNumberId, data.accessToken);
+    // Nunca deixar o token de sistema vazar de volta para o browser numa mensagem de erro.
+    const scrub = (message: string) => message.split(data.accessToken).join("***");
+
+    let meta: Awaited<ReturnType<typeof verifyMetaNumber>>;
+    try {
+      meta = await verifyMetaNumber(data.phoneNumberId, data.accessToken);
+    } catch (e) {
+      throw new Error(scrub((e as Error).message));
+    }
+
 
     const admin = serviceClient();
     const { data: row, error } = await admin
