@@ -62,8 +62,8 @@ function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const webhookUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/api/public/whatsapp/webhook` : "";
+  // URL oficial de produção do webhook da Meta (domínio próprio).
+  const webhookUrl = "https://whappnus.online/api/public/whatsapp/webhook";
 
   const { data: numbers, isLoading } = useQuery({
     queryKey: ["whatsapp_numbers", orgId],

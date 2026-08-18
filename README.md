@@ -721,7 +721,7 @@ Não implemente a Fase 2 agora, mas construa a Fase 1 de maneira que ela possa r
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://wappy-nu-connect.lovable.app
+**Live app**: https://whappnus.online
 
 ## Build with Lovable
 

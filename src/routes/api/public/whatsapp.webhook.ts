@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * Webhook oficial da Meta / WhatsApp Cloud API.
  *
- * URL a configurar no Meta Developers:
- *   https://<dominio>/api/public/whatsapp/webhook
+ * URL oficial de produção (configurar no Meta Developers):
+ *   https://whappnus.online/api/public/whatsapp/webhook
  *
  * GET  → verificação (hub.challenge) com META_WEBHOOK_VERIFY_TOKEN
  * POST → recepção de mensagens/estados, com validação HMAC (META_APP_SECRET)
