@@ -79,14 +79,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Wappy Nus — Atendimento WhatsApp para empresas angolanas" },
+      { title: "Whappy Nus" },
       {
         name: "description",
         content:
           "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
       },
       { name: "author", content: "Wappy Nus" },
-      { property: "og:title", content: "Wappy Nus — Atendimento WhatsApp para empresas angolanas" },
+      { property: "og:title", content: "Whappy Nus" },
       {
         property: "og:description",
         content: "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
@@ -94,7 +94,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Wappy Nus — Atendimento WhatsApp para empresas angolanas" },
+      { name: "twitter:title", content: "Whappy Nus" },
       { name: "twitter:description", content: "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ab03b025ccb6c376b8f7d630e7e790d2/id-preview-f0e15cb6--d5ed7cbf-9bd5-49f3-a7c4-499641cb92dd.lovable.app-1786930658757.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ab03b025ccb6c376b8f7d630e7e790d2/id-preview-f0e15cb6--d5ed7cbf-9bd5-49f3-a7c4-499641cb92dd.lovable.app-1786930658757.png" },
@@ -104,7 +104,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
