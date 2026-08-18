@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
               const profileName =
                 value.contacts?.find((c) => c.wa_id === msg.from)?.profile?.name ?? null;
               const { text, mediaId, type } = normalize(msg);
-              const { error } = await admin.rpc("ingest_whatsapp_message", {
+              const { data: result, error } = await admin.rpc("ingest_whatsapp_message", {
                 _phone_number_id: phoneNumberId,
                 _from_wa_id: msg.from,
                 _profile_name: profileName,
@@ -66,8 +66,11 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
                   ? new Date(Number(msg.timestamp) * 1000).toISOString()
                   : new Date().toISOString(),
               });
-              if (error) console.error("[wappy-nus] ingest_whatsapp_message falhou", error);
-              else ingested += 1;
+              const outcome = (result ?? null) as { ok?: boolean; duplicate?: boolean; reason?: string } | null;
+              if (error) console.error("[wappy-nus] ingest_whatsapp_message falhou", error.message);
+              else if (!outcome?.ok) console.warn("[wappy-nus] webhook ignorado:", outcome?.reason ?? "unknown");
+              else if (!outcome.duplicate) ingested += 1;
+
             }
 
             // Estados de entrega das mensagens enviadas
