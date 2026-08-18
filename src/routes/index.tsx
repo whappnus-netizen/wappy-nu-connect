@@ -15,13 +15,13 @@ import { Logo } from "@/components/app/app-shell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Wappy Nus — Atendimento WhatsApp para empresas angolanas" },
+      { title: "Whappy Nus" },
       {
         name: "description",
         content:
           "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
       },
-      { property: "og:title", content: "Wappy Nus — Atendimento WhatsApp para empresas angolanas" },
+      { property: "og:title", content: "Whappy Nus" },
       {
         property: "og:description",
         content: "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
