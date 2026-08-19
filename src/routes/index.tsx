@@ -128,8 +128,9 @@ function Landing() {
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <Logo className="text-base" />
           <div className="flex gap-4">
-            <Link to="/termos" className="hover:text-foreground">Termos</Link>
-            <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>
+            <Link to="/terms" className="hover:text-foreground">Termos</Link>
+            <Link to="/privacy" className="hover:text-foreground">Privacidade</Link>
+            <Link to="/deletion" className="hover:text-foreground">Eliminar dados</Link>
           </div>
         </div>
       </footer>
