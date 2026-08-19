@@ -11,8 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as DeletionRouteImport } from './routes/deletion'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
@@ -37,14 +40,29 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeletionRoute = DeletionRouteImport.update({
+  id: '/deletion',
+  path: '/deletion',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
   path: '/privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
   path: '/termos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAutomacoesRoute = AuthenticatedAutomacoesRouteImport.update({
@@ -121,8 +139,11 @@ const ApiPublicWhatsappWebhookRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/deletion': typeof DeletionRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/privacy': typeof PrivacyRoute
   '/termos': typeof TermosRoute
+  '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -140,8 +161,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/deletion': typeof DeletionRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/privacy': typeof PrivacyRoute
   '/termos': typeof TermosRoute
+  '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -161,8 +185,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/deletion': typeof DeletionRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/privacy': typeof PrivacyRoute
   '/termos': typeof TermosRoute
+  '/terms': typeof TermsRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
@@ -182,8 +209,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/deletion'
     | '/privacidade'
+    | '/privacy'
     | '/termos'
+    | '/terms'
     | '/automacoes'
     | '/contactos'
     | '/crm'
@@ -201,8 +231,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/deletion'
     | '/privacidade'
+    | '/privacy'
     | '/termos'
+    | '/terms'
     | '/automacoes'
     | '/contactos'
     | '/crm'
@@ -221,8 +254,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/deletion'
     | '/privacidade'
+    | '/privacy'
     | '/termos'
+    | '/terms'
     | '/_authenticated/automacoes'
     | '/_authenticated/contactos'
     | '/_authenticated/crm'
@@ -242,8 +278,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  DeletionRoute: typeof DeletionRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  PrivacyRoute: typeof PrivacyRoute
   TermosRoute: typeof TermosRoute
+  TermsRoute: typeof TermsRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
@@ -266,6 +305,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/deletion': {
+      id: '/deletion'
+      path: '/deletion'
+      fullPath: '/deletion'
+      preLoaderRoute: typeof DeletionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacidade': {
       id: '/privacidade'
       path: '/privacidade'
@@ -273,11 +319,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/termos': {
       id: '/termos'
       path: '/termos'
       fullPath: '/termos'
       preLoaderRoute: typeof TermosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/automacoes': {
@@ -413,8 +473,11 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  DeletionRoute: DeletionRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  PrivacyRoute: PrivacyRoute,
   TermosRoute: TermosRoute,
+  TermsRoute: TermsRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRecuperarRoute: AuthRecuperarRoute,
   AuthRegistoRoute: AuthRegistoRoute,
