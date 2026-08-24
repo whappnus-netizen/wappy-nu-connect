@@ -77,44 +77,92 @@ export async function metaTokenForNumber(numberId: string): Promise<string> {
   return token;
 }
 
-const GRAPH = "https://graph.facebook.com/v21.0";
-
-/** Confirma na Graph API que o Phone Number ID + token existem e são válidos. */
+/** Confirma que o Phone Number ID + token são válidos (via provider activo). */
 export async function verifyMetaNumber(phoneNumberId: string, token: string) {
-  const res = await fetch(`${GRAPH}/${phoneNumberId}?fields=id,display_phone_number,verified_name,quality_rating`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const json = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    const message =
-      ((json["error"] as { message?: string } | undefined)?.message) ?? `Graph API respondeu ${res.status}`;
-    throw new Error(`Meta: ${message}`);
-  }
-  return json as { id: string; display_phone_number?: string; verified_name?: string; quality_rating?: string };
+  const { whatsappProvider } = await import("./whatsapp/provider.server");
+  const info = await whatsappProvider().verifyNumber(phoneNumberId, token);
+  return {
+    id: info.id,
+    display_phone_number: info.displayPhoneNumber ?? undefined,
+    verified_name: info.verifiedName ?? undefined,
+    quality_rating: info.qualityRating ?? undefined,
+  };
 }
 
-/** Envia mensagem de texto pelo WhatsApp Cloud API oficial. */
+/** Envia mensagem de texto pelo provider activo (Meta oficial ou mock). */
 export async function sendMetaText(phoneNumberId: string, token: string, to: string, body: string) {
-  const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: to.replace(/^\+/, ""),
-      type: "text",
-      text: { preview_url: false, body },
-    }),
-  });
-  const json = (await res.json()) as Record<string, unknown>;
-  if (!res.ok) {
-    const message =
-      ((json["error"] as { message?: string } | undefined)?.message) ?? `Graph API respondeu ${res.status}`;
-    throw new Error(`Meta: ${message}`);
-  }
-  const waId = (json["messages"] as Array<{ id?: string }> | undefined)?.[0]?.id ?? null;
-  return { waMessageId: waId };
+  const { whatsappProvider } = await import("./whatsapp/provider.server");
+  return whatsappProvider().sendText({ phoneNumberId, token, to, body });
 }
+
+/**
+ * Worker da fila (outbox): reserva atomicamente trabalhos `queued` e envia-os
+ * pelo provider activo. Nunca deixa um trabalho preso em `processing`.
+ */
+export async function processMessageJobs(limit = 10) {
+  const admin = serviceClient();
+  const { data, error } = await admin.rpc("claim_message_jobs", { _limit: limit });
+  if (error) throw new Error(`Fila: ${error.message}`);
+
+  type Job = {
+    id: string;
+    organization_id: string;
+    conversation_id: string | null;
+    message_id: string | null;
+    whatsapp_number_id: string | null;
+    job_type: string;
+    payload: { to?: string; body?: string; phone_number_id?: string } | null;
+  };
+  const jobs = (data ?? []) as Job[];
+  let sent = 0;
+  let failed = 0;
+
+  for (const job of jobs) {
+    try {
+      const to = job.payload?.to;
+      const body = job.payload?.body;
+      let phoneNumberId = job.payload?.phone_number_id ?? null;
+
+      if (!phoneNumberId && job.whatsapp_number_id) {
+        const { data: num } = await admin
+          .from("whatsapp_numbers")
+          .select("phone_number_id")
+          .eq("id", job.whatsapp_number_id)
+          .maybeSingle();
+        phoneNumberId = (num as { phone_number_id?: string } | null)?.phone_number_id ?? null;
+      }
+      if (job.job_type !== "send_text") throw new Error(`Tipo de trabalho não suportado: ${job.job_type}`);
+      if (!to || !body || !phoneNumberId || !job.whatsapp_number_id) {
+        throw new Error("Trabalho sem destino, corpo ou número WhatsApp.");
+      }
+
+      const token = await metaTokenForNumber(job.whatsapp_number_id);
+      const result = await sendMetaText(phoneNumberId, token, to, body);
+
+      await admin
+        .from("message_jobs")
+        .update({ status: "sent", processed_at: new Date().toISOString(), last_error: null })
+        .eq("id", job.id);
+      if (job.message_id) {
+        await admin
+          .from("messages")
+          .update({ status: "sent", wa_message_id: result.waMessageId })
+          .eq("id", job.message_id);
+      }
+      sent += 1;
+    } catch (e) {
+      const message = (e as Error).message.slice(0, 500);
+      await admin.from("message_jobs").update({ status: "queued", last_error: message }).eq("id", job.id);
+      if (job.message_id) {
+        await admin.from("messages").update({ status: "failed" }).eq("id", job.message_id);
+      }
+      failed += 1;
+    }
+  }
+
+  return { claimed: jobs.length, sent, failed };
+}
+
 
 /** Valida a assinatura X-Hub-Signature-256 do webhook da Meta. */
 export async function verifyWebhookSignature(rawBody: string, signature: string | null): Promise<boolean> {
