@@ -1,0 +1,17 @@
+{
+  "name": "wappy-nus-qr-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Serviço de sessões WhatsApp por QR Code (Baileys) do Wappy Nus. Hospedado separadamente da app.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -30,6 +30,7 @@ import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
+import { Route as ApiPublicWhatsappQrEventsRouteImport } from './routes/api/public/whatsapp.qr.events'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -136,6 +137,12 @@ const ApiPublicWhatsappWebhookRoute =
     path: '/api/public/whatsapp/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWhatsappQrEventsRoute =
+  ApiPublicWhatsappQrEventsRouteImport.update({
+    id: '/api/public/whatsapp/qr/events',
+    path: '/api/public/whatsapp/qr/events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -180,6 +188,7 @@ export interface FileRoutesByTo {
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -204,6 +213,7 @@ export interface FileRoutesById {
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
+  '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/whatsapp/webhook'
+    | '/api/public/whatsapp/qr/events'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/whatsapp/webhook'
+    | '/api/public/whatsapp/qr/events'
   id:
     | '__root__'
     | '/'
@@ -273,6 +285,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/whatsapp/webhook'
+    | '/api/public/whatsapp/qr/events'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -287,6 +300,7 @@ export interface RootRouteChildren {
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
+  ApiPublicWhatsappQrEventsRoute: typeof ApiPublicWhatsappQrEventsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -438,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/whatsapp/qr/events': {
+      id: '/api/public/whatsapp/qr/events'
+      path: '/api/public/whatsapp/qr/events'
+      fullPath: '/api/public/whatsapp/qr/events'
+      preLoaderRoute: typeof ApiPublicWhatsappQrEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -482,6 +503,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRecuperarRoute: AuthRecuperarRoute,
   AuthRegistoRoute: AuthRegistoRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
+  ApiPublicWhatsappQrEventsRoute: ApiPublicWhatsappQrEventsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
