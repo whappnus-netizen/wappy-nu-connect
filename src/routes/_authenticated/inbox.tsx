@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
 import { sendWhatsAppMessage } from "@/lib/whatsapp.functions";
+import { setConversationAi } from "@/lib/whatsapp.qr.functions";
+import { Switch } from "@/components/ui/switch";
+
 
 export const Route = createFileRoute("/_authenticated/inbox")({
   head: () => ({
@@ -33,6 +36,10 @@ type Conversation = {
   last_message_at: string | null;
   contact_id: string | null;
   whatsapp_number_id: string | null;
+  ai_enabled: boolean | null;
+  assigned_to: string | null;
+  whatsapp_numbers: { provider: string | null } | null;
+
   contacts: { full_name: string | null; phone_e164: string } | null;
 };
 
@@ -65,7 +72,10 @@ function InboxPage() {
     queryFn: async () => {
       let q = supabase
         .from("conversations")
-        .select("id, status, priority, last_message_at, contact_id, whatsapp_number_id, contacts(full_name, phone_e164)")
+        .select(
+          "id, status, priority, last_message_at, contact_id, whatsapp_number_id, ai_enabled, assigned_to, contacts(full_name, phone_e164), whatsapp_numbers(provider)",
+        )
+
         .eq("organization_id", orgId!)
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(50);
