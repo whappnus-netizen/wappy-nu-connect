@@ -144,6 +144,16 @@ function InboxPage() {
     onError: (e: Error) => setError(e.message),
   });
 
+  // 13. Controle humano: liga/desliga a IA automática nesta conversa.
+  const setAiFn = useServerFn(setConversationAi);
+  const toggleAi = useMutation({
+    mutationFn: async (enabled: boolean) =>
+      setAiFn({ data: { organizationId: orgId!, conversationId: selected!, enabled } }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] }),
+    onError: (e: Error) => setError(e.message),
+  });
+
+
   const closeConversation = useMutation({
     mutationFn: async () => {
       const { error: err } = await supabase
@@ -285,7 +295,11 @@ function InboxPage() {
                 <Send className="size-4" /> {send.isPending ? "A enviar…" : "Enviar"}
               </Button>
               <span className="text-xs text-muted-foreground">
-                Envio pela WhatsApp Cloud API oficial (janela de 24h aplica-se).
+                {active?.whatsapp_numbers?.provider === "qr"
+                  ? "Envio pela ligação WhatsApp — QR (não oficial da Meta)."
+                  : "Envio pela WhatsApp Cloud API oficial (janela de 24h aplica-se)."}
+              </span>
+
               </span>
             </div>
           </div>
