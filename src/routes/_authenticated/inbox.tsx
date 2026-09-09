@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
 import { sendWhatsAppMessage } from "@/lib/whatsapp.functions";
+import { setConversationAi } from "@/lib/whatsapp.qr.functions";
+import { Switch } from "@/components/ui/switch";
+
 
 export const Route = createFileRoute("/_authenticated/inbox")({
   head: () => ({
@@ -33,6 +36,10 @@ type Conversation = {
   last_message_at: string | null;
   contact_id: string | null;
   whatsapp_number_id: string | null;
+  ai_enabled: boolean | null;
+  assigned_to: string | null;
+  whatsapp_numbers: { provider: string | null } | null;
+
   contacts: { full_name: string | null; phone_e164: string } | null;
 };
 
@@ -65,7 +72,10 @@ function InboxPage() {
     queryFn: async () => {
       let q = supabase
         .from("conversations")
-        .select("id, status, priority, last_message_at, contact_id, whatsapp_number_id, contacts(full_name, phone_e164)")
+        .select(
+          "id, status, priority, last_message_at, contact_id, whatsapp_number_id, ai_enabled, assigned_to, contacts(full_name, phone_e164), whatsapp_numbers(provider)",
+        )
+
         .eq("organization_id", orgId!)
         .order("last_message_at", { ascending: false, nullsFirst: false })
         .limit(50);
@@ -133,6 +143,16 @@ function InboxPage() {
     },
     onError: (e: Error) => setError(e.message),
   });
+
+  // 13. Controle humano: liga/desliga a IA automática nesta conversa.
+  const setAiFn = useServerFn(setConversationAi);
+  const toggleAi = useMutation({
+    mutationFn: async (enabled: boolean) =>
+      setAiFn({ data: { organizationId: orgId!, conversationId: selected!, enabled } }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] }),
+    onError: (e: Error) => setError(e.message),
+  });
+
 
   const closeConversation = useMutation({
     mutationFn: async () => {
@@ -275,7 +295,9 @@ function InboxPage() {
                 <Send className="size-4" /> {send.isPending ? "A enviar…" : "Enviar"}
               </Button>
               <span className="text-xs text-muted-foreground">
-                Envio pela WhatsApp Cloud API oficial (janela de 24h aplica-se).
+                {active?.whatsapp_numbers?.provider === "qr"
+                  ? "Envio pela ligação WhatsApp — QR (não oficial da Meta)."
+                  : "Envio pela WhatsApp Cloud API oficial (janela de 24h aplica-se)."}
               </span>
             </div>
           </div>
@@ -287,9 +309,30 @@ function InboxPage() {
             <div className="space-y-1 text-sm">
               <p className="font-medium">{active.contacts?.full_name ?? "Sem nome"}</p>
               <p className="text-muted-foreground">{active.contacts?.phone_e164}</p>
+              <Badge variant="secondary" className="text-[10px]">
+                {active.whatsapp_numbers?.provider === "qr" ? "WhatsApp — QR" : "WhatsApp — Cloud API"}
+              </Badge>
               <p className="text-xs text-muted-foreground">
                 Estado: {active.status} · Prioridade: {active.priority}
               </p>
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-xs font-medium">IA automática</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {active.assigned_to
+                      ? "Atendimento humano activo"
+                      : active.ai_enabled
+                        ? "A IA responde automaticamente"
+                        : "As mensagens ficam só na caixa de entrada"}
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(active.ai_enabled)}
+                  disabled={toggleAi.isPending}
+                  onCheckedChange={(v) => toggleAi.mutate(v)}
+                />
+              </div>
+
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Sem conversa selecionada.</p>
