@@ -121,9 +121,8 @@ export const sendWhatsAppMessage = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { requireOrgRole, serviceClient, metaTokenForNumber, sendMetaText } = await import(
-      "./whatsapp.server"
-    );
+    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    const { sendOutgoingMessage } = await import("./whatsapp/pipeline.server");
     const { userId } = await requireOrgRole(data.organizationId, [
       "OWNER",
       "ADMIN",
@@ -134,47 +133,25 @@ export const sendWhatsAppMessage = createServerFn({ method: "POST" })
     const admin = serviceClient();
     const { data: conv, error } = await admin
       .from("conversations")
-      .select("id, whatsapp_number_id, contacts(phone_e164), whatsapp_numbers(phone_number_id)")
+      .select("id, whatsapp_number_id")
       .eq("id", data.conversationId)
       .eq("organization_id", data.organizationId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!conv) throw new Error("Conversa não encontrada nesta organização.");
 
-    const c = conv as unknown as {
-      whatsapp_number_id: string | null;
-      contacts: { phone_e164: string } | null;
-      whatsapp_numbers: { phone_number_id: string | null } | null;
-    };
-    if (!c.contacts?.phone_e164) throw new Error("Conversa sem contacto com telefone.");
-    if (!c.whatsapp_number_id || !c.whatsapp_numbers?.phone_number_id) {
-      throw new Error("Conversa sem número WhatsApp ligado.");
-    }
+    const numberId = (conv as { whatsapp_number_id: string | null }).whatsapp_number_id;
+    if (!numberId) throw new Error("Conversa sem número WhatsApp ligado.");
 
-    const token = await metaTokenForNumber(c.whatsapp_number_id);
-    const sent = await sendMetaText(
-      c.whatsapp_numbers.phone_number_id,
-      token,
-      c.contacts.phone_e164,
-      data.body,
-    );
-
-    const { error: insErr } = await admin.from("messages").insert({
-      organization_id: data.organizationId,
-      conversation_id: data.conversationId,
-      direction: "outbound",
-      message_type: "text",
+    // Envio pelo provedor do próprio número: Cloud API oficial ou QR Code.
+    const sent = await sendOutgoingMessage({
+      organizationId: data.organizationId,
+      whatsappNumberId: numberId,
+      conversationId: data.conversationId,
       body: data.body,
-      status: "sent",
-      wa_message_id: sent.waMessageId,
-      sent_by: userId,
+      sentBy: userId,
     });
-    if (insErr) throw new Error(`Mensagem enviada mas não gravada: ${insErr.message}`);
 
-    await admin
-      .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", data.conversationId);
-
-    return { ok: true, waMessageId: sent.waMessageId };
+    return { ok: true, waMessageId: sent.waMessageId, provider: sent.provider };
   });
+
