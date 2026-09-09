@@ -299,8 +299,6 @@ function InboxPage() {
                   ? "Envio pela ligação WhatsApp — QR (não oficial da Meta)."
                   : "Envio pela WhatsApp Cloud API oficial (janela de 24h aplica-se)."}
               </span>
-
-              </span>
             </div>
           </div>
         </section>
@@ -311,9 +309,30 @@ function InboxPage() {
             <div className="space-y-1 text-sm">
               <p className="font-medium">{active.contacts?.full_name ?? "Sem nome"}</p>
               <p className="text-muted-foreground">{active.contacts?.phone_e164}</p>
+              <Badge variant="secondary" className="text-[10px]">
+                {active.whatsapp_numbers?.provider === "qr" ? "WhatsApp — QR" : "WhatsApp — Cloud API"}
+              </Badge>
               <p className="text-xs text-muted-foreground">
                 Estado: {active.status} · Prioridade: {active.priority}
               </p>
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-xs font-medium">IA automática</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {active.assigned_to
+                      ? "Atendimento humano activo"
+                      : active.ai_enabled
+                        ? "A IA responde automaticamente"
+                        : "As mensagens ficam só na caixa de entrada"}
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(active.ai_enabled)}
+                  disabled={toggleAi.isPending}
+                  onCheckedChange={(v) => toggleAi.mutate(v)}
+                />
+              </div>
+
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Sem conversa selecionada.</p>
