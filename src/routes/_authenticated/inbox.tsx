@@ -170,12 +170,13 @@ function InboxPage() {
     onError: (e: Error) => setError(e.message),
   });
 
+  // 13. Ao assumir o atendimento, a IA automática desliga-se nesta conversa.
   const claim = useMutation({
     mutationFn: async () => {
       const { data: user } = await supabase.auth.getUser();
       const { error: err } = await supabase
         .from("conversations")
-        .update({ assigned_to: user.user?.id ?? null, status: "in_progress" })
+        .update({ assigned_to: user.user?.id ?? null, status: "in_progress", ai_enabled: false })
         .eq("id", selected!)
         .eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
