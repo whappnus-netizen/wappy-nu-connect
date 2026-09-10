@@ -253,6 +253,8 @@ declare
   conv public.conversations;
   msg_id uuid;
   v_auto boolean := false;
+  dup_conv uuid;
+  dup_contact uuid;
 begin
   select * into num from public.whatsapp_numbers
    where id = _whatsapp_number_id and deleted_at is null;
@@ -262,10 +264,10 @@ begin
 
   if _wa_message_id is not null
      and exists (select 1 from public.messages where wa_message_id = _wa_message_id) then
-    select m.conversation_id, m.contact_id into conv.id, contact_row.id
+    select m.conversation_id, m.contact_id into dup_conv, dup_contact
       from public.messages m where m.wa_message_id = _wa_message_id limit 1;
     return json_build_object('ok', true, 'duplicate', true,
-      'conversation_id', conv.id, 'contact_id', contact_row.id);
+      'conversation_id', dup_conv, 'contact_id', dup_contact);
   end if;
 
   phone := case when left(_from_wa_id, 1) = '+' then _from_wa_id else '+' || _from_wa_id end;
