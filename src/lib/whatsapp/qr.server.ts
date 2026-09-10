@@ -64,14 +64,15 @@ async function bridgeFetch<T>(
   const { url, secret } = bridgeConfig();
   let res: Response;
   try {
-    res = await fetch(`${url}${path}`, {
+    const request: RequestInit = {
       method: init.method,
       headers: {
         authorization: `Bearer ${secret}`,
         "content-type": "application/json",
       },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    });
+    };
+    if (init.body !== undefined) request.body = JSON.stringify(init.body);
+    res = await fetch(`${url}${path}`, request);
   } catch (e) {
     throw new Error(`Serviço de sessões WhatsApp inacessível: ${(e as Error).message}`);
   }
