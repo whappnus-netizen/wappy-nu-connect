@@ -80,7 +80,9 @@ export async function metaTokenForNumber(numberId: string): Promise<string> {
 /** Confirma que o Phone Number ID + token são válidos (via provider activo). */
 export async function verifyMetaNumber(phoneNumberId: string, token: string) {
   const { whatsappProvider } = await import("./whatsapp/provider.server");
-  const info = await whatsappProvider().verifyNumber(phoneNumberId, token);
+  const p = whatsappProvider();
+  if (!p.verifyNumber) throw new Error("Provedor activo não suporta verificação de número.");
+  const info = await p.verifyNumber(phoneNumberId, token);
   return {
     id: info.id,
     display_phone_number: info.displayPhoneNumber ?? undefined,
@@ -92,7 +94,9 @@ export async function verifyMetaNumber(phoneNumberId: string, token: string) {
 /** Envia mensagem de texto pelo provider activo (Meta oficial ou mock). */
 export async function sendMetaText(phoneNumberId: string, token: string, to: string, body: string) {
   const { whatsappProvider } = await import("./whatsapp/provider.server");
-  return whatsappProvider().sendText({ phoneNumberId, token, to, body });
+  const p = whatsappProvider();
+  if (!p.sendText) throw new Error("Provedor activo não suporta envio directo.");
+  return p.sendText({ phoneNumberId, token, to, body });
 }
 
 /**

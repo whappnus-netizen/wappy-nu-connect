@@ -15,6 +15,7 @@ import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { countRows } from "@/lib/metrics";
+import { supabase } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -48,6 +49,28 @@ function DashboardPage() {
         countRows("whatsapp_numbers", id),
       ]);
       return { open, pending, active, contacts, deals, automations, numbers };
+    },
+  });
+
+  // Fase 5: estado real da ligação WhatsApp (Cloud API oficial ou QR Code).
+  const { data: waNumbers } = useQuery({
+    queryKey: ["dashboard-wa-numbers", orgId],
+    enabled: Boolean(orgId),
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("whatsapp_numbers")
+        .select("id, display_name, phone_e164, provider, status")
+        .eq("organization_id", orgId!)
+        .order("created_at", { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as {
+        id: string;
+        display_name: string | null;
+        phone_e164: string;
+        provider: string | null;
+        status: string;
+      }[];
     },
   });
 
@@ -99,6 +122,43 @@ function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {waNumbers && waNumbers.length > 0 ? (
+        <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-soft">
+          <h2 className="font-display text-base font-semibold">Ligações WhatsApp</h2>
+          <ul className="mt-3 space-y-2">
+            {waNumbers.map((n) => (
+              <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium">{n.display_name ?? n.phone_e164}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {n.phone_e164} · {n.provider === "qr" ? "QR Code (não oficial)" : "Meta Cloud API"}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-md px-2 py-1 text-xs font-medium ${
+                    n.status === "connected"
+                      ? "bg-primary/10 text-primary"
+                      : n.status === "error"
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  {n.status === "connected"
+                    ? "Conectado"
+                    : n.status === "qr_pending"
+                      ? "À espera do QR"
+                      : n.status === "connecting" || n.status === "reconnecting"
+                        ? "A ligar…"
+                        : n.status === "error"
+                          ? "Erro"
+                          : "Desconectado"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {!data?.numbers ? (
         <div className="mt-6 rounded-xl border border-border bg-card p-6 shadow-soft">
