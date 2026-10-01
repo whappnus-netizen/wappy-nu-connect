@@ -10,6 +10,17 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
+-- 0. GARANTIR COLUNAS BASE EM whatsapp_numbers
+--    (caso a Fase 3 não tenha sido executada por completo)
+-- ---------------------------------------------------------------------
+alter table public.whatsapp_numbers add column if not exists provider text not null default 'meta';
+alter table public.whatsapp_numbers add column if not exists verified_name text;
+alter table public.whatsapp_numbers add column if not exists last_error text;
+alter table public.whatsapp_numbers add column if not exists connected_at timestamptz;
+alter table public.whatsapp_numbers add column if not exists disconnected_at timestamptz;
+alter table public.whatsapp_numbers add column if not exists deleted_at timestamptz;
+
+-- ---------------------------------------------------------------------
 -- 1. NÚMEROS — aceitar o provedor QR e os estados da ligação por QR
 -- ---------------------------------------------------------------------
 alter table public.whatsapp_numbers
