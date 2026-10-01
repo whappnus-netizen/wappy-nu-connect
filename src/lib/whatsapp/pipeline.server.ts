@@ -75,11 +75,11 @@ async function loadNumber(whatsappNumberId: string): Promise<NumberRow> {
 export type IngestOutcome = {
   ok: boolean;
   duplicate: boolean;
-  reason?: string;
-  conversationId?: string;
-  contactId?: string;
+  reason?: string | undefined;
+  conversationId?: string | undefined;
+  contactId?: string | undefined;
   aiReplied: boolean;
-  aiSkippedReason?: string;
+  aiSkippedReason?: string | undefined;
 };
 
 /**
