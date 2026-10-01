@@ -48,7 +48,7 @@ export type SendMessageInput = SessionRef & {
   to: string;
   body: string;
   /** Só o provedor Meta usa estes campos. */
-  meta?: { phoneNumberId: string; token: string };
+  meta?: { phoneNumberId: string; token: string } | undefined;
 };
 
 export type SendResult = {
