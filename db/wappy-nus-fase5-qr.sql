@@ -44,10 +44,9 @@ create index if not exists idx_messages_ai_rate
 
 -- ---------------------------------------------------------------------
 -- 3. SESSÕES QR (tabela nova 1/2)
---    session_data é server-only: nunca é lida pelo browser (RLS abaixo
---    dá SELECT a membros, por isso as credenciais ficam noutra coluna
---    protegida por uma view? não — aqui optamos por NÃO guardar
---    credenciais na base de dados: o bridge guarda-as no seu volume.)
+--    Nenhuma credencial de sessão é guardada aqui: as credenciais do
+--    WhatsApp ficam apenas no volume do serviço de sessões (bridge).
+--    Esta tabela guarda só estado, QR temporário e metadados públicos.
 -- ---------------------------------------------------------------------
 create table if not exists public.whatsapp_sessions (
   id uuid primary key default gen_random_uuid(),
