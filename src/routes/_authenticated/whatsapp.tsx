@@ -199,7 +199,7 @@ function WhatsAppPage() {
   });
 
   const startQr = useMutation({
-    mutationFn: async (form: { displayName: string; phoneE164: string }) =>
+    mutationFn: async (form: { displayName?: string; phoneE164?: string }) =>
       startQrFn({ data: { organizationId: orgId!, ...form } }),
     onSuccess: (res) => {
       setError(res.error ?? null);
@@ -276,8 +276,8 @@ function WhatsAppPage() {
           <Button size="sm" variant="outline" disabled={!orgId || !canManage} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
-          <Button size="sm" disabled={!orgId || !canManage} onClick={() => setMethod("qr")}>
-            <QrCode className="size-4" /> Conectar por QR Code
+          <Button size="sm" disabled={!orgId || !canManage || startQr.isPending} onClick={() => startQr.mutate({})}>
+            <QrCode className="size-4" /> {startQr.isPending ? "A gerar QR…" : "Conectar por QR Code"}
           </Button>
         </div>
       }
