@@ -97,6 +97,17 @@ export const Route = createFileRoute("/api/public/whatsapp/qr/events")({
           });
         }
 
+        // Substitui o número provisório pelo número real do telemóvel escaneado.
+        if (event === "connected" && payload.phoneNumber) {
+          const update: Record<string, string> = { phone_e164: payload.phoneNumber };
+          if (payload.displayName) update["display_name"] = payload.displayName;
+          await admin
+            .from("whatsapp_numbers")
+            .update(update)
+            .eq("id", whatsappNumberId)
+            .eq("organization_id", organizationId);
+        }
+
         const logType =
           event === "qr"
             ? "qr_generated"

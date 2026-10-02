@@ -18,8 +18,8 @@ export const startQrSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     orgOnly
       .extend({
-        displayName: z.string().trim().min(2).max(80),
-        phoneE164: phone,
+        displayName: z.string().trim().min(2).max(80).optional(),
+        phoneE164: phone.optional(),
       })
       .parse(input),
   )
@@ -31,14 +31,31 @@ export const startQrSession = createServerFn({ method: "POST" })
 
     const admin = serviceClient();
 
+    // Sem formulário: o número real só é conhecido depois de escanear o QR.
+    // Reutiliza um número QR ainda não ligado, ou cria um provisório.
+    let phoneE164 = data.phoneE164;
+    if (!phoneE164) {
+      const { data: pending } = await admin
+        .from("whatsapp_numbers")
+        .select("phone_e164")
+        .eq("organization_id", data.organizationId)
+        .eq("provider", "qr")
+        .neq("status", "connected")
+        .limit(1)
+        .maybeSingle();
+      phoneE164 =
+        (pending as { phone_e164?: string } | null)?.phone_e164 ??
+        `+000${Date.now().toString().slice(-10)}`;
+    }
+
     // Número (reutiliza whatsapp_numbers — nada de tabela paralela).
     const { data: numberRow, error: numErr } = await admin
       .from("whatsapp_numbers")
       .upsert(
         {
           organization_id: data.organizationId,
-          display_name: data.displayName,
-          phone_e164: data.phoneE164,
+          display_name: data.displayName ?? "WhatsApp (QR Code)",
+          phone_e164: phoneE164,
           provider: "qr",
           status: "connecting",
         },
