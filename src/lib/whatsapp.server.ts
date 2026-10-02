@@ -15,10 +15,12 @@ export function supabaseUrl(): string {
   return process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? FALLBACK_URL;
 }
 
+// Chave pública (anon) do Supabase externo — pública por natureza, segura no código.
+const FALLBACK_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljcWtvYWZoaXR1ZGFxeWxubmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NDg4ODcsImV4cCI6MjEwMjMyNDg4N30.WJXVq331fm_aV222EJIWs3WXrYTMBxzoIgVsyA8rxao";
+
 function anonKey(): string {
-  const key = process.env["SUPABASE_ANON_KEY"] ?? process.env["VITE_SUPABASE_ANON_KEY"];
-  if (!key) throw new Error("SUPABASE_ANON_KEY não está configurada no servidor.");
-  return key;
+  return process.env["SUPABASE_ANON_KEY"] ?? process.env["VITE_SUPABASE_ANON_KEY"] ?? FALLBACK_ANON_KEY;
 }
 
 /** Cliente com service_role: só para webhook e operações privilegiadas verificadas. */
