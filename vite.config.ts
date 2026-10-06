@@ -18,5 +18,11 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    define: {
+      "import.meta.env.SUPABASE_URL": JSON.stringify(process.env["SUPABASE_URL"]),
+      "import.meta.env.SUPABASE_ANON_KEY": JSON.stringify(process.env["SUPABASE_ANON_KEY"]),
+    },
+  },
   ...(isNetlifyBuild && { nitro: false, plugins: [netlify()] }),
 });
