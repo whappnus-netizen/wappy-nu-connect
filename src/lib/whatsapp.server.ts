@@ -8,25 +8,14 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getRequestHeader } from "@tanstack/react-start/server";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase/client";
 
 export function supabaseUrl(): string {
-  const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
-  if (!url) {
-    throw new Error(
-      "SUPABASE_URL não está configurada no servidor. Adicione-a nas variáveis de ambiente.",
-    );
-  }
-  return url;
+  return process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || SUPABASE_URL;
 }
 
 function anonKey(): string {
-  const key = process.env["SUPABASE_ANON_KEY"] ?? process.env["VITE_SUPABASE_ANON_KEY"];
-  if (!key) {
-    throw new Error(
-      "SUPABASE_ANON_KEY não está configurada no servidor. Adicione-a nas variáveis de ambiente.",
-    );
-  }
-  return key;
+  return process.env["SUPABASE_ANON_KEY"] || process.env["VITE_SUPABASE_ANON_KEY"] || SUPABASE_ANON_KEY;
 }
 
 /** Cliente com service_role: só para webhook e operações privilegiadas verificadas. */
