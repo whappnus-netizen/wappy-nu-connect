@@ -9,13 +9,19 @@ import { createClient } from "@supabase/supabase-js";
  *
  * Configuração: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.
  */
-export const SUPABASE_URL =
-  (import.meta.env["VITE_SUPABASE_URL"] as string | undefined) ??
-  "https://icqkoafhitudaqylnnfd.supabase.co";
+const SUPABASE_URL =
+  import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
 
-export const SUPABASE_ANON_KEY =
-  (import.meta.env["VITE_SUPABASE_ANON_KEY"] as string | undefined) ??
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljcWtvYWZoaXR1ZGFxeWxubmZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NDg4ODcsImV4cCI6MjEwMjMyNDg4N30.WJXVq331fm_aV222EJIWs3WXrYTMBxzoIgVsyA8rxao";
+const SUPABASE_ANON_KEY =
+  import.meta.env["VITE_SUPABASE_ANON_KEY"] as string | undefined;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    "Supabase configuration is missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.",
+  );
+}
+
+export { SUPABASE_URL, SUPABASE_ANON_KEY };
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
