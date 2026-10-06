@@ -40,7 +40,7 @@ function OnboardingPage() {
     e.preventDefault();
     setTechnicalError(null);
 
-    if (!SUPABASE_URL.includes("icqkoafhitudaqylnnfd.supabase.co")) {
+    if (!(SUPABASE_URL ?? "").includes("icqkoafhitudaqylnnfd.supabase.co")) {
       const message = `Configuração inválida: o frontend não está ligado ao projeto externo icqkoafhitudaqylnnfd.`;
       console.error("[Wappy Nus] Supabase externo incorreto", { supabaseUrl: SUPABASE_URL });
       setTechnicalError(message);
