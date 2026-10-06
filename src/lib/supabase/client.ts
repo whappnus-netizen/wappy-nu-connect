@@ -7,17 +7,17 @@ import { createClient } from "@supabase/supabase-js";
  * A service_role key NUNCA deve aparecer aqui: operações privilegiadas
  * pertencem a Edge Functions / ambiente server-side.
  *
- * Configuração: defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.
+ * Configuração: defina SUPABASE_URL e SUPABASE_ANON_KEY no ambiente de execução.
  */
 const SUPABASE_URL =
-  import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
+  import.meta.env["SUPABASE_URL"] as string | undefined;
 
 const SUPABASE_ANON_KEY =
-  import.meta.env["VITE_SUPABASE_ANON_KEY"] as string | undefined;
+  import.meta.env["SUPABASE_ANON_KEY"] as string | undefined;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(
-    "Supabase configuration is missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.",
+    "Supabase configuration is missing. Set SUPABASE_URL and SUPABASE_ANON_KEY in the deployment environment.",
   );
 }
 
