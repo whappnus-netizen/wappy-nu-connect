@@ -60,7 +60,7 @@ export const startQrSession = createServerFn({ method: "POST" })
         .insert({
           organization_id: data.organizationId,
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          phone_e164: data.phoneE164 ?? null,
+          phone_e164: null,
           provider: "qr",
           status: "connecting",
         })
