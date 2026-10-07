@@ -31,40 +31,62 @@ export const startQrSession = createServerFn({ method: "POST" })
 
     const admin = serviceClient();
 
-    // Sem formulário: o número real só é conhecido depois de escanear o QR.
-    // Reutiliza um número QR ainda não ligado, ou cria um provisório.
-    let phoneE164 = data.phoneE164;
-    if (!phoneE164) {
-      const { data: pending } = await admin
-        .from("whatsapp_numbers")
-        .select("phone_e164")
-        .eq("organization_id", data.organizationId)
-        .eq("provider", "qr")
-        .neq("status", "connected")
-        .limit(1)
-        .maybeSingle();
-      phoneE164 =
-        (pending as { phone_e164?: string } | null)?.phone_e164 ??
-        `+000${Date.now().toString().slice(-10)}`;
-    }
+    // No QR Code o telefone real só existe depois de o WhatsApp ser autenticado.
+    // Nunca usamos telefone falso. Se já houver uma sessão QR pendente sem telefone,
+    // reutilizamo-la; caso contrário criamos um whatsapp_number com phone_e164 = null.
+    let numberId: string;
 
-    // Número (reutiliza whatsapp_numbers — nada de tabela paralela).
-    const { data: numberRow, error: numErr } = await admin
+    const { data: pendingNumber, error: pendingErr } = await admin
       .from("whatsapp_numbers")
-      .upsert(
-        {
+      .select("id")
+      .eq("organization_id", data.organizationId)
+      .eq("provider", "qr")
+      .is("phone_e164", null)
+      .in("status", ["pending", "connecting", "qr_pending", "reconnecting"])
+      .limit(1)
+      .maybeSingle();
+
+    if (pendingErr) throw new Error(`Base de dados: ${pendingErr.message}`);
+
+    if (pendingNumber) {
+      numberId = (pendingNumber as { id: string }).id;
+      const { error: updateErr } = await admin
+        .from("whatsapp_numbers")
+        .update({
+          display_name: data.displayName ?? "WhatsApp (QR Code)",
+          status: "connecting",
+          last_error: null,
+        })
+        .eq("id", numberId)
+        .eq("organization_id", data.organizationId);
+      if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
+    } else {
+      const { data: createdNumber, error: createErr } = await admin
+        .from("whatsapp_numbers")
+        .insert({
           organization_id: data.organizationId,
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          phone_e164: phoneE164,
+          phone_e164: data.phoneE164 ?? null,
           provider: "qr",
           status: "connecting",
-        },
-        { onConflict: "organization_id,phone_e164" },
-      )
-      .select("id, provider")
-      .single();
-    if (numErr) throw new Error(`Base de dados: ${numErr.message}`);
-    const numberId = (numberRow as { id: string }).id;
+        })
+        .select("id")
+        .single();
+
+      if (createErr) throw new Error(`Base de dados: ${createErr.message}`);
+      numberId = (createdNumber as { id: string }).id;
+    }
+
+    // Se o utilizador informou um telefone opcionalmente, ele só é aceite se for E.164.
+    // Mesmo assim, o QR continua a poder descobrir/sobrescrever o número real depois.
+    if (data.phoneE164) {
+      const { error: phoneErr } = await admin
+        .from("whatsapp_numbers")
+        .update({ phone_e164: data.phoneE164 })
+        .eq("id", numberId)
+        .eq("organization_id", data.organizationId);
+      if (phoneErr) throw new Error(`Base de dados: ${phoneErr.message}`);
+    }
 
     // Sessão (uma por organização + número; lock impede duplicados).
     const { data: sessionId, error: sesErr } = await admin.rpc("upsert_whatsapp_session", {
