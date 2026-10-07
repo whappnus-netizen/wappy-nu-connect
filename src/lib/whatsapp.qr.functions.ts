@@ -1,11 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const phone = z
-  .string()
-  .trim()
-  .regex(/^\+[1-9][0-9]{6,15}$/, "Telefone deve estar em formato E.164, ex.: +244912345678");
-
 const orgOnly = z.object({ organizationId: z.string().uuid() });
 const orgNumber = orgOnly.extend({ numberId: z.string().uuid() });
 
