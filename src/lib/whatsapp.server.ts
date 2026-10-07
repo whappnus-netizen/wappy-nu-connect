@@ -8,14 +8,27 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getRequestHeader } from "@tanstack/react-start/server";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./supabase/client";
 
+/**
+ * Configuração Supabase SERVER-ONLY.
+ * Não importar `./supabase/client` aqui: esse módulo é browser-oriented
+ * e pode depender de `import.meta.env` durante o SSR. No servidor usamos
+ * exclusivamente variáveis de ambiente disponíveis no runtime da Netlify.
+ */
 export function supabaseUrl(): string {
-  return process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || SUPABASE_URL;
+  const value = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
+  if (!value) {
+    throw new Error("SUPABASE_URL não está configurada no servidor.");
+  }
+  return value;
 }
 
 function anonKey(): string {
-  return process.env["SUPABASE_ANON_KEY"] || process.env["VITE_SUPABASE_ANON_KEY"] || SUPABASE_ANON_KEY;
+  const value = process.env["SUPABASE_ANON_KEY"] || process.env["VITE_SUPABASE_ANON_KEY"];
+  if (!value) {
+    throw new Error("SUPABASE_ANON_KEY não está configurada no servidor.");
+  }
+  return value;
 }
 
 /** Cliente com service_role: só para webhook e operações privilegiadas verificadas. */
