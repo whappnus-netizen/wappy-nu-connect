@@ -58,7 +58,7 @@ export const Route = createFileRoute("/_authenticated/whatsapp")({
 type WaNumber = {
   id: string;
   display_name: string | null;
-  phone_e164: string;
+  phone_e164: string | null;
   status: string;
   provider: string | null;
   waba_id: string | null;
@@ -258,14 +258,6 @@ function WhatsAppPage() {
     });
   }
 
-  function submitQr(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    startQr.mutate({
-      displayName: String(fd.get("displayName") ?? ""),
-      phoneE164: String(fd.get("phoneE164") ?? "").replace(/\s/g, ""),
-    });
-  }
 
   return (
     <AppShell
@@ -371,7 +363,7 @@ function WhatsAppPage() {
                     </Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {session?.phone_number ?? n.phone_e164}
+                    {session?.phone_number ?? n.phone_e164 ?? "Número será identificado após ler o QR Code"}
                   </p>
                   <p className="mt-1 text-xs font-medium text-primary">
                     Método: {providerLabel[n.provider ?? "meta_cloud"] ?? n.provider}
@@ -507,34 +499,6 @@ function WhatsAppPage() {
             <DialogFooter>
               <Button type="submit" disabled={connect.isPending}>
                 {connect.isPending ? "A validar na Meta…" : "Ligar número"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo: iniciar ligação por QR */}
-      <Dialog open={method === "qr"} onOpenChange={(o) => setMethod(o ? "qr" : null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Conectar WhatsApp por QR Code</DialogTitle>
-            <DialogDescription>
-              Indique o número que vai ligar. A sessão é criada apenas para a organização{" "}
-              <strong>{membership?.organizations?.name ?? "actual"}</strong> e nunca é partilhada.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={submitQr} className="space-y-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="qrDisplayName">Nome de exibição</Label>
-              <Input id="qrDisplayName" name="displayName" placeholder="Atendimento Wappy Nus" required />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="qrPhone">Telefone (E.164)</Label>
-              <Input id="qrPhone" name="phoneE164" placeholder="+244912345678" required />
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={startQr.isPending}>
-                {startQr.isPending ? "A criar sessão…" : "Gerar QR Code"}
               </Button>
             </DialogFooter>
           </form>
