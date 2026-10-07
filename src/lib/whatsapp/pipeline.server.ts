@@ -192,7 +192,6 @@ export async function processIncomingMessage(
 
   try {
     const { generateViaWhappNusAI } = await import("../ai-engine.server");
-    const history = await conversationHistory(res.conversation_id, number.organization_id);
     const { reply } = await generateOrgAiReply(
       number.organization_id,
       incoming.body ?? `[${incoming.messageType}]`,
