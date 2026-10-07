@@ -20,8 +20,8 @@ export default defineConfig({
   },
   vite: {
     define: {
-      "import.meta.env.SUPABASE_URL": JSON.stringify(process.env["SUPABASE_URL"]),
-      "import.meta.env.SUPABASE_ANON_KEY": JSON.stringify(process.env["SUPABASE_ANON_KEY"]),
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(process.env["VITE_SUPABASE_URL"]),
+      "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(process.env["VITE_SUPABASE_ANON_KEY"]),
     },
   },
   ...(isNetlifyBuild && { nitro: false, plugins: [netlify()] }),
