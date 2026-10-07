@@ -19,7 +19,6 @@ export const startQrSession = createServerFn({ method: "POST" })
     orgOnly
       .extend({
         displayName: z.string().trim().min(2).max(80).optional(),
-        phoneE164: phone.optional(),
       })
       .parse(input),
   )
@@ -75,17 +74,6 @@ export const startQrSession = createServerFn({ method: "POST" })
 
       if (createErr) throw new Error(`Base de dados: ${createErr.message}`);
       numberId = (createdNumber as { id: string }).id;
-    }
-
-    // Se o utilizador informou um telefone opcionalmente, ele só é aceite se for E.164.
-    // Mesmo assim, o QR continua a poder descobrir/sobrescrever o número real depois.
-    if (data.phoneE164) {
-      const { error: phoneErr } = await admin
-        .from("whatsapp_numbers")
-        .update({ phone_e164: data.phoneE164 })
-        .eq("id", numberId)
-        .eq("organization_id", data.organizationId);
-      if (phoneErr) throw new Error(`Base de dados: ${phoneErr.message}`);
     }
 
     // Sessão (uma por organização + número; lock impede duplicados).
