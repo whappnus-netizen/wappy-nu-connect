@@ -180,3 +180,5 @@ async function verifySignature(raw: string, header: string | null, secret: strin
   for (let i = 0; i < expected.length; i += 1) diff |= expected.charCodeAt(i) ^ received.charCodeAt(i);
   return diff === 0;
 }
+
+// Deploy trigger: keep bridge authentication compatible with HMAC and Bearer.
