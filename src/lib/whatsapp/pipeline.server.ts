@@ -9,6 +9,7 @@
  * O resto da aplicação (inbox, dashboard, CRM) nunca precisa saber a origem.
  */
 import { serviceClient } from "../whatsapp.server";
+import { generateViaWhappNusAI } from "../ai-engine.server";
 import type { NormalizedIncoming, SessionRef } from "./provider.server";
 import { providerByName } from "./registry.server";
 
@@ -191,18 +192,21 @@ export async function processIncomingMessage(
   }
 
   try {
-    const { generateOrgAiReply } = await import("../ai.server");
-    const history = await conversationHistory(res.conversation_id, number.organization_id);
-    const { reply } = await generateOrgAiReply(
-      number.organization_id,
-      incoming.body ?? `[${incoming.messageType}]`,
-      history,
-    );
+    const ai = await generateViaWhappNusAI({
+      organizationId: number.organization_id,
+      whatsappNumberId: number.id,
+      conversationId: res.conversation_id,
+      contactId: res.contact_id ?? null,
+      messageId: incoming.waMessageId,
+      fromWaId: incoming.fromWaId,
+      profileName: incoming.profileName,
+      text: incoming.body ?? `[${incoming.messageType}]`,
+    });
     await sendOutgoingMessage({
       organizationId: number.organization_id,
       whatsappNumberId: number.id,
       conversationId: res.conversation_id,
-      body: reply,
+      body: ai.text,
       isAi: true,
     });
     return { ...base, aiReplied: true };
