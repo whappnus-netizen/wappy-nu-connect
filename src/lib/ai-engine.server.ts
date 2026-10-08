@@ -23,12 +23,24 @@ type GenerateResult = {
 };
 
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
-  const url = process.env["WHAPPNUS_AI_ENGINE_URL"];
+  const configuredUrl = process.env["WHAPPNUS_AI_ENGINE_URL"];
   const secret = process.env["WHAPPNUS_AI_ENGINE_SECRET"];
-  if (!url) throw new Error("WHAPPNUS_AI_ENGINE_URL não está configurada no servidor.");
+  if (!configuredUrl) throw new Error("WHAPPNUS_AI_ENGINE_URL não está configurada no servidor.");
   if (!secret) throw new Error("WHAPPNUS_AI_ENGINE_SECRET não está configurada no servidor.");
 
-  const response = await fetch(url.replace(/\/$/, "") + "/v1/generate", {
+  // Aceita tanto https://host como host para evitar o erro nativo
+  // "Failed to parse URL" quando a variável foi guardada sem o esquema.
+  const url = /^https?:\/\//i.test(configuredUrl)
+    ? configuredUrl
+    : `https://${configuredUrl}`;
+  let engineUrl: URL;
+  try {
+    engineUrl = new URL(url);
+  } catch {
+    throw new Error("WHAPPNUS_AI_ENGINE_URL inválida.");
+  }
+  engineUrl.pathname = engineUrl.pathname.replace(/\/$/, "");
+  const response = await fetch(engineUrl.toString().replace(/\/$/, "") + "/v1/generate", {
     method: "POST",
     headers: {
       "content-type": "application/json",
