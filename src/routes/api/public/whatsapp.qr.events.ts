@@ -22,8 +22,13 @@ export const Route = createFileRoute("/api/public/whatsapp/qr/events")({
         const secret = process.env["WHATSAPP_QR_BRIDGE_SECRET"];
         if (!secret) return new Response("bridge secret not configured", { status: 503 });
 
-        const ok = await verifySignature(raw, request.headers.get("x-wappy-signature"), secret);
-        if (!ok) return new Response("invalid signature", { status: 401 });
+        // HMAC é o método principal; Bearer é aceito como fallback para
+        // compatibilidade com versões do bridge que enviam Authorization.
+        const signatureOk = await verifySignature(raw, request.headers.get("x-wappy-signature"), secret);
+        const authorization = request.headers.get("authorization") ?? "";
+        const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+        const bearerOk = bearer.length > 0 && timingSafeEqualText(bearer, secret);
+        if (!signatureOk && !bearerOk) return new Response("invalid bridge authentication", { status: 401 });
 
         let payload: BridgeEvent;
         try {
@@ -144,6 +149,16 @@ type BridgeEvent = {
   error?: string | null;
   message?: unknown;
 };
+
+function timingSafeEqualText(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aa = enc.encode(a);
+  const bb = enc.encode(b);
+  if (aa.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aa.length; i += 1) diff |= aa[i] ^ bb[i];
+  return diff === 0;
+}
 
 async function verifySignature(raw: string, header: string | null, secret: string): Promise<boolean> {
   if (!header || !header.startsWith("sha256=")) return false;
