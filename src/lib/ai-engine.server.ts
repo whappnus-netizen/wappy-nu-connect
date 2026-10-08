@@ -46,18 +46,18 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     throw new Error(code);
   }
 
-  if (typeof data.text !== "string" || !data.text.trim()) {
+  if (typeof data["text"] !== "string" || !(data["text"] as string).trim()) {
     throw new Error("AI Engine não devolveu uma resposta válida.");
   }
 
   return {
-    text: data.text.trim(),
-    provider: String(data.provider ?? "unknown"),
-    model: String(data.model ?? "unknown"),
-    intent: String(data.intent ?? "general"),
-    confidence: Number(data.confidence ?? 0),
-    latencyMs: Number(data.latencyMs ?? 0),
-    usedKnowledge: Number(data.usedKnowledge ?? 0),
-    agentId: typeof data.agentId === "string" ? data.agentId : null,
+    text: (data["text"] as string).trim(),
+    provider: String(data["provider"] ?? "unknown"),
+    model: String(data["model"] ?? "unknown"),
+    intent: String(data["intent"] ?? "general"),
+    confidence: Number(data["confidence"] ?? 0),
+    latencyMs: Number(data["latencyMs"] ?? 0),
+    usedKnowledge: Number(data["usedKnowledge"] ?? 0),
+    agentId: typeof data["agentId"] === "string" ? (data["agentId"] as string) : null,
   };
 }
