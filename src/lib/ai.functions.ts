@@ -18,10 +18,36 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { requireOrgRole } = await import("./whatsapp.server");
-    const { generateOrgAiReply } = await import("./ai.server");
+    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    const { generateViaWhappNusAI } = await import("./ai-engine.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN", "SUPERVISOR", "AGENT"]);
-    return generateOrgAiReply(data.organizationId, data.message, data.history ?? []);
+
+    const admin = serviceClient();
+    const { data: number, error } = await admin
+      .from("whatsapp_numbers")
+      .select("id")
+      .eq("organization_id", data.organizationId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!number?.id) throw new Error("Esta organização ainda não tem um WhatsApp conectado.");
+
+    const result = await generateViaWhappNusAI({
+      organizationId: data.organizationId,
+      whatsappNumberId: number.id,
+      text: data.message,
+    });
+    return {
+      reply: result.text,
+      model: result.model,
+      agentName: result.agentId ?? "Mia",
+      provider: result.provider,
+      intent: result.intent,
+      confidence: result.confidence,
+      latencyMs: result.latencyMs,
+      usedKnowledge: result.usedKnowledge,
+    };
   });
 
 /**
@@ -37,10 +63,19 @@ export const draftAiReplyForConversation = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
-    const { generateOrgAiReply } = await import("./ai.server");
+    const { generateViaWhappNusAI } = await import("./ai-engine.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN", "SUPERVISOR", "AGENT"]);
 
     const admin = serviceClient();
+    const { data: conversation, error: conversationError } = await admin
+      .from("conversations")
+      .select("whatsapp_number_id")
+      .eq("organization_id", data.organizationId)
+      .eq("id", data.conversationId)
+      .maybeSingle();
+    if (conversationError) throw new Error(conversationError.message);
+    if (!conversation?.whatsapp_number_id) throw new Error("A conversa não está ligada a um WhatsApp.");
+
     const { data: rows, error } = await admin
       .from("messages")
       .select("direction, body, created_at")
@@ -62,10 +97,20 @@ export const draftAiReplyForConversation = createServerFn({ method: "POST" })
     const last = [...history].reverse().find((m) => m.role === "user");
     if (!last) throw new Error("Conversa sem mensagem do cliente para responder.");
 
-    const result = await generateOrgAiReply(
-      data.organizationId,
-      last.content,
-      history.slice(0, -1),
-    );
-    return result;
+    const result = await generateViaWhappNusAI({
+      organizationId: data.organizationId,
+      whatsappNumberId: conversation.whatsapp_number_id as string,
+      conversationId: data.conversationId,
+      text: last.content,
+    });
+    return {
+      reply: result.text,
+      model: result.model,
+      agentName: result.agentId ?? "Mia",
+      provider: result.provider,
+      intent: result.intent,
+      confidence: result.confidence,
+      latencyMs: result.latencyMs,
+      usedKnowledge: result.usedKnowledge,
+    };
   });
