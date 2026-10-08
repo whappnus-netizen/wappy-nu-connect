@@ -42,7 +42,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   try { data = JSON.parse(raw) as Record<string, unknown>; } catch {}
 
   if (!response.ok) {
-    const code = typeof data.error === "string" ? data.error : "AI_ENGINE_ERROR";
+    const code = typeof data["error"] === "string" ? data["error"] : "AI_ENGINE_ERROR";
     throw new Error(code);
   }
 
