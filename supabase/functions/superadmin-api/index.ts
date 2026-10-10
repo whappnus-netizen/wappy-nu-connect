@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
       (admin.role === "admin" && !["team.promote_owner"].includes(permission)) ||
       admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "dashboard"].includes(permission) ||
       admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "health", "dashboard"].includes(permission) ||
-      permissions["*"] === true || permissions[permission] === true;
+      permissions[permission] === true;
   };
   if (!action) return fail("Ação não especificada.");
   if (!can(action)) return fail("Não tens permissão para esta operação.", 403);
@@ -258,6 +258,7 @@ Deno.serve(async (req: Request) => {
       const role = str(input.role, 30);
       const isActive = input.is_active !== false;
       const permissions = isObject(input.permissions) ? input.permissions : {};
+      if (role !== "owner" && permissions["*"] === true) return fail("A permissão global só pode ser atribuída ao proprietário.");
       if (!userId || !/^[0-9a-fA-F-]{36}$/.test(userId)) return fail("UUID do utilizador inválido.");
       if (!["owner", "admin", "support", "billing"].includes(role)) return fail("Função administrativa inválida.");
       const { data: target, error: targetError } = await db.auth.admin.getUserById(userId);
