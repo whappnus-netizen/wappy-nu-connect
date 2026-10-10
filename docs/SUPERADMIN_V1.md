@@ -1,30 +1,56 @@
-# WhappNus Superadmin v1 — integration notes
+# Wapnus Super Admin v1
 
-## Current architecture confirmed
-- Frontend repository: `whappnus-netizen/wappy-nu-connect` (Netlify site `whappnus1`, custom domain `https://whappnus.online`).
-- External Supabase project: `icqkoafhitudaqylnnfd` (active, EU West 2). Keep this as the source of truth.
-- Railway services: `WhappNus-AI-Engine` and WhatsApp engine remain separate runtime services.
-- Existing public schema already contains organizations, memberships, profiles, WhatsApp sessions/numbers, AI settings/logs, conversations, messages, and activity logs. This migration is additive; it does not recreate those tables.
+## Estado desta entrega
 
-## Superadmin v1 modules
-1. Overview: organization count, active/suspended tenants, active subscriptions, payment failures, WhatsApp connection health, AI errors.
-2. Organizations: search/list, create organization, suspend/reactivate, inspect tenant health. No client-side cross-tenant SQL access.
-3. Subscriptions & plans: monthly/yearly plan catalog, status, period, renewal/cancellation.
-4. Payments: provider reference, amount in AOA, status, idempotency; payment webhooks must verify provider signatures and deduplicate provider event IDs.
-5. WhatsApp: connection state and one-use invitation metadata; never store raw QR credentials/tokens in audit logs.
-6. AI configuration/health: per-tenant agent status, provider/model health, usage and failures without exposing API keys.
-7. Team & audit: scoped staff permissions and immutable audit history.
+- Frontend: rota protegida `/superadmin` em `src/routes/superadmin.tsx`, adicionada sem substituir rotas existentes.
+- Backend administrativo: Supabase Edge Function `superadmin-api`, com JWT obrigatório, validação do utilizador via Supabase Auth e autorização por `public.superadmin_users`.
+- Supabase externo `icqkoafhitudaqylnnfd`: migrações `whappnus_superadmin_v1` e `whappnus_superadmin_v2` aplicadas em 2026-10-10.
+- Dados existentes de conversas, mensagens, sessões e logs não foram recriados nem apagados.
+- A conta do proprietário ainda precisa de ser autorizada em `public.superadmin_users`; não se deve promover um utilizador automaticamente sem confirmar o UUID correto.
 
-## Security boundary (required)
-- The browser may only read its own `superadmin_users` membership and active plan catalog.
-- Every administrative operation must call a Supabase Edge Function (or a private authenticated backend endpoint). That function must validate the user's active superadmin row and role/permission for each action before using the service-role key.
-- Never put `SUPABASE_SERVICE_ROLE_KEY`, payment secrets, AI provider keys, or webhook secrets in Netlify frontend environment variables prefixed with `VITE_` or in browser code.
-- Do not rely on hiding routes or a SPA URL for security. Route visibility is UX only; authorization is enforced on the server and by RLS.
-- Payment webhooks must verify signatures, use idempotency, and only then update `payment_transactions` and `organization_subscriptions`.
-- Use least privilege: support staff cannot change billing; billing staff cannot change owner accounts; only owner can promote another owner.
+## Módulos presentes no frontend
 
-## Migration
-Run `supabase/migrations/20261010_superadmin_v1.sql` manually in the SQL editor of external project `icqkoafhitudaqylnnfd`. Then insert the owner's auth UUID using the bootstrap statement at the bottom of that migration. Do not run the bootstrap until the correct auth user UUID is known.
+1. **Visão geral:** organizações, organizações ativas/suspensas, subscrições ativas, pagamentos com falha, números WhatsApp ligados e erros de IA.
+2. **Organizações:** pesquisa, criação, atribuição opcional de proprietário por UUID, contagens de equipa/WhatsApp/agentes e alteração do estado administrativo.
+3. **Planos:** catálogo em AOA, periodicidade mensal/anual e criação de planos. Planos com preço zero ficam inativos.
+4. **Assinaturas:** estado, valor, plano, organização e período atual.
+5. **Pagamentos:** estado, fornecedor, referência, valor e data de pagamento.
+6. **Saúde operacional:** estado registado das sessões WhatsApp, erros de IA e eventos recentes.
+7. **Auditoria:** ações privilegiadas registadas no servidor.
 
-## Implementation status
-This commit adds the database migration and implementation/security specification. The existing frontend's route/layout source was not discoverable through the connected GitHub code-search index during this run, so no existing route was overwritten blindly. Next safe step is to inspect the current app entry/router and add a protected `/superadmin` route plus Edge Functions for dashboard, organizations, plans, billing, invites, and audit.
+## Segurança
+
+- A interface não consulta diretamente todas as organizações nem as tabelas de pagamentos/auditoria.
+- Todas as ações administrativas passam pela Edge Function autenticada.
+- A Edge Function valida a sessão Supabase e confirma que existe uma linha ativa em `superadmin_users`.
+- As tabelas administrativas mantêm RLS ativado; dados de pagamentos, subscrições, auditoria, convites e credenciais não têm acesso direto para `anon`/ `authenticated`.
+- A chave `service_role` só é usada na Edge Function; nunca deve ser adicionada ao frontend/Netlify com prefixo `VITE_`.
+- Os planos de exemplo têm preço zero e ficam inativos até serem configurados.
+
+## Migrações aplicadas
+
+- `supabase/migrations/20261010_superadmin_v1.sql`: administradores, catálogo de planos, subscrições, transações, auditoria e metadados de convites.
+- `supabase/migrations/20261010_superadmin_v2.sql`: estados administrativos de organização e registos de webhooks/e-mail.
+
+## Limites conhecidos — não confundir estado administrativo com bloqueio operacional
+
+A mudança de estado da organização é registada em `organizations.status`. Nesta entrega, **a alteração de estado ainda não desliga uma sessão Baileys ativa nem garante que o motor WhatsApp/IA recuse todo o tráfego dessa organização**. Isso exige uma integração aditiva e validada nos serviços Railway. Não afirmar que suspender/bloquear já corta a sessão até essa integração ser implementada e testada.
+
+O painel mostra o estado de WhatsApp/IA que está guardado na base de dados; não reinicia serviços Railway nem revela segredos de fornecedores.
+
+## Configuração final do proprietário
+
+Depois de confirmar o UUID correto da conta de login do proprietário, executar uma única vez no SQL Editor:
+
+```sql
+insert into public.superadmin_users (user_id, role, permissions, is_active)
+values ('UUID_CONFIRMADO_DO_PROPRIETARIO'::uuid, 'owner', '{"*": true}'::jsonb, true)
+on conflict (user_id) do update
+set role = 'owner', permissions = '{"*": true}'::jsonb, is_active = true;
+```
+
+Não executar com um UUID de cliente comum. Para outros membros, atribuir apenas as permissões necessárias e não usar `owner`.
+
+## Pagamentos e convites — fase seguinte
+
+As tabelas base para transações, eventos de webhook, convites e logs de e-mail existem. A confirmação de pagamento ainda depende da integração real com o fornecedor: validar assinatura do webhook, deduplicar IDs de evento e atualizar subscrições apenas depois de confirmação válida. O painel não simula pagamentos nem envia e-mails automaticamente.
