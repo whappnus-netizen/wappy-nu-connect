@@ -172,20 +172,20 @@ grant select on public.subscription_plans to authenticated;
 
 -- Seed editable catalog without assuming current commercial prices.
 insert into public.subscription_plans
-  (code, name, description, billing_interval, price_aoa, trial_days, limits, features, sort_order)
+  (code, name, description, billing_interval, price_aoa, trial_days, limits, features, is_active, sort_order)
 values
   ('starter-monthly', 'Starter Mensal', 'Plano mensal base; definir preço antes de vender.', 'monthly', 0, 0,
    '{"whatsapp_numbers":1,"agents":1,"team_members":2}'::jsonb,
-   '{"crm":true,"automations":false,"analytics":false}'::jsonb, 10),
+   '{"crm":true,"automations":false,"analytics":false}'::jsonb, false, 10),
   ('starter-yearly', 'Starter Anual', 'Plano anual base; definir preço antes de vender.', 'yearly', 0, 0,
    '{"whatsapp_numbers":1,"agents":1,"team_members":2}'::jsonb,
-   '{"crm":true,"automations":false,"analytics":false}'::jsonb, 11),
+   '{"crm":true,"automations":false,"analytics":false}'::jsonb, false, 11),
   ('pro-monthly', 'Pro Mensal', 'Plano mensal profissional; definir preço antes de vender.', 'monthly', 0, 0,
    '{"whatsapp_numbers":3,"agents":5,"team_members":10}'::jsonb,
-   '{"crm":true,"automations":true,"analytics":true}'::jsonb, 20),
+   '{"crm":true,"automations":true,"analytics":true}'::jsonb, false, 20),
   ('pro-yearly', 'Pro Anual', 'Plano anual profissional; definir preço antes de vender.', 'yearly', 0, 0,
    '{"whatsapp_numbers":3,"agents":5,"team_members":10}'::jsonb,
-   '{"crm":true,"automations":true,"analytics":true}'::jsonb, 21)
+   '{"crm":true,"automations":true,"analytics":true}'::jsonb, false, 21)
 on conflict (code) do nothing;
 
 commit;
