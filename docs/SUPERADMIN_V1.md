@@ -31,6 +31,7 @@
 
 - `supabase/migrations/20261010_superadmin_v1.sql`: administradores, catálogo de planos, subscrições, transações, auditoria e metadados de convites.
 - `supabase/migrations/20261010_superadmin_v2.sql`: estados administrativos de organização e registos de webhooks/e-mail.
+- `supabase/migrations/20261010_superadmin_v3.sql`: revoga a leitura do catálogo de planos para utilizadores anónimos e mantém apenas leitura autenticada.
 
 ## Limites conhecidos — não confundir estado administrativo com bloqueio operacional
 
