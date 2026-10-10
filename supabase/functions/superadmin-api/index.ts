@@ -65,6 +65,7 @@ Deno.serve(async (req: Request) => {
   };
   if (!action) return fail("Ação não especificada.");
   if (!can(action)) return fail("Não tens permissão para esta operação.", 403);
+  if (action === "team.save" && admin.role !== "owner") return fail("Só o proprietário da plataforma pode alterar administradores.", 403);
 
   const audit = async (name: string, targetType: string, targetId: string | null, organizationId: string | null, details: Record<string, unknown> = {}) => {
     const { error } = await db.from("superadmin_audit_logs").insert({
@@ -237,6 +238,46 @@ Deno.serve(async (req: Request) => {
       if (aiLogs.error) throw aiLogs.error;
       if (events.error) throw events.error;
       return json({ ok: true, data: { sessions: sessions.data ?? [], aiLogs: aiLogs.data ?? [], events: events.data ?? [] } });
+    }
+
+
+    if (action === "team.list") {
+      const { data, error } = await db.from("superadmin_users")
+        .select("user_id,role,permissions,is_active,created_at,updated_at,created_by")
+        .order("created_at", { ascending: true }).limit(100);
+      if (error) throw error;
+      const users = await Promise.all((data ?? []).map(async (row: any) => {
+        const { data: result } = await db.auth.admin.getUserById(row.user_id);
+        return { ...row, email: result.user?.email ?? null, full_name: result.user?.user_metadata?.full_name ?? null };
+      }));
+      return json({ ok: true, data: users });
+    }
+
+    if (action === "team.save") {
+      const userId = str(input.user_id, 60);
+      const role = str(input.role, 30);
+      const isActive = input.is_active !== false;
+      const permissions = isObject(input.permissions) ? input.permissions : {};
+      if (!userId || !/^[0-9a-fA-F-]{36}$/.test(userId)) return fail("UUID do utilizador inválido.");
+      if (!["owner", "admin", "support", "billing"].includes(role)) return fail("Função administrativa inválida.");
+      const { data: target, error: targetError } = await db.auth.admin.getUserById(userId);
+      if (targetError || !target.user) return fail("Não foi encontrada uma conta com esse UUID.");
+      if (userId === actor.id && (!isActive || role !== "owner")) return fail("Não podes remover nem despromover a tua própria conta de proprietário.");
+      const { data: current, error: currentError } = await db.from("superadmin_users")
+        .select("user_id,role,is_active").eq("user_id", userId).maybeSingle();
+      if (currentError) throw currentError;
+      if (current?.role === "owner" && current.is_active && (role !== "owner" || !isActive)) {
+        const { count: ownerCount, error: countError } = await db.from("superadmin_users")
+          .select("user_id", { count: "exact", head: true }).eq("role", "owner").eq("is_active", true);
+        if (countError) throw countError;
+        if ((ownerCount ?? 0) <= 1) return fail("A plataforma precisa de manter pelo menos um proprietário ativo.");
+      }
+      const { data, error } = await db.from("superadmin_users").upsert({
+        user_id: userId, role, permissions, is_active: isActive, created_by: current ? undefined : actor.id,
+      }, { onConflict: "user_id" }).select("user_id,role,permissions,is_active,created_at,updated_at,created_by").single();
+      if (error) throw error;
+      await audit(current ? "admin.updated" : "admin.created", "platform_admin", userId, null, { role, is_active: isActive });
+      return json({ ok: true, data: { ...data, email: target.user.email ?? null, full_name: target.user.user_metadata?.full_name ?? null } });
     }
 
     if (action === "audit.list") {
