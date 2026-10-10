@@ -16,7 +16,7 @@
 4. **Assinaturas:** estado, valor, plano, organização e período atual.
 5. **Pagamentos:** estado, fornecedor, referência, valor e data de pagamento.
 6. **Saúde operacional:** estado registado das sessões WhatsApp, erros de IA e eventos recentes.
-7. **Auditoria:** ações privilegiadas registadas no servidor.
+7. **Equipa administrativa:** adicionar/atualizar contas existentes por UUID, funções owner/admin/support/billing e ativação/desativação; só o owner pode alterar membros da equipa.\n8. **Auditoria:** ações privilegiadas registadas no servidor.
 
 ## Segurança
 
