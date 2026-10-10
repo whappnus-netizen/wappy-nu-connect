@@ -20,6 +20,12 @@ export const Route = createFileRoute("/superadmin")({
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth/login" });
+
+    // Do not render the privileged route unless the server authorizes this session.
+    const { data: access, error: accessError } = await supabase.functions.invoke("superadmin-api", {
+      body: { action: "dashboard" },
+    });
+    if (accessError || access?.ok !== true) throw redirect({ to: "/dashboard" });
   },
   head: () => ({ meta: [{ title: "Super Admin — Wapnus" }, { name: "description", content: "Painel de controlo da plataforma Wapnus." }] }),
   component: SuperAdminPage,

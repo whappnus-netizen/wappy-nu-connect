@@ -28,10 +28,20 @@ function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
       toast.error(error.message);
+      return;
+    }
+
+    // Route platform owners to the control center only when the server confirms admin access.
+    // Ordinary customers continue to their existing dashboard.
+    const { data: adminCheck, error: adminError } = await supabase.functions.invoke("superadmin-api", {
+      body: { action: "dashboard" },
+    });
+    if (authData.user && !adminError && adminCheck?.ok === true) {
+      navigate({ to: "/superadmin" });
       return;
     }
     navigate({ to: "/dashboard" });

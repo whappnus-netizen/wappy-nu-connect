@@ -29,6 +29,7 @@ import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticat
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
+import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicWhatsappQrEventsRouteImport } from './routes/api/public/whatsapp.qr.events'
 
@@ -131,6 +132,11 @@ const AuthRegistoRoute = AuthRegistoRouteImport.update({
   path: '/auth/registo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuperadminRoute = SuperadminRouteImport.update({
+  id: '/superadmin',
+  path: '/superadmin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp/webhook',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
+  '/superadmin': typeof SuperadminRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -237,6 +244,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
+    | '/superadmin'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesByTo: FileRoutesByTo
@@ -299,6 +307,7 @@ export interface RootRouteChildren {
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
+  SuperadminRoute: typeof SuperadminRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicWhatsappQrEventsRoute: typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -445,6 +454,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRegistoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/superadmin': {
+      id: '/superadmin'
+      path: '/superadmin'
+      fullPath: '/superadmin'
+      preLoaderRoute: typeof SuperadminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/whatsapp/webhook': {
       id: '/api/public/whatsapp/webhook'
       path: '/api/public/whatsapp/webhook'
@@ -502,6 +518,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthLoginRoute: AuthLoginRoute,
   AuthRecuperarRoute: AuthRecuperarRoute,
   AuthRegistoRoute: AuthRegistoRoute,
+  SuperadminRoute: SuperadminRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicWhatsappQrEventsRoute: ApiPublicWhatsappQrEventsRoute,
 }
