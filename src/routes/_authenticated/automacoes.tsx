@@ -61,7 +61,7 @@ function AutomationsPage() {
         organization_id: orgId,
         name: cleanName,
         description: `Responde quando a mensagem contém: ${cleanKeyword}`,
-        trigger_type: "keyword",
+        trigger_type: "keyword_match",
         conditions: [],
         config: { keyword: cleanKeyword, reply: cleanReply },
         is_active: true,
