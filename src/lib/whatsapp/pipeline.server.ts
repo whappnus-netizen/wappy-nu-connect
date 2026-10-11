@@ -177,12 +177,20 @@ export async function processIncomingMessage(
         const value = rule.config?.["reply"];
         return typeof value === "string" ? value.trim() : "";
       };
-      const keywordRule = activeRules.find((rule) => {
-        if (rule.trigger_type !== "keyword_match") return false;
-        const value = rule.config?.["keyword"];
-        const keyword = typeof value === "string" ? value.trim().toLocaleLowerCase() : "";
-        return keyword.length >= 2 && getReply(rule).length > 0 && inboundText.includes(keyword);
-      });
+      const keywordRule = activeRules
+        .filter((rule) => rule.trigger_type === "keyword_match" && getReply(rule).length > 0)
+        .sort((a, b) => {
+          const aValue = a.config?.["keyword"];
+          const bValue = b.config?.["keyword"];
+          const aKeyword = typeof aValue === "string" ? aValue.trim() : "";
+          const bKeyword = typeof bValue === "string" ? bValue.trim() : "";
+          return bKeyword.length - aKeyword.length;
+        })
+        .find((rule) => {
+          const value = rule.config?.["keyword"];
+          const keyword = typeof value === "string" ? value.trim().toLocaleLowerCase() : "";
+          return keyword.length >= 2 && inboundText.includes(keyword);
+        });
 
       let selectedRule: AutomationRow | undefined = keywordRule;
       let selectedReason = "keyword_automation";
