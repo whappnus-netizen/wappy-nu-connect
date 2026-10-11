@@ -19,3 +19,7 @@ Before merging this feature, the repository TypeScript check and both Netlify pr
 
 ## Automatic distribution
 A `conversation_created` rule can set `config.actionType = 'assign_agent'`. The runtime assigns the first message to the eligible member with the fewest conversations in `open` or `in_progress`, preferring AGENT, then SUPERVISOR, ADMIN, and OWNER. The conversation stays `open` with AI enabled until a human explicitly assumes it; that action changes it to `in_progress` and disables AI.
+
+
+## Automatic CRM opportunities
+A `conversation_created` rule can set `config.actionType = 'create_deal'`. On the first inbound message of a conversation, the runtime creates an opportunity in the first pipeline stage if the contact does not already have an open deal. It uses the organization currency and associates the deal with the auto-assigned member when distribution is enabled. The rule is opt-in; no deals are created automatically until an administrator enables it.
