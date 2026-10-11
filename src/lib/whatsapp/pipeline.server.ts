@@ -345,7 +345,7 @@ export async function processIncomingMessage(
               .eq("direction", "outbound")
               .gte("created_at", cooldownSince)
               .limit(1);
-            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("media_id", cooldownMediaPath);
+            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("wa_media_id", cooldownMediaPath);
             else if (reply) priorReplyQuery = priorReplyQuery.eq("body", reply);
             else continue;
             const { data: priorReply, error: priorReplyError } = await priorReplyQuery.maybeSingle();
@@ -547,8 +547,8 @@ export async function processIncomingMessage(
                   kind: step.kind,
                   storagePath: step.storagePath,
                   mimeType: step.mimeType,
-                  caption: step.caption,
-                  fileName: step.fileName,
+                  ...(step.caption !== undefined ? { caption: step.caption } : {}),
+                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),
                 },
                 isAi: false,
               });
@@ -639,6 +639,29 @@ export async function processIncomingMessage(
       body: ai.text,
       isAi: true,
     });
+
+    // Reações são opcionais por agente e só são enviadas quando a IA identificou
+    // um sinal claro. Uma falha de reação nunca invalida a resposta de texto já enviada.
+    if (ai.reactionEmoji && incoming.waMessageId) {
+      const reactionProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
+      if (reactionProvider.reactToMessage) {
+        try {
+          await reactionProvider.reactToMessage({
+            organizationId: number.organization_id,
+            whatsappNumberId: number.id,
+            to: incoming.fromWaId,
+            waMessageId: incoming.waMessageId,
+            emoji: ai.reactionEmoji,
+          });
+        } catch (reactionError) {
+          await logWhatsAppEvent(number.organization_id, "error", {
+            whatsappNumberId: number.id,
+            provider: incoming.provider,
+            detail: { stage: "ai_reaction", error: (reactionError as Error).message.slice(0, 200) },
+          });
+        }
+      }
+    }
     return { ...base, aiReplied: true };
   } catch (e) {
     await logWhatsAppEvent(number.organization_id, "message_failed", {
@@ -732,26 +755,35 @@ export async function sendOutgoingMessage(input: {
       kind: input.media.kind,
       url: signed.signedUrl,
       mimeType: input.media.mimeType,
-      caption: input.media.caption,
-      fileName: input.media.fileName,
+      ...(input.media.caption !== undefined ? { caption: input.media.caption } : {}),
+      ...(input.media.fileName !== undefined ? { fileName: input.media.fileName } : {}),
       storagePath: input.media.storagePath,
     };
   }
 
   try {
-    const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
-    await admin.from("messages").insert({
+    const sent = await provider.sendMessage({
+      ...ref,
+      to,
+      body: input.body,
+      ...(outgoingMedia ? { media: outgoingMedia } : {}),
+      ...(metaCreds ? { meta: metaCreds } : {}),
+    });
+    const { error: insertMessageError } = await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
       direction: "outbound",
       message_type: input.media?.kind ?? "text",
       body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
-      media_id: input.media?.storagePath ?? null,
+      wa_media_id: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
       sent_by: input.sentBy ?? null,
       is_ai: Boolean(input.isAi),
     });
+    if (insertMessageError) {
+      throw new Error("A mensagem foi enviada pelo WhatsApp, mas não foi registada no Inbox: " + insertMessageError.message);
+    }
     await admin
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })

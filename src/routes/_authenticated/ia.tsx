@@ -63,6 +63,7 @@ type Agent = {
   handoff_instructions: string | null;
   greeting_message: string | null;
   extra_instructions: string | null;
+  config: Record<string, unknown> | null;
 };
 
 type Knowledge = {
@@ -84,7 +85,7 @@ type Example = {
 const AGENT_FIELDS = [
   "id, organization_id, name, model, is_active, goal, company_name, company_description",
   "products_services, business_hours, location, payment_methods, faq, tone",
-  "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions",
+  "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions, config",
 ].join(", ");
 
 const CATEGORIES = [
@@ -330,7 +331,7 @@ function AiPage() {
             </TabsContent>
 
             <TabsContent value="config">
-              <ConfigForm agent={agent} orgId={orgId} />
+              <ConfigForm agent={agent} orgId={orgId} canManage={canManage} />
             </TabsContent>
 
             <TabsContent value="knowledge">
@@ -599,24 +600,32 @@ const CONFIG_FIELDS: {
   { key: "extra_instructions", label: "Instruções adicionais", hint: "Qualquer outra orientação.", long: true },
 ];
 
-function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
+function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; canManage: boolean }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Record<string, string>>({});
+  const [features, setFeatures] = useState({ imageUnderstanding: true, audioUnderstanding: true, reactionsEnabled: false });
 
   useEffect(() => {
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
-  }, [agent.id]);
+    const stored = agent.config ?? {};
+    setFeatures({
+      imageUnderstanding: stored["imageUnderstanding"] !== false,
+      audioUnderstanding: stored["audioUnderstanding"] !== false,
+      reactionsEnabled: stored["reactionsEnabled"] === true,
+    });
+  }, [agent.id, agent.config]);
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, string | null> = {};
+      const payload: Record<string, unknown> = {};
       for (const f of CONFIG_FIELDS) {
         const v = (form[f.key] ?? "").trim();
         payload[f.key] = v.length > 0 ? v : null;
       }
       if (!payload["name"]) throw new Error("O agente precisa de um nome.");
+      payload["config"] = { ...(agent.config ?? {}), ...features };
       const { error } = await supabase
         .from("ai_agents")
         .update(payload)
@@ -663,7 +672,34 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
           </div>
         ))}
       </div>
-      <Button type="submit" disabled={save.isPending}>
+      <section className="space-y-4 rounded-xl border border-border p-4">
+        <div>
+          <h3 className="font-display font-semibold">Capacidades deste agente</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Escolha o que esta IA pode analisar e quando pode reagir. As reações são moderadas e não são enviadas em todas as mensagens.</p>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <Label htmlFor="feature-image">Compreensão de imagens</Label>
+            <p className="text-xs text-muted-foreground">Permite analisar fotografias e imagens recebidas no WhatsApp.</p>
+          </div>
+          <Switch id="feature-image" checked={features.imageUnderstanding} disabled={!canManage || save.isPending} onCheckedChange={(checked) => setFeatures((f) => ({ ...f, imageUnderstanding: checked }))} />
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <Label htmlFor="feature-audio">Compreensão de áudio</Label>
+            <p className="text-xs text-muted-foreground">Permite interpretar notas de voz e responder ao que foi dito.</p>
+          </div>
+          <Switch id="feature-audio" checked={features.audioUnderstanding} disabled={!canManage || save.isPending} onCheckedChange={(checked) => setFeatures((f) => ({ ...f, audioUnderstanding: checked }))} />
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <Label htmlFor="feature-reactions">Reações de emoji moderadas</Label>
+            <p className="text-xs text-muted-foreground">Reage apenas quando deteta agradecimento, aprovação ou sinal claro de interesse. Desativado por padrão.</p>
+          </div>
+          <Switch id="feature-reactions" checked={features.reactionsEnabled} disabled={!canManage || save.isPending} onCheckedChange={(checked) => setFeatures((f) => ({ ...f, reactionsEnabled: checked }))} />
+        </div>
+      </section>
+      <Button type="submit" disabled={!canManage || save.isPending}>
         {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Guardar treinamento
       </Button>
