@@ -13,7 +13,9 @@ export function useSubscriptionAccess(organizationId?: string) {
   const query = useQuery({
     queryKey: ["subscription-access", organizationId],
     enabled: Boolean(organizationId),
-    staleTime: 30_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const [subscriptionResult, organizationResult] = await Promise.all([
         supabase.from("organization_subscriptions")
