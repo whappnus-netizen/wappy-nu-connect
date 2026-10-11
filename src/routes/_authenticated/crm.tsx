@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { KanbanSquare, Plus, ArrowRight } from "lucide-react";
+import { KanbanSquare, Plus } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/crm")({
 
 type Stage = { id: string; name: string; position: number };
 type Deal = { id: string; title: string; amount: number | null; currency: string | null; stage_id: string | null; contact_id: string | null; status: string };
+type Contact = { id: string; full_name: string | null; phone_e164: string };
 
 function CrmPage() {
   const { membership } = useAuth();
@@ -23,6 +24,7 @@ function CrmPage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
+  const [contactId, setContactId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const query = useQuery({
@@ -37,7 +39,7 @@ function CrmPage() {
       if (stagesRes.error) throw new Error(`Etapas do CRM: ${stagesRes.error.message}`);
       if (dealsRes.error) throw new Error(`Oportunidades: ${dealsRes.error.message}`);
       if (contactsRes.error) throw new Error(`Contactos: ${contactsRes.error.message}`);
-      return { stages: (stagesRes.data ?? []) as Stage[], deals: (dealsRes.data ?? []) as Deal[], contacts: contactsRes.data ?? [] };
+      return { stages: (stagesRes.data ?? []) as Stage[], deals: (dealsRes.data ?? []) as Deal[], contacts: (contactsRes.data ?? []) as Contact[] };
     },
   });
 
@@ -50,17 +52,19 @@ function CrmPage() {
       if (!firstStage) throw new Error("O funil ainda não tem etapas configuradas.");
       const { error: err } = await supabase.from("deals").insert({
         organization_id: orgId, title: cleanTitle, amount: amount.trim() ? Number(amount) : null,
-        currency: "AOA", stage_id: firstStage.id, status: "open",
+        currency: membership?.organizations?.currency ?? "AOA", stage_id: firstStage.id, status: "open", contact_id: contactId || null,
       });
       if (err) throw new Error(err.message);
     },
-    onSuccess: () => { setTitle(""); setAmount(""); setError(null); void queryClient.invalidateQueries({ queryKey: ["crm", orgId] }); },
+    onSuccess: () => { setTitle(""); setAmount(""); setContactId(""); setError(null); void queryClient.invalidateQueries({ queryKey: ["crm", orgId] }); },
     onError: (e: Error) => setError(e.message),
   });
 
   const moveDeal = useMutation({
-    mutationFn: async ({ dealId, stageId }: { dealId: string; stageId: string }) => {
-      const { error: err } = await supabase.from("deals").update({ stage_id: stageId, updated_at: new Date().toISOString() }).eq("id", dealId).eq("organization_id", orgId!);
+    mutationFn: async ({ dealId, stageId, stageName }: { dealId: string; stageId: string; stageName: string }) => {
+      const normalized = stageName.toLocaleLowerCase();
+      const nextStatus = normalized.includes("ganho") || normalized.includes("won") ? "won" : normalized.includes("perdido") || normalized.includes("lost") ? "lost" : "open";
+      const { error: err } = await supabase.from("deals").update({ stage_id: stageId, status: nextStatus, updated_at: new Date().toISOString() }).eq("id", dealId).eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
     },
     onSuccess: () => { setError(null); void queryClient.invalidateQueries({ queryKey: ["crm", orgId] }); },
@@ -74,9 +78,10 @@ function CrmPage() {
     <AppShell title="CRM" description="Acompanhe oportunidades comerciais associadas ao atendimento WhatsApp.">
       <section className="mb-5 rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 className="mb-3 font-display font-semibold">Criar oportunidade</h2>
-        <form className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
+        <form className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Pedido de catering para evento" maxLength={160} aria-label="Nome da oportunidade" />
           <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor em Kz (opcional)" type="number" min="0" step="1" aria-label="Valor em kwanzas" />
+          <div className="space-y-1"><label className="text-sm font-medium" htmlFor="deal-contact">Contacto (opcional)</label><select id="deal-contact" value={contactId} onChange={(e) => setContactId(e.target.value)} className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Associar contacto à oportunidade"><option value="">Sem contacto associado</option>{(query.data?.contacts ?? []).map((contact) => <option key={contact.id} value={contact.id}>{contact.full_name || contact.phone_e164}</option>)}</select></div>
           <Button type="submit" disabled={!orgId || createDeal.isPending}><Plus className="mr-2 size-4" />{createDeal.isPending ? "A guardar…" : "Adicionar"}</Button>
         </form>
         <p className="mt-2 text-xs text-muted-foreground">A criação manual funciona já. A conversão automática de conversas em oportunidades será activada apenas quando definirmos critérios comerciais claros, para não encher o CRM com falsos leads.</p>
@@ -86,15 +91,20 @@ function CrmPage() {
       {query.isLoading ? <p className="text-sm text-muted-foreground">A carregar CRM…</p> :
         stages.length === 0 ? <EmptyState icon={KanbanSquare} title="Funil por configurar" description="Não existem etapas de pipeline nesta organização. É necessário criar as etapas iniciais antes de adicionar oportunidades." /> :
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {stages.map((stage, index) => {
+          {stages.map((stage) => {
             const stageDeals = deals.filter((deal) => deal.stage_id === stage.id);
-            const nextStage = stages[index + 1];
             return <section key={stage.id} className="min-w-0 rounded-xl border border-border bg-card p-3 sm:p-4">
               <div className="mb-3 flex items-center justify-between gap-2"><h2 className="font-display text-sm font-semibold">{stage.name}</h2><Badge variant="secondary">{stageDeals.length}</Badge></div>
               <div className="space-y-2">{stageDeals.length === 0 ? <p className="text-xs text-muted-foreground">Sem oportunidades.</p> : stageDeals.map((deal) => <article key={deal.id} className="space-y-3 rounded-lg border border-border bg-background p-3">
                 <p className="break-words text-sm font-medium">{deal.title}</p>
                 <p className="text-xs text-muted-foreground">{deal.amount !== null ? `${Number(deal.amount).toLocaleString("pt-AO")} ${deal.currency ?? "AOA"}` : "Sem valor definido"}</p>
-                {nextStage && <Button size="sm" variant="outline" className="w-full" disabled={moveDeal.isPending} onClick={() => moveDeal.mutate({ dealId: deal.id, stageId: nextStage.id })}><ArrowRight className="mr-2 size-3" />Mover para {nextStage.name}</Button>}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor={`deal-stage-${deal.id}`}>Mover para etapa</label>
+                  <select id={`deal-stage-${deal.id}`} value={deal.stage_id ?? ""} disabled={moveDeal.isPending} onChange={(e) => { const destination = stages.find((candidate) => candidate.id === e.target.value); if (destination) moveDeal.mutate({ dealId: deal.id, stageId: destination.id, stageName: destination.name }); }} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs">
+                    {stages.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                  </select>
+                  <Badge variant={deal.status === "won" ? "default" : deal.status === "lost" ? "destructive" : "secondary"}>{deal.status === "won" ? "Ganho" : deal.status === "lost" ? "Perdido" : "Aberto"}</Badge>
+                </div>
               </article>)}</div>
             </section>;
           })}

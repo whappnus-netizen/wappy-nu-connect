@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
+import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ function InboxPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["conversations", orgId, status],
@@ -187,6 +188,40 @@ function InboxPage() {
     onError: (e: Error) => setError(e.message),
   });
 
+  const createLead = useMutation({
+    mutationFn: async () => {
+      if (!orgId || !active?.contact_id) throw new Error("Esta conversa não tem um contacto associado.");
+      const { data: existing, error: existingError } = await supabase
+        .from("deals").select("id").eq("organization_id", orgId)
+        .eq("contact_id", active.contact_id).eq("status", "open").limit(1).maybeSingle();
+      if (existingError) throw new Error(existingError.message);
+      if (existing) throw new Error("Este contacto já tem uma oportunidade aberta no CRM.");
+
+      const { data: stage, error: stageError } = await supabase
+        .from("pipeline_stages").select("id").eq("organization_id", orgId)
+        .order("position", { ascending: true }).limit(1).maybeSingle();
+      if (stageError) throw new Error(stageError.message);
+      if (!stage) throw new Error("O funil do CRM ainda não tem etapas configuradas.");
+
+      const contactLabel = active.contacts?.full_name || active.contacts?.phone_e164 || "Contacto";
+      const { error: insertError } = await supabase.from("deals").insert({
+        organization_id: orgId,
+        title: `Novo lead — ${contactLabel}`,
+        contact_id: active.contact_id,
+        stage_id: stage.id,
+        currency: membership?.organizations?.currency ?? "AOA",
+        status: "open",
+      });
+      if (insertError) throw new Error(insertError.message);
+    },
+    onSuccess: () => {
+      setError(null);
+      setNotice("Oportunidade criada no CRM, associada a este contacto.");
+      void queryClient.invalidateQueries({ queryKey: ["crm", orgId] });
+    },
+    onError: (e: Error) => { setNotice(null); setError(e.message); },
+  });
+
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
       <div className="grid gap-4 lg:grid-cols-[320px_1fr_300px]">
@@ -222,7 +257,7 @@ function InboxPage() {
               list.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setSelected(c.id)}
+                  onClick={() => { setSelected(c.id); setNotice(null); setError(null); }}
                   className={`w-full rounded-lg p-3 text-left transition-colors ${
                     selected === c.id ? "bg-secondary" : "hover:bg-secondary"
                   }`}
@@ -318,6 +353,13 @@ function InboxPage() {
               <p className="text-xs text-muted-foreground">
                 Estado: {active.status} · Prioridade: {active.priority}
               </p>
+              <div className="mt-3 space-y-2">
+                <Button size="sm" variant="outline" className="w-full" disabled={!active.contact_id || createLead.isPending || Boolean(notice)} onClick={() => createLead.mutate()}>
+                  <Plus className="mr-1 size-4" />{createLead.isPending ? "A criar oportunidade…" : "Criar oportunidade no CRM"}
+                </Button>
+                {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">{notice}</p>}
+                {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">{error}</p>}
+              </div>
               <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border p-3">
                 <div>
                   <p className="text-xs font-medium">IA automática</p>
