@@ -59,8 +59,8 @@ Deno.serve(async (req: Request) => {
     const permissions = admin.permissions ?? {};
     return admin.role === "owner" ||
       (admin.role === "admin" && !["team.promote_owner"].includes(permission)) ||
-      admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "dashboard"].includes(permission) ||
-      admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "health", "dashboard"].includes(permission) ||
+      admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "notifications.list", "dashboard"].includes(permission) ||
+      admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "notifications.list", "health", "dashboard"].includes(permission) ||
       permissions[permission] === true;
   };
   if (!action) return fail("Ação não especificada.");
@@ -229,6 +229,33 @@ Deno.serve(async (req: Request) => {
         .order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
       return json({ ok: true, data: data ?? [] });
+    }
+
+    if (action === "notifications.list") {
+      const { data, error } = await db.from("organization_notifications")
+        .select("id,organization_id,title,body,notification_type,created_at,organizations(name,slug)")
+        .order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      return json({ ok: true, data: data ?? [] });
+    }
+
+    if (action === "notifications.send") {
+      if (!["owner", "admin"].includes(admin.role)) return fail("Só o proprietário ou administrador pode enviar notificações.", 403);
+      const organizationId = str(input.organization_id, 60);
+      const title = str(input.title, 140);
+      const body = str(input.body, 2000);
+      if (!organizationId || title.length < 3 || body.length < 3) return fail("Escolhe uma organização e preenche o título e a mensagem.");
+      const { data: organization, error: organizationError } = await db.from("organizations")
+        .select("id,name").eq("id", organizationId).maybeSingle();
+      if (organizationError) throw organizationError;
+      if (!organization) return fail("Organização não encontrada.", 404);
+      const { data, error } = await db.from("organization_notifications").insert({
+        organization_id: organizationId, title, body, notification_type: "subscription",
+        created_by: actor.id, metadata: { source: "superadmin" },
+      }).select("id,organization_id,title,body,notification_type,created_at").single();
+      if (error) throw error;
+      await audit("notification.sent", "organization_notification", data.id, organizationId, { title });
+      return json({ ok: true, data: { ...data, organizations: organization } });
     }
 
     if (action === "subscriptions.reactivate") {
