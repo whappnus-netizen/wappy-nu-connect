@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { KanbanSquare, Plus, ArrowRight } from "lucide-react";
+import { KanbanSquare, Plus } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,8 +61,10 @@ function CrmPage() {
   });
 
   const moveDeal = useMutation({
-    mutationFn: async ({ dealId, stageId }: { dealId: string; stageId: string }) => {
-      const { error: err } = await supabase.from("deals").update({ stage_id: stageId, updated_at: new Date().toISOString() }).eq("id", dealId).eq("organization_id", orgId!);
+    mutationFn: async ({ dealId, stageId, stageName }: { dealId: string; stageId: string; stageName: string }) => {
+      const normalized = stageName.toLocaleLowerCase();
+      const nextStatus = normalized.includes("ganho") || normalized.includes("won") ? "won" : normalized.includes("perdido") || normalized.includes("lost") ? "lost" : "open";
+      const { error: err } = await supabase.from("deals").update({ stage_id: stageId, status: nextStatus, updated_at: new Date().toISOString() }).eq("id", dealId).eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
     },
     onSuccess: () => { setError(null); void queryClient.invalidateQueries({ queryKey: ["crm", orgId] }); },
@@ -89,15 +91,20 @@ function CrmPage() {
       {query.isLoading ? <p className="text-sm text-muted-foreground">A carregar CRM…</p> :
         stages.length === 0 ? <EmptyState icon={KanbanSquare} title="Funil por configurar" description="Não existem etapas de pipeline nesta organização. É necessário criar as etapas iniciais antes de adicionar oportunidades." /> :
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {stages.map((stage, index) => {
+          {stages.map((stage) => {
             const stageDeals = deals.filter((deal) => deal.stage_id === stage.id);
-            const nextStage = stages[index + 1];
             return <section key={stage.id} className="min-w-0 rounded-xl border border-border bg-card p-3 sm:p-4">
               <div className="mb-3 flex items-center justify-between gap-2"><h2 className="font-display text-sm font-semibold">{stage.name}</h2><Badge variant="secondary">{stageDeals.length}</Badge></div>
               <div className="space-y-2">{stageDeals.length === 0 ? <p className="text-xs text-muted-foreground">Sem oportunidades.</p> : stageDeals.map((deal) => <article key={deal.id} className="space-y-3 rounded-lg border border-border bg-background p-3">
                 <p className="break-words text-sm font-medium">{deal.title}</p>
                 <p className="text-xs text-muted-foreground">{deal.amount !== null ? `${Number(deal.amount).toLocaleString("pt-AO")} ${deal.currency ?? "AOA"}` : "Sem valor definido"}</p>
-                {nextStage && <Button size="sm" variant="outline" className="w-full" disabled={moveDeal.isPending} onClick={() => moveDeal.mutate({ dealId: deal.id, stageId: nextStage.id })}><ArrowRight className="mr-2 size-3" />Mover para {nextStage.name}</Button>}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground" htmlFor={`deal-stage-${deal.id}`}>Mover para etapa</label>
+                  <select id={`deal-stage-${deal.id}`} value={deal.stage_id ?? ""} disabled={moveDeal.isPending} onChange={(e) => { const destination = stages.find((candidate) => candidate.id === e.target.value); if (destination) moveDeal.mutate({ dealId: deal.id, stageId: destination.id, stageName: destination.name }); }} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs">
+                    {stages.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                  </select>
+                  <Badge variant={deal.status === "won" ? "default" : deal.status === "lost" ? "destructive" : "secondary"}>{deal.status === "won" ? "Ganho" : deal.status === "lost" ? "Perdido" : "Aberto"}</Badge>
+                </div>
               </article>)}</div>
             </section>;
           })}
