@@ -313,7 +313,8 @@ function InboxPage() {
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
-                (messages ?? []).map((m) => (
+                <>
+                  {(messages ?? []).map((m) => (
                   <div
                     key={m.id}
                     className={`max-w-[75%] rounded-xl px-3 py-2 text-sm ${
@@ -329,8 +330,9 @@ function InboxPage() {
                       {new Date(m.sent_at ?? m.created_at).toLocaleTimeString("pt-PT")} · {m.status}
                     </p>
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
               )}
             </div>
           )}
