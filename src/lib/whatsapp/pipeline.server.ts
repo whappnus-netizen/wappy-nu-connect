@@ -10,7 +10,7 @@
  */
 import { serviceClient } from "../whatsapp.server";
 import { generateViaWhappNusAI } from "../ai-engine.server";
-import type { NormalizedIncoming, SessionRef } from "./provider.server";
+import type { NormalizedIncoming, OutgoingMedia, SessionRef } from "./provider.server";
 import { providerByName } from "./registry.server";
 
 export type WhatsAppEventType =
@@ -593,6 +593,7 @@ export async function sendOutgoingMessage(input: {
   whatsappNumberId: string;
   conversationId: string;
   body: string;
+  media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string };
   isAi?: boolean;
   sentBy?: string | null;
 }): Promise<{ waMessageId: string | null; provider: string }> {
@@ -623,14 +624,38 @@ export async function sendOutgoingMessage(input: {
     metaCreds = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
   }
 
+  let outgoingMedia: OutgoingMedia | undefined;
+  if (input.media) {
+    const expectedPrefix = input.organizationId + "/";
+    if (!input.media.storagePath.startsWith(expectedPrefix) || input.media.storagePath.includes("..")) {
+      throw new Error("Caminho de mídia inválido para esta organização.");
+    }
+    if ((input.media.kind === "image" && !input.media.mimeType.startsWith("image/")) ||
+        (input.media.kind === "audio" && !input.media.mimeType.startsWith("audio/"))) {
+      throw new Error("Tipo de mídia inválido.");
+    }
+    const { data: signed, error: signError } = await admin.storage
+      .from("automation-media").createSignedUrl(input.media.storagePath, 300);
+    if (signError || !signed?.signedUrl) throw new Error("Não foi possível preparar o ficheiro de mídia: " + (signError?.message ?? "URL temporário indisponível"));
+    outgoingMedia = {
+      kind: input.media.kind,
+      url: signed.signedUrl,
+      mimeType: input.media.mimeType,
+      caption: input.media.caption,
+      fileName: input.media.fileName,
+      storagePath: input.media.storagePath,
+    };
+  }
+
   try {
-    const sent = await provider.sendMessage({ ...ref, to, body: input.body, meta: metaCreds });
+    const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
     await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
       direction: "outbound",
-      message_type: "text",
-      body: input.body,
+      message_type: input.media?.kind ?? "text",
+      body: input.media?.caption ?? input.body ?? "",
+      media_id: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
       sent_by: input.sentBy ?? null,
