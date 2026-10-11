@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
+import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
 import { sendWhatsAppMessage } from "@/lib/whatsapp.functions";
 import { setConversationAi } from "@/lib/whatsapp.qr.functions";
@@ -58,6 +59,7 @@ const statuses = ["all", "open", "pending", "in_progress", "closed"] as const;
 function InboxPage() {
   const { user, membership } = useAuth();
   const orgId = membership?.organization_id;
+  const subscription = useSubscriptionAccess(orgId);
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<(typeof statuses)[number]>("all");
   const [search, setSearch] = useState("");
@@ -205,6 +207,7 @@ function InboxPage() {
 
   const createLead = useMutation({
     mutationFn: async () => {
+      if (!subscription.active) throw new Error("A criação de oportunidades está bloqueada enquanto a assinatura estiver suspensa.");
       if (!orgId || !active?.contact_id) throw new Error("Esta conversa não tem um contacto associado.");
       const { data: existing, error: existingError } = await supabase
         .from("deals").select("id").eq("organization_id", orgId)
@@ -370,7 +373,7 @@ function InboxPage() {
                 Estado: {active.status} · Prioridade: {active.priority}
               </p>
               <div className="mt-3 space-y-2">
-                <Button size="sm" variant="outline" className="w-full" disabled={!active.contact_id || createLead.isPending || Boolean(notice)} onClick={() => createLead.mutate()}>
+                <Button size="sm" variant="outline" className="w-full" disabled={!subscription.active || !active.contact_id || createLead.isPending || Boolean(notice)} onClick={() => createLead.mutate()}>
                   <Plus className="mr-1 size-4" />{createLead.isPending ? "A criar oportunidade…" : "Criar oportunidade no CRM"}
                 </Button>
                 {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">{notice}</p>}
@@ -391,7 +394,7 @@ function InboxPage() {
                 </div>
                 <Switch
                   checked={Boolean(active.ai_enabled)}
-                  disabled={toggleAi.isPending || active.status !== "open" || Boolean(active.assigned_to)}
+                  disabled={!subscription.active || toggleAi.isPending || active.status !== "open" || Boolean(active.assigned_to)}
                   onCheckedChange={(v) => toggleAi.mutate(v)}
                 />
               </div>
