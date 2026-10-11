@@ -178,7 +178,7 @@ function DashboardPage() {
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: progress + "%" }} /></div>
             <p className="mt-2 text-xs text-muted-foreground">O histórico, os contactos e as oportunidades existentes permanecem guardados mesmo quando o período termina.</p>
           </div>
-          {suspended && <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm">A IA e as automações estão bloqueadas até a assinatura ser reactivada pelo administrador.</p><Button asChild size="sm"><Link to="/#planos">Ver planos</Link></Button></div>}
+          {suspended && <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm">A IA e as automações estão bloqueadas até a assinatura ser reactivada pelo administrador.</p><Button asChild size="sm"><a href="/#planos">Ver planos</a></Button></div>}
         </section>;
       })()}
 
