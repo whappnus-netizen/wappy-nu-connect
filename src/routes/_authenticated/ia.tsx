@@ -624,7 +624,7 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
     },
     onSuccess: () => {
       toast.success("Treinamento da IA guardado.");
-      void qc.invalidateQueries({ queryKey: ["ai-agent", orgId] });
+      void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
