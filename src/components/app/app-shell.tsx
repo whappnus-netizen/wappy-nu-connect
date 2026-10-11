@@ -122,7 +122,8 @@ export function AppShell({
             </div>
             <Button asChild size="sm"><a href="/#planos">Ver planos</a></Button>
           </div>
-        )}\n        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        )}
+        <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );
