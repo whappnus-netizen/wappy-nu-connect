@@ -339,6 +339,7 @@ function AiPage() {
                 agentId={agent.id}
                 items={knowledgeQuery.data ?? []}
                 loading={knowledgeQuery.isLoading}
+                canManage={canManage}
               />
             </TabsContent>
 
@@ -675,11 +676,13 @@ function KnowledgePanel({
   agentId,
   items,
   loading,
+  canManage,
 }: {
   orgId: string;
   agentId: string;
   items: Knowledge[];
   loading: boolean;
+  canManage: boolean;
 }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState("");
@@ -723,7 +726,9 @@ function KnowledgePanel({
   });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+    <div className="space-y-6">
+      <PdfUploadPanel orgId={orgId} agentId={agentId} canManage={canManage} />
+      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
       <div className="space-y-4 rounded-xl border border-border bg-card p-5">
         <p className="font-display font-semibold">Adicionar conhecimento</p>
         <div className="space-y-2">
@@ -790,7 +795,150 @@ function KnowledgePanel({
           ))
         )}
       </div>
+      </div>
     </div>
+  );
+}
+
+function PdfUploadPanel({ orgId, agentId, canManage }: { orgId: string; agentId: string; canManage: boolean }) {
+  const qc = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+
+  const documentsQuery = useQuery({
+    queryKey: ["ai-knowledge-documents", orgId, agentId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ai_knowledge_documents")
+        .select("id, file_name, size_bytes, extracted_chars, storage_path, created_at")
+        .eq("organization_id", orgId).eq("agent_id", agentId)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Array<{ id: string; file_name: string; size_bytes: number; extracted_chars: number; storage_path: string; created_at: string }>;
+    },
+  });
+
+  const upload = useMutation({
+    mutationFn: async () => {
+      if (!canManage) throw new Error("Apenas OWNER ou ADMIN pode carregar documentos.");
+      if (!file) throw new Error("Escolha um PDF.");
+      if (!file.name.toLowerCase().endsWith(".pdf") || (file.type && file.type !== "application/pdf")) throw new Error("Escolha um ficheiro PDF válido.");
+      if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("O PDF deve ter até 20 MB.");
+
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).toString();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
+      if (pdf.numPages > 500) {
+        await pdf.destroy();
+        throw new Error("O PDF tem mais de 500 páginas. Divida-o em ficheiros menores.");
+      }
+      const pageTexts: string[] = [];
+      try {
+        for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+          const page = await pdf.getPage(pageNo);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item) => ("str" in item ? item.str : "")).filter(Boolean).join(" ");
+          if (pageText.trim()) pageTexts.push(pageText.trim());
+        }
+      } finally {
+        await pdf.destroy();
+      }
+      const extracted = pageTexts.join("\n\n").replace(/[ \t]+/g, " ").trim().slice(0, 150000);
+      if (extracted.length < 20) throw new Error("Este PDF não contém texto extraível. PDFs digitalizados como imagens precisam de OCR, que ainda não está incluído.");
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "documento.pdf";
+      const storagePath = `${orgId}/${agentId}/${crypto.randomUUID()}-${safeName}`;
+      const { error: storageError } = await supabase.storage.from("ai-knowledge-pdfs")
+        .upload(storagePath, file, { contentType: "application/pdf", upsert: false });
+      if (storageError) throw new Error("Falha ao guardar o PDF: " + storageError.message);
+
+      let documentId: string | null = null;
+      try {
+        const { data: doc, error: docError } = await supabase.from("ai_knowledge_documents").insert({
+          organization_id: orgId, agent_id: agentId, file_name: file.name,
+          storage_path: storagePath, size_bytes: file.size, extracted_chars: extracted.length,
+        }).select("id").single();
+        if (docError) throw new Error(docError.message);
+        documentId = doc.id as string;
+
+        const chunks: Array<Record<string, unknown>> = [];
+        const size = 2400, overlap = 200;
+        for (let offset = 0; offset < extracted.length && chunks.length < 70; offset += size - overlap) {
+          const part = extracted.slice(offset, offset + size).trim();
+          if (part) chunks.push({
+            organization_id: orgId, agent_id: agentId, source_document_id: documentId,
+            title: `${file.name} — trecho ${chunks.length + 1}`, content: part, category: "documento_pdf",
+          });
+        }
+        const { error: chunkError } = await supabase.from("ai_knowledge").insert(chunks);
+        if (chunkError) throw new Error("Não foi possível indexar o texto do PDF: " + chunkError.message);
+        return { chunks: chunks.length };
+      } catch (error) {
+        if (documentId) await supabase.from("ai_knowledge_documents").delete().eq("id", documentId).eq("organization_id", orgId);
+        await supabase.storage.from("ai-knowledge-pdfs").remove([storagePath]);
+        throw error;
+      }
+    },
+    onSuccess: (result) => {
+      setFile(null);
+      toast.success(`PDF carregado e indexado em ${result.chunks} partes.`);
+      void qc.invalidateQueries({ queryKey: ["ai-knowledge", orgId, agentId] });
+      void qc.invalidateQueries({ queryKey: ["ai-knowledge-documents", orgId, agentId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (doc: { id: string; storage_path: string }) => {
+      if (!canManage) throw new Error("Apenas OWNER ou ADMIN pode eliminar documentos.");
+      const { error: storageError } = await supabase.storage.from("ai-knowledge-pdfs").remove([doc.storage_path]);
+      if (storageError) throw new Error("Falha ao eliminar o ficheiro: " + storageError.message);
+      const { error } = await supabase.from("ai_knowledge_documents").delete()
+        .eq("id", doc.id).eq("organization_id", orgId).eq("agent_id", agentId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("PDF e conteúdo de treinamento removidos.");
+      void qc.invalidateQueries({ queryKey: ["ai-knowledge", orgId, agentId] });
+      void qc.invalidateQueries({ queryKey: ["ai-knowledge-documents", orgId, agentId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <section className="space-y-4 rounded-xl border border-border bg-card p-5">
+      <div>
+        <h3 className="font-display font-semibold">Conhecimento adicional por PDF</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Carregue catálogos, tabelas de preços, políticas e manuais. O WhappNus extrai o texto e divide-o em trechos para o agente recuperar durante as conversas. Limite: 20 MB e 500 páginas por PDF. Documentos digitalizados sem texto precisam de OCR, ainda não incluído.</p>
+      </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="min-w-0 flex-1 space-y-2">
+          <Label htmlFor="ai-knowledge-pdf">Ficheiro PDF</Label>
+          <Input id="ai-knowledge-pdf" type="file" accept=".pdf,application/pdf" disabled={!canManage || upload.isPending} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          {file && <p className="text-xs text-muted-foreground">{file.name} · {(file.size / (1024 * 1024)).toFixed(2)} MB</p>}
+        </div>
+        <Button onClick={() => upload.mutate()} disabled={!canManage || !file || upload.isPending} className="sm:min-w-44">
+          {upload.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+          {upload.isPending ? "A processar…" : "Carregar PDF"}
+        </Button>
+      </div>
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium">Documentos deste agente</h4>
+        {documentsQuery.isLoading ? <p className="text-sm text-muted-foreground">A carregar documentos…</p> : documentsQuery.isError ? (
+          <p role="alert" className="text-sm text-destructive">Não foi possível carregar documentos: {(documentsQuery.error as Error).message}</p>
+        ) : (documentsQuery.data ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">Ainda não há PDFs carregados para este agente.</p>
+        ) : (documentsQuery.data ?? []).map((doc) => (
+          <div key={doc.id} className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="break-words text-sm font-medium">{doc.file_name}</p>
+              <p className="text-xs text-muted-foreground">{(Number(doc.size_bytes) / (1024 * 1024)).toFixed(2)} MB · {Number(doc.extracted_chars).toLocaleString("pt-PT")} caracteres · {new Date(doc.created_at).toLocaleDateString("pt-PT")}</p>
+            </div>
+            <Button variant="outline" size="sm" disabled={!canManage || remove.isPending} onClick={() => {
+              if (window.confirm(`Eliminar “${doc.file_name}” e retirar o seu texto do treinamento?`)) remove.mutate({ id: doc.id, storage_path: doc.storage_path });
+            }}><Trash2 className="mr-2 h-4 w-4" /> Eliminar PDF</Button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

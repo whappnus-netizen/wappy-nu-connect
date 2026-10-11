@@ -16,13 +16,15 @@ export const Route = createFileRoute("/_authenticated/automacoes")({
 });
 
 type TriggerType = "keyword_match" | "conversation_created" | "outside_business_hours" | "auto_assignment" | "auto_crm_lead";
+type AutomationStep = { id: string; kind: "text" | "image" | "audio"; content: string; file: File | null };
+type StoredAutomationStep = { id: string; kind: "text" | "image" | "audio"; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string };
 type Rule = {
   id: string;
   name: string;
   trigger_type: string;
   is_active: boolean;
   description: string | null;
-  config: { keyword?: string; reply?: string; startTime?: string; endTime?: string; days?: number[]; actionType?: string } | null;
+  config: { keyword?: string; reply?: string; startTime?: string; endTime?: string; days?: number[]; actionType?: string; steps?: StoredAutomationStep[] } | null;
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -52,7 +54,8 @@ function AutomationsPage() {
   const [keyword, setKeyword] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
-  const [reply, setReply] = useState("");
+  const [steps, setSteps] = useState<AutomationStep[]>([{ id: "step-initial", kind: "text", content: "", file: null }]);
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -75,21 +78,49 @@ function AutomationsPage() {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
       const cleanName = name.trim();
       const cleanKeyword = keyword.trim();
-      const cleanReply = reply.trim();
       if (cleanName.length < 2) throw new Error("Dê um nome à automação.");
-      if (triggerType !== "auto_assignment" && triggerType !== "auto_crm_lead" && !cleanReply) throw new Error("Escreva a resposta automática.");
       if (triggerType === "keyword_match" && cleanKeyword.length < 2) throw new Error("A palavra-chave deve ter pelo menos 2 caracteres.");
       if (triggerType === "outside_business_hours" && startTime === endTime) throw new Error("A hora inicial e final não podem ser iguais.");
+      const usesActions = triggerType !== "auto_assignment" && triggerType !== "auto_crm_lead";
+      const usableSteps = usesActions ? steps.filter((step) => step.kind === "text" ? step.content.trim().length > 0 : Boolean(step.file)) : [];
+      if (usesActions && usableSteps.length === 0) throw new Error("Adicione pelo menos uma etapa de texto, imagem ou áudio.");
+      if (usesActions && steps.some((step) => step.kind !== "text" && !step.file)) {
+        throw new Error("Escolha um ficheiro para cada etapa de imagem ou áudio.");
+      }
 
-      const config = triggerType === "auto_assignment"
-        ? { actionType: "assign_agent" }
-        : triggerType === "auto_crm_lead"
-          ? { actionType: "create_deal" }
-          : triggerType === "keyword_match"
-          ? { keyword: cleanKeyword, reply: cleanReply }
+      const uploadedPaths: string[] = [];
+      let storedSteps: StoredAutomationStep[] = [];
+      try {
+        for (const step of usableSteps) {
+          if (step.kind === "text") {
+            storedSteps.push({ id: step.id, kind: "text", text: step.content.trim() });
+            continue;
+          }
+          const file = step.file;
+          if (!file) throw new Error("Escolha um ficheiro para cada etapa de mídia.");
+          const allowedMime = step.kind === "image" ? file.type.startsWith("image/") : file.type.startsWith("audio/");
+          if (!allowedMime) throw new Error(step.kind === "image" ? "Escolha um ficheiro de imagem válido." : "Escolha um ficheiro de áudio válido.");
+          if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("Cada ficheiro deve ter até 20 MB.");
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || (step.kind === "image" ? "imagem" : "audio");
+          const storagePath = `${orgId}/${crypto.randomUUID()}-${safeName}`;
+          const { error: uploadError } = await supabase.storage.from("automation-media")
+            .upload(storagePath, file, { contentType: file.type, upsert: false });
+          if (uploadError) throw new Error("Falha ao carregar mídia: " + uploadError.message);
+          uploadedPaths.push(storagePath);
+          storedSteps.push({ id: step.id, kind: step.kind, storagePath, mimeType: file.type, fileName: file.name, caption: step.kind === "image" ? step.content.trim() : undefined });
+        }
+
+        const cleanReply = storedSteps.filter((step) => step.kind === "text").map((step) => step.text ?? "").join("\\n").trim();
+        const baseConfig: Record<string, unknown> = triggerType === "keyword_match"
+          ? { keyword: cleanKeyword, reply: cleanReply, steps: storedSteps }
           : triggerType === "outside_business_hours"
-            ? { reply: cleanReply, startTime, endTime, days: [1, 2, 3, 4, 5] }
-            : { reply: cleanReply };
+            ? { reply: cleanReply, steps: storedSteps, startTime, endTime, days: [1, 2, 3, 4, 5] }
+            : { reply: cleanReply, steps: storedSteps };
+        const config = triggerType === "auto_assignment"
+          ? { actionType: "assign_agent" }
+          : triggerType === "auto_crm_lead"
+            ? { actionType: "create_deal" }
+            : baseConfig;
       const storedTriggerType = triggerType === "auto_assignment" || triggerType === "auto_crm_lead" ? "conversation_created" : triggerType;
 
       const description = triggerType === "auto_assignment"
@@ -112,9 +143,13 @@ function AutomationsPage() {
         is_active: true,
       });
       if (err) throw new Error(err.message);
+      } catch (error) {
+        if (uploadedPaths.length) await supabase.storage.from("automation-media").remove(uploadedPaths);
+        throw error;
+      }
     },
     onSuccess: () => {
-      setName(""); setKeyword(""); setReply(""); setError(null);
+      setName(""); setKeyword(""); setSteps([{ id: crypto.randomUUID(), kind: "text", content: "", file: null }]); setError(null);
       setNotice("Automação criada. Teste primeiro com uma conversa controlada.");
       void queryClient.invalidateQueries({ queryKey: ["automations", orgId] });
     },
@@ -133,13 +168,20 @@ function AutomationsPage() {
   });
 
   const deleteRule = useMutation({
-    mutationFn: async (ruleId: string) => {
+    mutationFn: async (rule: Rule) => {
       const { error: actionError } = await supabase.from("automation_actions")
-        .delete().eq("rule_id", ruleId).eq("organization_id", orgId!);
+        .delete().eq("rule_id", rule.id).eq("organization_id", orgId!);
       if (actionError) throw new Error(actionError.message);
       const { error: ruleError } = await supabase.from("automation_rules")
-        .delete().eq("id", ruleId).eq("organization_id", orgId!);
+        .delete().eq("id", rule.id).eq("organization_id", orgId!);
       if (ruleError) throw new Error(ruleError.message);
+      const mediaPaths = (rule.config?.steps ?? [])
+        .map((step) => step.storagePath)
+        .filter((path): path is string => Boolean(path && path.startsWith(orgId + "/")));
+      if (mediaPaths.length) {
+        const { error: storageError } = await supabase.storage.from("automation-media").remove(mediaPaths);
+        if (storageError) console.error("Falha ao limpar ficheiros da automação eliminada:", storageError.message);
+      }
     },
     onSuccess: () => { setError(null); void queryClient.invalidateQueries({ queryKey: ["automations", orgId] }); },
     onError: (e: Error) => setError(e.message),
@@ -159,7 +201,40 @@ function AutomationsPage() {
             <div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-trigger">Quando deve executar?</label><select id="automation-trigger" value={triggerType} onChange={(e) => setTriggerType(e.target.value as TriggerType)} className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="keyword_match">Palavra-chave</option><option value="conversation_created">Boas-vindas (primeira mensagem)</option><option value="outside_business_hours">Fora do horário de atendimento</option><option value="auto_assignment">Distribuição automática de conversa</option><option value="auto_crm_lead">Criar oportunidade no CRM</option></select></div>
             {triggerType === "keyword_match" && <div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-keyword">Palavra-chave ou expressão</label><Input id="automation-keyword" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Ex.: menu, horário, localização" maxLength={100} /></div>}
             {triggerType === "outside_business_hours" && <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-start">Abre às</label><Input id="automation-start" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required /></div><div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-end">Fecha às</label><Input id="automation-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} required /></div><p className="col-span-2 text-xs text-muted-foreground">Usa o fuso horário da organização e considera segunda a sexta-feira como dias de atendimento.</p></div>}
-            {triggerType === "auto_assignment" ? <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">A nova conversa será atribuída ao membro elegível com menos conversas abertas/em atendimento. Se não houver agentes, o sistema usa supervisor, administrador ou proprietário como alternativa. A IA continua a responder até um humano assumir.</p> : triggerType === "auto_crm_lead" ? <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">Cria uma oportunidade na primeira mensagem recebida da conversa, na primeira etapa do CRM. Se o contacto já tiver uma oportunidade aberta, não cria outra.</p> : <div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-reply">Resposta automática</label><Textarea id="automation-reply" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Escreva a resposta que será enviada..." rows={4} maxLength={2000} /></div>}
+            {triggerType === "auto_assignment" ? <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">A nova conversa será atribuída ao membro elegível com menos conversas abertas/em atendimento. Se não houver agentes, o sistema usa supervisor, administrador ou proprietário como alternativa. A IA continua a responder até um humano assumir.</p> : triggerType === "auto_crm_lead" ? <p className="rounded-md bg-secondary p-3 text-sm text-muted-foreground">Cria uma oportunidade na primeira mensagem recebida da conversa, na primeira etapa do CRM. Se o contacto já tiver uma oportunidade aberta, não cria outra.</p> : (
+              <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+                <div><h3 className="text-sm font-semibold">Construtor visual de etapas</h3><p className="text-xs text-muted-foreground">Arraste as etapas para mudar a ordem. Cada etapa pode enviar texto, uma imagem ou um áudio.</p></div>
+                {steps.map((step, index) => (
+                  <div key={step.id} draggable onDragStart={(e) => { setDraggingStepId(step.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", step.id); }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+                    e.preventDefault();
+                    const fromId = e.dataTransfer.getData("text/plain") || draggingStepId;
+                    if (!fromId || fromId === step.id) return;
+                    setSteps((current) => { const from = current.findIndex((item) => item.id === fromId); const to = current.findIndex((item) => item.id === step.id); if (from < 0 || to < 0) return current; const next = [...current]; const [moved] = next.splice(from, 1); if (moved) next.splice(to, 0, moved); return next; });
+                    setDraggingStepId(null);
+                  }} className={`space-y-2 rounded-md border p-3 ${draggingStepId === step.id ? "border-primary opacity-60" : "border-border"}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2"><span className="cursor-grab text-muted-foreground" aria-label="Arrastar etapa">⠿</span><span className="text-xs font-semibold uppercase tracking-wide">Etapa {index + 1}</span></div>
+                      <div className="flex items-center gap-1">
+                        <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => setSteps((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; return next; })}>↑</Button>
+                        <Button type="button" variant="ghost" size="sm" disabled={index === steps.length - 1} onClick={() => setSteps((current) => { const next = [...current]; [next[index], next[index + 1]] = [next[index + 1]!, next[index]!]; return next; })}>↓</Button>
+                        <Button type="button" variant="ghost" size="sm" disabled={steps.length === 1} onClick={() => setSteps((current) => current.filter((item) => item.id !== step.id))} aria-label="Remover etapa"><Trash2 className="size-4" /></Button>
+                      </div>
+                    </div>
+                    <label className="text-xs font-medium" htmlFor={`step-kind-${step.id}`}>Tipo de ação</label>
+                    <select id={`step-kind-${step.id}`} value={step.kind} onChange={(e) => setSteps((current) => current.map((item) => item.id === step.id ? { ...item, kind: e.target.value as AutomationStep["kind"], file: null } : item))} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                      <option value="text">Enviar texto</option><option value="image">Enviar imagem</option><option value="audio">Enviar áudio</option>
+                    </select>
+                    {step.kind !== "text" && <div className="space-y-1"><label className="text-xs font-medium" htmlFor={`step-file-${step.id}`}>{step.kind === "image" ? "Imagem (máx. 20 MB)" : "Áudio (máx. 20 MB)"}</label><Input id={`step-file-${step.id}`} type="file" accept={step.kind === "image" ? "image/*" : "audio/*"} onChange={(e) => setSteps((current) => current.map((item) => item.id === step.id ? { ...item, file: e.target.files?.[0] ?? null } : item))} />{step.file && <p className="text-xs text-muted-foreground">{step.file.name}</p>}</div>}
+                    {(step.kind === "text" || step.kind === "image") && <div className="space-y-1"><label className="text-xs font-medium" htmlFor={`step-content-${step.id}`}>{step.kind === "image" ? "Legenda (opcional)" : "Texto a enviar"}</label><Textarea id={`step-content-${step.id}`} value={step.content} onChange={(e) => setSteps((current) => current.map((item) => item.id === step.id ? { ...item, content: e.target.value } : item))} rows={step.kind === "text" ? 3 : 2} maxLength={2000} placeholder={step.kind === "image" ? "Legenda da imagem..." : "Escreva a mensagem..."} /></div>}
+                  </div>
+                ))}
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSteps((current) => [...current, { id: crypto.randomUUID(), kind: "text", content: "", file: null }])}><Plus className="mr-1 size-4" /> Etapa de texto</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSteps((current) => [...current, { id: crypto.randomUUID(), kind: "image", content: "", file: null }])}><Plus className="mr-1 size-4" /> Etapa de imagem</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSteps((current) => [...current, { id: crypto.randomUUID(), kind: "audio", content: "", file: null }])}><Plus className="mr-1 size-4" /> Etapa de áudio</Button>
+                </div>
+              </div>
+            )}
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
             {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">{notice}</p>}
             <Button type="submit" disabled={!orgId || !canManage || createRule.isPending} className="w-full sm:w-auto"><Plus className="mr-2 size-4" />{createRule.isPending ? "A guardar…" : "Criar automação"}</Button>
@@ -175,7 +250,7 @@ function AutomationsPage() {
               <article key={rule.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{rule.name}</h3><Badge variant={rule.is_active ? "default" : "secondary"}>{rule.is_active ? "Activa" : "Pausada"}</Badge></div><div className="mt-1 flex flex-wrap items-center gap-2"><Badge variant="outline">{rule.config?.actionType === "assign_agent" ? triggerLabels.auto_assignment : rule.config?.actionType === "create_deal" ? triggerLabels.auto_crm_lead : triggerLabels[rule.trigger_type as TriggerType] ?? "Tipo não suportado"}</Badge><p className="text-xs text-muted-foreground">{triggerDescription(rule)}</p></div></div>
-                  <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={!canManage || toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={!canManage || deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule.id); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
+                  <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={!canManage || toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={!canManage || deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
                 </div>
                 {rule.trigger_type === "outside_business_hours" && <p className="text-xs text-muted-foreground"><Clock3 className="mr-1 inline size-3" />Segunda a sexta · {rule.config?.startTime ?? "09:00"}–{rule.config?.endTime ?? "18:00"}</p>}
                 {rule.trigger_type === "conversation_created" && rule.config?.actionType !== "assign_agent" && rule.config?.actionType !== "create_deal" && <p className="text-xs text-muted-foreground"><Handshake className="mr-1 inline size-3" />Executa apenas na primeira mensagem da conversa.</p>}

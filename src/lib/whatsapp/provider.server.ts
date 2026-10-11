@@ -44,9 +44,19 @@ export type ConnectResult = {
 
 export type StatusResult = ConnectResult;
 
+export type OutgoingMedia = {
+  kind: "image" | "audio";
+  url: string;
+  mimeType: string;
+  caption?: string;
+  fileName?: string;
+  storagePath?: string;
+};
+
 export type SendMessageInput = SessionRef & {
   to: string;
   body: string;
+  media?: OutgoingMedia;
   /** Só o provedor Meta usa estes campos. */
   meta?: { phoneNumberId: string; token: string } | undefined;
 };
@@ -73,6 +83,7 @@ export type NormalizedIncoming = {
   messageType: "text" | "image" | "audio" | "video" | "document" | "system";
   body: string | null;
   mediaId: string | null;
+  mediaMimeType?: string | null;
   sentAt: string;
   fromMe: boolean;
 };
@@ -123,10 +134,10 @@ export function normalizeMetaMessage(msg: {
   timestamp?: string;
   type?: string;
   text?: { body?: string };
-  image?: { id?: string; caption?: string };
-  audio?: { id?: string };
-  video?: { id?: string; caption?: string };
-  document?: { id?: string; filename?: string };
+  image?: { id?: string; caption?: string; mime_type?: string };
+  audio?: { id?: string; mime_type?: string };
+  video?: { id?: string; caption?: string; mime_type?: string };
+  document?: { id?: string; filename?: string; mime_type?: string };
   button?: { text?: string };
   profileName?: string | null;
 }): NormalizedIncoming | null {
@@ -137,6 +148,7 @@ export function normalizeMetaMessage(msg: {
 
   let body: string | null = null;
   let mediaId: string | null = null;
+  let mediaMimeType: string | null = null;
   switch (msg.type) {
     case "text":
       body = msg.text?.body ?? null;
@@ -144,17 +156,21 @@ export function normalizeMetaMessage(msg: {
     case "image":
       body = msg.image?.caption ?? null;
       mediaId = msg.image?.id ?? null;
+      mediaMimeType = msg.image?.mime_type ?? null;
       break;
     case "audio":
       mediaId = msg.audio?.id ?? null;
+      mediaMimeType = msg.audio?.mime_type ?? null;
       break;
     case "video":
       body = msg.video?.caption ?? null;
       mediaId = msg.video?.id ?? null;
+      mediaMimeType = msg.video?.mime_type ?? null;
       break;
     case "document":
       body = msg.document?.filename ?? null;
       mediaId = msg.document?.id ?? null;
+      mediaMimeType = msg.document?.mime_type ?? null;
       break;
     case "button":
       body = msg.button?.text ?? null;
@@ -171,6 +187,7 @@ export function normalizeMetaMessage(msg: {
     messageType: msg.type === "button" ? "text" : type,
     body,
     mediaId,
+    mediaMimeType,
     sentAt: msg.timestamp
       ? new Date(Number(msg.timestamp) * 1000).toISOString()
       : new Date().toISOString(),
@@ -242,12 +259,32 @@ export const metaProvider: WhatsAppProvider = {
 
   async sendMessage(input) {
     if (!input.meta) throw new Error("Cloud API: phoneNumberId e token são obrigatórios.");
-    return metaProvider.sendText!({
-      phoneNumberId: input.meta.phoneNumberId,
-      token: input.meta.token,
-      to: input.to,
-      body: input.body,
+    if (!input.media) {
+      return metaProvider.sendText!({
+        phoneNumberId: input.meta.phoneNumberId,
+        token: input.meta.token,
+        to: input.to,
+        body: input.body,
+      });
+    }
+    const to = input.to.replace(/^\+/, "");
+    const mediaPayload: Record<string, unknown> = { link: input.media.url };
+    if (input.media.kind === "image" && input.media.caption) mediaPayload["caption"] = input.media.caption;
+    const res = await fetch(`${GRAPH}/${input.meta.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${input.meta.token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: input.media.kind,
+        [input.media.kind]: mediaPayload,
+      }),
     });
+    const json = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) throw graphError(json, res.status);
+    const waId = (json["messages"] as Array<{ id?: string }> | undefined)?.[0]?.id ?? null;
+    return { waMessageId: waId, provider: "meta_cloud" };
   },
 
   async getConnectionStatus(input) {

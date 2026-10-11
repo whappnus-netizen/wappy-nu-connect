@@ -10,7 +10,7 @@
  */
 import { serviceClient } from "../whatsapp.server";
 import { generateViaWhappNusAI } from "../ai-engine.server";
-import type { NormalizedIncoming, SessionRef } from "./provider.server";
+import type { NormalizedIncoming, OutgoingMedia, SessionRef } from "./provider.server";
 import { providerByName } from "./registry.server";
 
 export type WhatsAppEventType =
@@ -87,12 +87,59 @@ export type IngestOutcome = {
  * Grava a mensagem recebida (idempotente por wa_message_id) e, se a IA
  * automática estiver activa nessa conversa, gera e envia a resposta.
  */
+async function persistMetaAttachment(number: NumberRow, incoming: NormalizedIncoming): Promise<void> {
+  if (incoming.provider !== "meta_cloud" || !incoming.mediaId ||
+      !["image", "audio", "video", "document"].includes(incoming.messageType)) return;
+  try {
+    const { metaTokenForNumber } = await import("../whatsapp.server");
+    const token = await metaTokenForNumber(number.id);
+    const metadataResponse = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(incoming.mediaId)}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12000),
+    });
+    const metadata = await metadataResponse.json() as Record<string, unknown>;
+    if (!metadataResponse.ok || typeof metadata["url"] !== "string") throw new Error("A Meta não disponibilizou o URL do anexo.");
+    const mediaUrl = new URL(metadata["url"]);
+    const host = mediaUrl.hostname.toLowerCase();
+    const trustedHost = host === "lookaside.fbsbx.com" || host.endsWith(".fbsbx.com") ||
+      host.endsWith(".fbcdn.net") || host.endsWith(".whatsapp.net") || host === "graph.facebook.com";
+    if (mediaUrl.protocol !== "https:" || !trustedHost) throw new Error("URL de mídia Meta não autorizada.");
+    const mimeType = String(metadata["mime_type"] ?? incoming.mediaMimeType ?? "");
+    const extensionByMime: Record<string, string> = {
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+      "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
+      "audio/amr": "amr", "audio/wav": "wav", "application/pdf": "pdf",
+      "video/mp4": "mp4", "video/3gpp": "3gp",
+    };
+    if (!extensionByMime[mimeType]) throw new Error("Tipo MIME do anexo não suportado: " + mimeType);
+    const fileResponse = await fetch(mediaUrl, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+    if (!fileResponse.ok) throw new Error("Falha ao descarregar mídia Meta (HTTP " + fileResponse.status + ").");
+    const bytes = await fileResponse.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > 20 * 1024 * 1024) throw new Error("Anexo vazio ou superior a 20 MB.");
+    const safeId = incoming.waMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const storagePath = `${number.organization_id}/${number.id}/${safeId}.${extensionByMime[mimeType]}`;
+    const { error: uploadError } = await serviceClient().storage.from("whatsapp-incoming-media")
+      .upload(storagePath, bytes, { contentType: mimeType, upsert: true });
+    if (uploadError) throw new Error(uploadError.message);
+    incoming.mediaId = storagePath;
+    incoming.mediaMimeType = mimeType;
+  } catch (error) {
+    console.error("[wappnus] falha ao processar mídia Meta:", (error as Error).message);
+    incoming.mediaId = null;
+    incoming.body = "[O cliente enviou um anexo, mas não foi possível processá-lo. Não descrevas o conteúdo; pede ao cliente para reenviar ou descrever o que enviou.]";
+    await logWhatsAppEvent(number.organization_id, "message_failed", {
+      whatsappNumberId: number.id, provider: "meta_cloud",
+      detail: { stage: "media_download", messageType: incoming.messageType, error: (error as Error).message.slice(0, 200) },
+    });
+  }
+}
+
 export async function processIncomingMessage(
   whatsappNumberId: string,
   incoming: NormalizedIncoming,
 ): Promise<IngestOutcome> {
   const admin = serviceClient();
   const number = await loadNumber(whatsappNumberId);
+  await persistMetaAttachment(number, incoming);
 
   // 14. Nunca processar mensagens próprias (evita loops entre automações).
   if (incoming.fromMe) {
@@ -190,14 +237,24 @@ export async function processIncomingMessage(
         detail: { stage: "automation_lookup", error: rulesError.message.slice(0, 200) },
       });
     } else {
+      type StoredStep = { kind?: string; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string };
       type AutomationRow = { id: string; name: string; trigger_type: string; config: Record<string, unknown> | null };
       const activeRules = (rules ?? []) as AutomationRow[];
       const getReply = (rule: AutomationRow) => {
         const value = rule.config?.["reply"];
         return typeof value === "string" ? value.trim() : "";
       };
+      const getSteps = (rule: AutomationRow): StoredStep[] => {
+        const steps = rule.config?.["steps"];
+        return Array.isArray(steps) ? steps as StoredStep[] : [];
+      }
+      const hasActions = (rule: AutomationRow) =>
+        getReply(rule).length > 0 || getSteps(rule).some((step) =>
+          step.kind === "text" ? Boolean(step.text?.trim()) :
+          (step.kind === "image" || step.kind === "audio") && Boolean(step.storagePath && step.mimeType)
+        );
       const keywordRule = activeRules
-        .filter((rule) => rule.trigger_type === "keyword_match" && getReply(rule).length > 0)
+        .filter((rule) => rule.trigger_type === "keyword_match" && hasActions(rule))
         .sort((a, b) => {
           const aValue = a.config?.["keyword"];
           const bValue = b.config?.["keyword"];
@@ -231,7 +288,7 @@ export async function processIncomingMessage(
 
       // Fora de horário usa o fuso horário persistido na organização.
       if (!selectedRule) {
-        const outsideRules = activeRules.filter((rule) => rule.trigger_type === "outside_business_hours" && getReply(rule).length > 0);
+        const outsideRules = activeRules.filter((rule) => rule.trigger_type === "outside_business_hours" && hasActions(rule));
         if (outsideRules.length > 0) {
           const { data: org } = await admin.from("organizations").select("timezone").eq("id", number.organization_id).maybeSingle();
           const timezone = typeof org?.timezone === "string" && org.timezone ? org.timezone : "Africa/Luanda";
@@ -278,11 +335,20 @@ export async function processIncomingMessage(
             if (withinHours) continue;
 
             const reply = getReply(rule);
+            const cooldownMediaPath = getSteps(rule).find((step) =>
+              (step.kind === "image" || step.kind === "audio") && Boolean(step.storagePath)
+            )?.storagePath;
             const cooldownSince = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-            const { data: priorReply, error: priorReplyError } = await admin
-              .from("messages").select("id").eq("organization_id", number.organization_id)
-              .eq("conversation_id", res.conversation_id).eq("direction", "outbound")
-              .eq("body", reply).gte("created_at", cooldownSince).limit(1).maybeSingle();
+            let priorReplyQuery = admin.from("messages").select("id")
+              .eq("organization_id", number.organization_id)
+              .eq("conversation_id", res.conversation_id)
+              .eq("direction", "outbound")
+              .gte("created_at", cooldownSince)
+              .limit(1);
+            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("media_id", cooldownMediaPath);
+            else if (reply) priorReplyQuery = priorReplyQuery.eq("body", reply);
+            else continue;
+            const { data: priorReply, error: priorReplyError } = await priorReplyQuery.maybeSingle();
             if (priorReplyError) {
               await logWhatsAppEvent(number.organization_id, "error", {
                 whatsappNumberId: number.id,
@@ -449,24 +515,49 @@ export async function processIncomingMessage(
 
       // Boas-vindas só na primeira mensagem recebida da conversa.
       if (!selectedRule && isFirstInbound) {
-        selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && getReply(rule).length > 0);
+        selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && hasActions(rule));
         if (selectedRule) selectedReason = "welcome_automation";
       }
 
       if (selectedRule) {
         const reply = getReply(selectedRule);
+        const configuredSteps = getSteps(selectedRule);
+        const executionSteps: StoredStep[] = configuredSteps.length
+          ? configuredSteps
+          : (reply ? [{ kind: "text", text: reply }] : []);
         try {
-          await sendOutgoingMessage({
-            organizationId: number.organization_id,
-            whatsappNumberId: number.id,
-            conversationId: res.conversation_id,
-            body: reply,
-            isAi: false,
-          });
+          for (const step of executionSteps) {
+            if (step.kind === "text") {
+              const body = (step.text ?? "").trim();
+              if (!body) continue;
+              await sendOutgoingMessage({
+                organizationId: number.organization_id,
+                whatsappNumberId: number.id,
+                conversationId: res.conversation_id,
+                body,
+                isAi: false,
+              });
+            } else if ((step.kind === "image" || step.kind === "audio") && step.storagePath && step.mimeType) {
+              await sendOutgoingMessage({
+                organizationId: number.organization_id,
+                whatsappNumberId: number.id,
+                conversationId: res.conversation_id,
+                body: step.caption ?? "",
+                media: {
+                  kind: step.kind,
+                  storagePath: step.storagePath,
+                  mimeType: step.mimeType,
+                  caption: step.caption,
+                  fileName: step.fileName,
+                },
+                isAi: false,
+              });
+            }
+          }
           await logWhatsAppEvent(number.organization_id, "message_sent", {
             whatsappNumberId: number.id,
             provider: incoming.provider,
-            detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type },
+            detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type, steps: executionSteps.length },
           });
           if (selectedReason !== "welcome_automation") {
             return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
@@ -534,7 +625,12 @@ export async function processIncomingMessage(
       messageId: incoming.waMessageId,
       fromWaId: incoming.fromWaId,
       profileName: incoming.profileName,
-      text: incoming.body ?? `[${incoming.messageType}]`,
+      text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
+      messageType: incoming.messageType,
+      mediaPath: incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
+        ? incoming.mediaId
+        : null,
+      mediaMimeType: incoming.mediaMimeType ?? null,
     });
     await sendOutgoingMessage({
       organizationId: number.organization_id,
@@ -588,6 +684,7 @@ export async function sendOutgoingMessage(input: {
   whatsappNumberId: string;
   conversationId: string;
   body: string;
+  media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string };
   isAi?: boolean;
   sentBy?: string | null;
 }): Promise<{ waMessageId: string | null; provider: string }> {
@@ -618,14 +715,38 @@ export async function sendOutgoingMessage(input: {
     metaCreds = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
   }
 
+  let outgoingMedia: OutgoingMedia | undefined;
+  if (input.media) {
+    const expectedPrefix = input.organizationId + "/";
+    if (!input.media.storagePath.startsWith(expectedPrefix) || input.media.storagePath.includes("..")) {
+      throw new Error("Caminho de mídia inválido para esta organização.");
+    }
+    if ((input.media.kind === "image" && !input.media.mimeType.startsWith("image/")) ||
+        (input.media.kind === "audio" && !input.media.mimeType.startsWith("audio/"))) {
+      throw new Error("Tipo de mídia inválido.");
+    }
+    const { data: signed, error: signError } = await admin.storage
+      .from("automation-media").createSignedUrl(input.media.storagePath, 300);
+    if (signError || !signed?.signedUrl) throw new Error("Não foi possível preparar o ficheiro de mídia: " + (signError?.message ?? "URL temporário indisponível"));
+    outgoingMedia = {
+      kind: input.media.kind,
+      url: signed.signedUrl,
+      mimeType: input.media.mimeType,
+      caption: input.media.caption,
+      fileName: input.media.fileName,
+      storagePath: input.media.storagePath,
+    };
+  }
+
   try {
-    const sent = await provider.sendMessage({ ...ref, to, body: input.body, meta: metaCreds });
+    const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
     await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
       direction: "outbound",
-      message_type: "text",
-      body: input.body,
+      message_type: input.media?.kind ?? "text",
+      body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
+      media_id: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
       sent_by: input.sentBy ?? null,

@@ -125,7 +125,7 @@ export const qrProvider: WhatsAppProvider = {
   async sendMessage(input: SendMessageInput): Promise<SendResult> {
     const out = await bridgeFetch<{ waMessageId?: string | null }>(
       `/sessions/${encodeURIComponent(qrSessionKey(input))}/messages`,
-      { method: "POST", body: { to: input.to, body: input.body } },
+      { method: "POST", body: { to: input.to, body: input.body, media: input.media } },
     );
     return { waMessageId: out.waMessageId ?? null, provider: "qr" };
   },
@@ -153,6 +153,7 @@ export const qrProvider: WhatsAppProvider = {
       messageType?: string;
       body?: string | null;
       mediaId?: string | null;
+      mediaMimeType?: string | null;
       sentAt?: string;
       fromMe?: boolean;
     };
@@ -171,6 +172,7 @@ export const qrProvider: WhatsAppProvider = {
       messageType: type,
       body: m.body ?? null,
       mediaId: m.mediaId ?? null,
+      mediaMimeType: m.mediaMimeType ?? null,
       sentAt: m.sentAt ?? new Date().toISOString(),
       fromMe: Boolean(m.fromMe),
     };
