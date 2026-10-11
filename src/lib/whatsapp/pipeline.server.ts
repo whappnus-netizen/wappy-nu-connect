@@ -686,7 +686,7 @@ export async function sendOutgoingMessage(input: {
   whatsappNumberId: string;
   conversationId: string;
   body: string;
-  media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string; durationMs?: number };
+  media?: { kind: "image" | "audio" | "video" | "document"; storagePath: string; mimeType: string; caption?: string; fileName?: string; durationMs?: number };
   isAi?: boolean;
   sentBy?: string | null;
   reaction?: { waMessageId: string; emoji: string };
@@ -725,7 +725,9 @@ export async function sendOutgoingMessage(input: {
       throw new Error("Caminho de mídia inválido para esta organização.");
     }
     if ((input.media.kind === "image" && !input.media.mimeType.startsWith("image/")) ||
-        (input.media.kind === "audio" && !input.media.mimeType.startsWith("audio/"))) {
+        (input.media.kind === "audio" && !input.media.mimeType.startsWith("audio/")) ||
+        (input.media.kind === "video" && !input.media.mimeType.startsWith("video/")) ||
+        (input.media.kind === "document" && !input.media.mimeType)) {
       throw new Error("Tipo de mídia inválido.");
     }
     const { data: signed, error: signError } = await admin.storage
@@ -756,7 +758,7 @@ export async function sendOutgoingMessage(input: {
       whatsapp_number_id: input.whatsappNumberId,
       direction: "outbound",
       message_type: input.media?.kind ?? "text",
-      body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
+      body: input.media ? (input.media.caption || ({ image: "[Imagem enviada]", audio: "[Áudio enviado]", video: "[Vídeo enviado]", document: "[Documento enviado]" } as Record<string, string>)[input.media.kind]) : input.body,
       media_url: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
