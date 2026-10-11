@@ -523,7 +523,7 @@ Deno.serve(async (req: Request) => {
       if (triggerMode === "relative" && (!Number.isInteger(delayMinutes) || Number(delayMinutes) < 0)) return fail("O atraso deve ser um número de minutos igual ou superior a zero.");
       if (triggerMode === "calendar" && (!scheduledAt || !Number.isFinite(Date.parse(scheduledAt)))) return fail("Escolha uma data e hora válidas.");
       if ((actionType === "text" || actionType === "ai_text") && !textContent) return fail("A etapa precisa de texto ou de uma instrução para a IA.");
-      if (actionType !== "text" && (!assetPath || !mimeType)) return fail("As etapas multimédia precisam de um ficheiro guardado e MIME type.");
+      if (actionType !== "text" && actionType !== "ai_text" && (!assetPath || !mimeType)) return fail("As etapas multimédia precisam de um ficheiro guardado e MIME type.");
       const patch = { flow_id: flowId, position, trigger_mode: triggerMode, delay_minutes: delayMinutes, scheduled_at: scheduledAt, action_type: actionType, text_content: textContent || null, asset_path: assetPath, asset_mime_type: mimeType, asset_file_name: fileName, caption, status: "draft", updated_at: new Date().toISOString() };
       const result = id
         ? await db.from("superadmin_group_flow_steps").update(patch).eq("id", id).select("*").single()
