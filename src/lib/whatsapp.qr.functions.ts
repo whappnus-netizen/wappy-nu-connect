@@ -18,7 +18,7 @@ export const startQrSession = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { requireOrgRole, requireActiveSubscription, serviceClient } = await import("./whatsapp.server");
+    const { requireOrgRole, requireActiveSubscription, requireWhatsAppConnectionCapacity, serviceClient } = await import("./whatsapp.server");
     const { qrProvider, qrBridgeConfigured } = await import("./whatsapp/qr.server");
     const { logWhatsAppEvent } = await import("./whatsapp/pipeline.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
@@ -56,6 +56,7 @@ export const startQrSession = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId);
       if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
     } else {
+      await requireWhatsAppConnectionCapacity(data.organizationId);
       const { data: createdNumber, error: createErr } = await admin
         .from("whatsapp_numbers")
         .insert({
