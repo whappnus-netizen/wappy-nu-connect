@@ -122,6 +122,7 @@ function WhatsAppPage() {
           "id, display_name, phone_e164, status, provider, waba_id, phone_number_id, last_synced_at",
         )
         .eq("organization_id", orgId!)
+        .is("deleted_at", null)
         .order("created_at", { ascending: true });
       if (err) throw new Error(err.message);
       return (data ?? []) as WaNumber[];
@@ -450,6 +451,18 @@ function WhatsAppPage() {
                             <QrCode className="size-4" /> Ligar / ver QR
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={!canManage || archiveQr.isPending}
+                          onClick={() => {
+                            if (window.confirm("Arquivar esta ligação? A sessão será desligada e deixará de aparecer nesta lista. As conversas, contactos e mensagens serão preservados.")) {
+                              archiveQr.mutate(n.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-4" /> Arquivar
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
