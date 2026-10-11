@@ -15,13 +15,13 @@ import { Logo } from "@/components/app/app-shell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Whappy Nus" },
+      { title: "WhappNus" },
       {
         name: "description",
         content:
           "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
       },
-      { property: "og:title", content: "Whappy Nus" },
+      { property: "og:title", content: "WhappNus" },
       {
         property: "og:description",
         content: "Centralize o WhatsApp da sua empresa: multiatendimento, CRM, automações e IA numa só plataforma feita para Angola.",
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/")({
 });
 
 const modules = [
-  { icon: Smartphone, title: "WhatsApp oficial", text: "Números geridos via WhatsApp Cloud API da Meta. Sem QR-code bots nem bibliotecas não oficiais." },
+  { icon: Smartphone, title: "Ligação WhatsApp", text: "Ligue números através da Cloud API da Meta ou por QR Code, conforme o método disponível." },
   { icon: MessagesSquare, title: "Multiatendimento", text: "Vários agentes na mesma caixa de entrada, com filas, etiquetas, prioridade e transferência." },
   { icon: KanbanSquare, title: "CRM", text: "Leads, oportunidades e pipeline em Kanban, com valor potencial em Kwanza (AOA)." },
   { icon: Workflow, title: "Automações", text: "Regras QUANDO → SE → ENTÃO para respostas fora do expediente, etiquetas e atribuições." },
@@ -68,7 +68,7 @@ function Landing() {
               O WhatsApp da sua empresa, finalmente organizado.
             </h1>
             <p className="mt-5 max-w-xl text-base text-muted-foreground">
-              Wappy Nus centraliza o atendimento, organiza os contactos e automatiza respostas — sobre a
+              WhappNus centraliza o atendimento, organiza os contactos e automatiza respostas — sobre a
               infraestrutura oficial do WhatsApp Business Platform.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -121,6 +121,38 @@ function Landing() {
               <p className="mt-2 text-sm text-muted-foreground">{m.text}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section id="planos" className="border-y border-border bg-card/40 py-20">
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Planos transparentes</span>
+            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Comece pequeno. Cresça com o seu negócio.</h2>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">Preços em Kwanza, limites claros e as ferramentas essenciais num só lugar. Sem cartão bancário para experimentar.</p>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {[
+              {name:"Teste grátis",price:"0",period:"7 dias",description:"Experimente antes de investir.",featured:false,items:["1 WhatsApp + 1 agente IA","Até 150 conversas com IA no teste","Até 2 automações","Acesso ao Inbox, CRM e contactos","Sem cartão bancário"]},
+              {name:"WhappNus Start",price:"10.000",period:"/ mês",description:"Para começar a automatizar o atendimento.",featured:false,items:["1 WhatsApp + 1 agente IA","Até 1.500 conversas com IA / mês","Até 2 automações activas","1 membro adicional na equipa","Dashboard, Inbox, CRM e IA"]},
+              {name:"WhappNus Pro",price:"25.000",period:"/ mês",description:"Mais capacidade para equipas em crescimento.",featured:true,items:["2 WhatsApps + 2 agentes IA","Até 4.000 conversas com IA / mês","Até 5 automações activas","Até 3 membros adicionais","Todas as ferramentas essenciais"]},
+              {name:"WhappNus Premium",price:"45.000",period:"/ mês",description:"Para operações com maior volume.",featured:false,items:["4 WhatsApps + 4 agentes IA","Até 10.000 conversas com IA / mês","Até 15 automações activas","Até 9 membros adicionais","Todas as ferramentas essenciais"]},
+            ].map((plan) => (
+              <div key={plan.name} className={`relative flex flex-col rounded-2xl border bg-background p-5 shadow-soft ${plan.featured ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
+                {plan.featured && <span className="mb-3 self-start rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">Mais escolhido</span>}
+                <h3 className="font-display text-lg font-bold">{plan.name}</h3>
+                <p className="mt-2 min-h-10 text-sm text-muted-foreground">{plan.description}</p>
+                <div className="mt-5 flex items-baseline gap-1"><span className="text-3xl font-bold tracking-tight">{plan.price}</span><span className="text-xs text-muted-foreground">Kz {plan.period}</span></div>
+                <ul className="mt-6 flex-1 space-y-3">
+                  {plan.items.map((item) => <li key={item} className="flex gap-2 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-primary" /><span>{item}</span></li>)}
+                </ul>
+                <Button asChild className="mt-7 w-full" variant={plan.featured ? "default" : "outline"}>
+                  <Link to="/auth/registo">{plan.price === "0" ? "Experimentar grátis" : "Começar agora"} <ArrowRight className="size-4" /></Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">As conversas e os recursos são contabilizados por organização. Os dados e o histórico permanecem guardados quando uma assinatura expira.</p>
         </div>
       </section>
 
