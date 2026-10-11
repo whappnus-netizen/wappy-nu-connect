@@ -15,3 +15,7 @@ The organization locale and trigger-function hardening migrations use the exact 
 
 
 Before merging this feature, the repository TypeScript check and both Netlify preview builds must pass.
+
+
+## Automatic distribution
+A `conversation_created` rule can set `config.actionType = 'assign_agent'`. The runtime assigns the first message to the eligible member with the fewest conversations in `open` or `in_progress`, preferring AGENT, then SUPERVISOR, ADMIN, and OWNER. The conversation stays `open` with AI enabled until a human explicitly assumes it; that action changes it to `in_progress` and disables AI.
