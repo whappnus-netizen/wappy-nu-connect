@@ -383,7 +383,7 @@ function InboxPage() {
                     {active.status !== "open"
                       ? "A IA só pode ser alterada em conversas abertas."
                       : active.assigned_to
-                        ? "Atendimento humano activo"
+                        ? active.ai_enabled ? "Atribuída à equipa; IA continua activa" : "Atendimento humano activo"
                         : active.ai_enabled
                           ? "A IA responde automaticamente"
                           : "As mensagens ficam só na caixa de entrada"}
