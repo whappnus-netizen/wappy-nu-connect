@@ -656,7 +656,7 @@ export async function processIncomingMessage(
             to: incoming.fromWaId,
             waMessageId: incoming.waMessageId,
             emoji: ai.reactionEmoji,
-            meta: reactionMeta,
+            ...(reactionMeta ? { meta: reactionMeta } : {}),
           });
         }
       } catch (reactionError) {
