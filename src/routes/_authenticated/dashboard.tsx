@@ -67,6 +67,7 @@ function DashboardPage() {
         .from("whatsapp_numbers")
         .select("id, display_name, phone_e164, provider, status")
         .eq("organization_id", orgId!)
+        .is("deleted_at", null)
         .order("created_at", { ascending: true });
       if (error) throw new Error(error.message);
       return (data ?? []) as {
