@@ -107,7 +107,14 @@ function AutomationsPage() {
             .upload(storagePath, file, { contentType: file.type, upsert: false });
           if (uploadError) throw new Error("Falha ao carregar mídia: " + uploadError.message);
           uploadedPaths.push(storagePath);
-          storedSteps.push({ id: step.id, kind: step.kind, storagePath, mimeType: file.type, fileName: file.name, caption: step.kind === "image" ? step.content.trim() : undefined });
+          storedSteps.push({
+            id: step.id,
+            kind: step.kind,
+            storagePath,
+            mimeType: file.type,
+            fileName: file.name,
+            ...(step.kind === "image" && step.content.trim() ? { caption: step.content.trim() } : {}),
+          });
         }
 
         const cleanReply = storedSteps.filter((step) => step.kind === "text").map((step) => step.text ?? "").join("\\n").trim();
