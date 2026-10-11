@@ -87,12 +87,59 @@ export type IngestOutcome = {
  * Grava a mensagem recebida (idempotente por wa_message_id) e, se a IA
  * automática estiver activa nessa conversa, gera e envia a resposta.
  */
+async function persistMetaAttachment(number: NumberRow, incoming: NormalizedIncoming): Promise<void> {
+  if (incoming.provider !== "meta_cloud" || !incoming.mediaId ||
+      !["image", "audio", "video", "document"].includes(incoming.messageType)) return;
+  try {
+    const { metaTokenForNumber } = await import("../whatsapp.server");
+    const token = await metaTokenForNumber(number.id);
+    const metadataResponse = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(incoming.mediaId)}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(12000),
+    });
+    const metadata = await metadataResponse.json() as Record<string, unknown>;
+    if (!metadataResponse.ok || typeof metadata["url"] !== "string") throw new Error("A Meta não disponibilizou o URL do anexo.");
+    const mediaUrl = new URL(metadata["url"]);
+    const host = mediaUrl.hostname.toLowerCase();
+    const trustedHost = host === "lookaside.fbsbx.com" || host.endsWith(".fbsbx.com") ||
+      host.endsWith(".fbcdn.net") || host.endsWith(".whatsapp.net") || host === "graph.facebook.com";
+    if (mediaUrl.protocol !== "https:" || !trustedHost) throw new Error("URL de mídia Meta não autorizada.");
+    const mimeType = String(metadata["mime_type"] ?? incoming.mediaMimeType ?? "");
+    const extensionByMime: Record<string, string> = {
+      "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+      "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "audio/aac": "aac",
+      "audio/amr": "amr", "audio/wav": "wav", "application/pdf": "pdf",
+      "video/mp4": "mp4", "video/3gpp": "3gp",
+    };
+    if (!extensionByMime[mimeType]) throw new Error("Tipo MIME do anexo não suportado: " + mimeType);
+    const fileResponse = await fetch(mediaUrl, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
+    if (!fileResponse.ok) throw new Error("Falha ao descarregar mídia Meta (HTTP " + fileResponse.status + ").");
+    const bytes = new Uint8Array(await fileResponse.arrayBuffer());
+    if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("Anexo vazio ou superior a 20 MB.");
+    const safeId = incoming.waMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const storagePath = `${number.organization_id}/${number.id}/${safeId}.${extensionByMime[mimeType]}`;
+    const { error: uploadError } = await serviceClient().storage.from("whatsapp-incoming-media")
+      .upload(storagePath, bytes, { contentType: mimeType, upsert: true });
+    if (uploadError) throw new Error(uploadError.message);
+    incoming.mediaId = storagePath;
+    incoming.mediaMimeType = mimeType;
+  } catch (error) {
+    console.error("[wappnus] falha ao processar mídia Meta:", (error as Error).message);
+    incoming.mediaId = null;
+    incoming.body = "[O cliente enviou um anexo, mas não foi possível processá-lo. Não descrevas o conteúdo; pede ao cliente para reenviar ou descrever o que enviou.]";
+    await logWhatsAppEvent(number.organization_id, "message_failed", {
+      whatsappNumberId: number.id, provider: "meta_cloud",
+      detail: { stage: "media_download", messageType: incoming.messageType, error: (error as Error).message.slice(0, 200) },
+    });
+  }
+}
+
 export async function processIncomingMessage(
   whatsappNumberId: string,
   incoming: NormalizedIncoming,
 ): Promise<IngestOutcome> {
   const admin = serviceClient();
   const number = await loadNumber(whatsappNumberId);
+  await persistMetaAttachment(number, incoming);
 
   // 14. Nunca processar mensagens próprias (evita loops entre automações).
   if (incoming.fromMe) {
@@ -580,7 +627,7 @@ export async function processIncomingMessage(
       profileName: incoming.profileName,
       text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
       messageType: incoming.messageType,
-      mediaPath: incoming.provider === "qr" && incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
+      mediaPath: incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
         ? incoming.mediaId
         : null,
       mediaMimeType: incoming.mediaMimeType ?? null,
