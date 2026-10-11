@@ -73,6 +73,7 @@ export type NormalizedIncoming = {
   messageType: "text" | "image" | "audio" | "video" | "document" | "system";
   body: string | null;
   mediaId: string | null;
+  mediaMimeType?: string | null;
   sentAt: string;
   fromMe: boolean;
 };
