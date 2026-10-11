@@ -27,7 +27,7 @@ export const Route = createFileRoute("/superadmin")({
     });
     if (accessError || access?.ok !== true) throw redirect({ to: "/dashboard" });
   },
-  head: () => ({ meta: [{ title: "Super Admin — Wapnus" }, { name: "description", content: "Painel de controlo da plataforma Wapnus." }] }),
+  head: () => ({ meta: [{ title: "Super Admin — WhappNus" }, { name: "description", content: "Painel de controlo da plataforma WhappNus." }] }),
   component: SuperAdminPage,
 });
 
@@ -134,7 +134,7 @@ function SuperAdminPage() {
   const savePlan = useMutation({
     mutationFn: () => adminApi<Plan>("plans.save", {
       code: planCode.trim() || slugify(planName).replace(/-/g, "_") + (planInterval === "yearly" ? "_yearly" : "_monthly"),
-      name: planName.trim(), description: "Plano Wapnus", billing_interval: planInterval,
+      name: planName.trim(), description: "Plano WhappNus", billing_interval: planInterval,
       price_aoa: Number(planPrice), trial_days: 0, limits: { whatsapp_numbers: 1, agents: 1, team_members: 2 },
       features: { crm: true, automations: false, analytics: false }, is_active: Number(planPrice) > 0,
     }),
@@ -159,7 +159,7 @@ function SuperAdminPage() {
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-white/10 bg-[#091510] lg:flex">
         <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
           <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-400 text-[#062016]"><ShieldCheck className="size-5" /></div>
-          <div><div className="font-display text-lg font-bold tracking-tight">Wapnus</div><div className="text-[10px] uppercase tracking-[0.24em] text-emerald-300">Control Center</div></div>
+          <div><div className="font-display text-lg font-bold tracking-tight">WhappNus</div><div className="text-[10px] uppercase tracking-[0.24em] text-emerald-300">Control Center</div></div>
         </div>
         <div className="px-4 pt-6 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Plataforma</div>
         <nav className="mt-2 flex-1 space-y-1 px-3">
@@ -196,7 +196,7 @@ function SuperAdminPage() {
           {tab === "overview" && <div className="space-y-6">
             <div className="relative overflow-hidden rounded-2xl border border-emerald-300/15 bg-gradient-to-br from-emerald-400/10 via-[#10251b] to-[#0b1712] p-6 sm:p-8">
               <div className="pointer-events-none absolute -right-8 -top-16 size-64 rounded-full border border-emerald-200/10" /><div className="pointer-events-none absolute -right-1 -top-9 size-48 rounded-full border border-emerald-200/10" />
-              <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"><div><Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-200 hover:bg-emerald-300/10">Super Admin · Acesso privilegiado</Badge><h2 className="mt-4 max-w-2xl font-display text-2xl font-bold sm:text-3xl">O centro de comando da Wapnus.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">Acompanha clientes, pagamentos, subscrições e o estado operacional num só lugar. As operações administrativas são autorizadas no servidor.</p></div><div className="flex items-center gap-2 text-xs text-slate-400"><CheckCircle2 className="size-4 text-emerald-300" /> Sessão protegida</div></div>
+              <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"><div><Badge className="border-emerald-300/20 bg-emerald-300/10 text-emerald-200 hover:bg-emerald-300/10">Super Admin · Acesso privilegiado</Badge><h2 className="mt-4 max-w-2xl font-display text-2xl font-bold sm:text-3xl">O centro de comando da WhappNus.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">Acompanha clientes, pagamentos, subscrições e o estado operacional num só lugar. As operações administrativas são autorizadas no servidor.</p></div><div className="flex items-center gap-2 text-xs text-slate-400"><CheckCircle2 className="size-4 text-emerald-300" /> Sessão protegida</div></div>
             </div>
             {isLoading ? <Loading /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <Metric icon={Building2} label="Organizações" value={metrics?.organizations} note={`${metrics?.activeOrganizations ?? 0} ativas`} />
