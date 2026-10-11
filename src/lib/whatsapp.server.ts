@@ -45,6 +45,29 @@ export function serviceClient(): SupabaseClient {
 export type OrgRole = "OWNER" | "ADMIN" | "SUPERVISOR" | "AGENT";
 
 /** Blocks new AI/connection setup actions when the organization has no active plan. */
+/** Enforces the number of WhatsApp connections allowed by the organization's current plan. */
+export async function requireWhatsAppConnectionCapacity(organizationId: string, phoneE164?: string): Promise<void> {
+  await requireActiveSubscription(organizationId);
+  const admin = serviceClient();
+  if (phoneE164) {
+    const { data: existing, error: existingError } = await admin.from("whatsapp_numbers")
+      .select("id").eq("organization_id", organizationId).eq("phone_e164", phoneE164)
+      .is("deleted_at", null).maybeSingle();
+    if (existingError) throw new Error("Não foi possível validar o limite de números WhatsApp.");
+    if (existing) return;
+  }
+  const [{ data: subscription, error: subscriptionError }, { count, error: countError }] = await Promise.all([
+    admin.from("organization_subscriptions").select("subscription_plans(limits)")
+      .eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("whatsapp_numbers").select("id", { count: "exact", head: true })
+      .eq("organization_id", organizationId).is("deleted_at", null),
+  ]);
+  if (subscriptionError || countError) throw new Error("Não foi possível validar o limite de números WhatsApp.");
+  const plan = subscription?.subscription_plans as { limits?: Record<string, unknown> } | null;
+  const limit = Number(plan?.limits?.["whatsapp_numbers"] ?? 0);
+  if ((count ?? 0) >= limit) throw new Error("PLAN_LIMIT_WHATSAPP_NUMBERS");
+}
+
 export async function requireActiveSubscription(organizationId: string): Promise<void> {
   const admin = serviceClient();
   const [{ data: organization, error: organizationError }, { data: subscription, error: subscriptionError }] = await Promise.all([
