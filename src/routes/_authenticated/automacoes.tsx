@@ -122,7 +122,7 @@ function AutomationsPage() {
             mimeType,
             fileName: file.name,
             ...(step.kind === "audio" && step.durationMs ? { durationMs: step.durationMs } : {}),
-            ...(step.kind !== "text" && step.kind !== "audio" && step.content.trim() ? { caption: step.content.trim() } : {}),
+            ...(step.kind !== "audio" && step.content.trim() ? { caption: step.content.trim() } : {}),
           });
         }
 
