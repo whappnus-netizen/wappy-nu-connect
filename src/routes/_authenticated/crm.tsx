@@ -30,6 +30,7 @@ function CrmPage() {
   const [error, setError] = useState<string | null>(null);
   const [backfillPreview, setBackfillPreview] = useState<{ contactsWithConversations: number; alreadyRepresented: number; opportunitiesToCreate: number; initialStage: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
   const canManageCRM = membership?.role === "OWNER" || membership?.role === "ADMIN";
   const previewBackfillFn = useServerFn(previewExistingConversationDeals);
   const syncBackfillFn = useServerFn(syncExistingConversationDeals);
@@ -72,8 +73,8 @@ function CrmPage() {
       if (!orgId || !canManageCRM) throw new Error("Apenas OWNER ou ADMIN pode sincronizar o CRM.");
       return previewBackfillFn({ data: { organizationId: orgId } });
     },
-    onSuccess: (result) => { setBackfillPreview(result); setError(null); setNotice(null); },
-    onError: (e: Error) => { setError(e.message); setBackfillPreview(null); },
+    onSuccess: (result) => { setBackfillPreview(result); setBackfillError(null); setNotice(null); },
+    onError: (e: Error) => { setBackfillError(e.message); setBackfillPreview(null); },
   });
 
   const syncBackfill = useMutation({
@@ -85,9 +86,10 @@ function CrmPage() {
       setNotice(`Sincronização concluída: ${result.createdCount} oportunidades criadas, ${result.skippedCount} contactos já representados e ${result.failedCount} falhas.`);
       setBackfillPreview(null);
       setError(null);
+      setBackfillError(null);
       void queryClient.invalidateQueries({ queryKey: ["crm", orgId] });
     },
-    onError: (e: Error) => { setError(e.message); setNotice(null); },
+    onError: (e: Error) => { setBackfillError(e.message); setNotice(null); },
   });
 
   const moveDeal = useMutation({
@@ -128,7 +130,7 @@ function CrmPage() {
           {backfillPreview.opportunitiesToCreate > 0 ? <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm font-medium">Serão criadas {backfillPreview.opportunitiesToCreate} oportunidades em falta.</p><Button disabled={syncBackfill.isPending} onClick={() => { if (window.confirm(`Criar ${backfillPreview.opportunitiesToCreate} oportunidades para contactos com conversas existentes? A acção não altera mensagens nem contactos.`)) syncBackfill.mutate(); }}>{syncBackfill.isPending ? "A sincronizar…" : `Criar ${backfillPreview.opportunitiesToCreate} oportunidades`}</Button></div> : <p className="text-sm text-muted-foreground">Não há oportunidades em falta para importar.</p>}
         </div>}
         {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">{notice}</p>}
-        {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+        {backfillError && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{backfillError}</p>}
       </section>}
 
       {query.isLoading ? <p className="text-sm text-muted-foreground">A carregar CRM…</p> :
