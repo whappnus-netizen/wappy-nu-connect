@@ -110,7 +110,7 @@ function WhatsAppPage() {
   const [copied, setCopied] = useState(false);
   const [activeQrNumber, setActiveQrNumber] = useState<string | null>(null);
 
-  const webhookUrl = "https://wapinus.online/api/public/whatsapp/webhook";
+  const webhookUrl = "https://whappnus.online/api/public/whatsapp/webhook";
 
   const { data: numbers, isLoading } = useQuery({
     queryKey: ["whatsapp_numbers", orgId],
