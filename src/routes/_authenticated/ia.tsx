@@ -110,34 +110,46 @@ const EXAMPLE_TYPES = [
 function AiPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
+  const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
   const qc = useQueryClient();
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   const agentQuery = useQuery({
-    queryKey: ["ai-agent", orgId],
+    queryKey: ["ai-agents", orgId],
     enabled: Boolean(orgId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_agents")
         .select(AGENT_FIELDS)
         .eq("organization_id", orgId!)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .order("created_at", { ascending: true });
       if (error) throw new Error(error.message);
-      return (data as unknown as Agent) ?? null;
+      return (data ?? []) as unknown as Agent[];
     },
   });
 
-  const agent = agentQuery.data ?? null;
+  const agents = agentQuery.data ?? [];
+  const agent = agents.find((item) => item.id === selectedAgentId) ?? agents[0] ?? null;
+
+  useEffect(() => {
+    if (agents.length === 0) {
+      if (selectedAgentId !== null) setSelectedAgentId(null);
+      return;
+    }
+    if (!selectedAgentId || !agents.some((item) => item.id === selectedAgentId)) {
+      setSelectedAgentId(agents[0]?.id ?? null);
+    }
+  }, [agentQuery.data, selectedAgentId]);
 
   const knowledgeQuery = useQuery({
-    queryKey: ["ai-knowledge", orgId],
-    enabled: Boolean(orgId),
+    queryKey: ["ai-knowledge", orgId, agent?.id],
+    enabled: Boolean(orgId && agent?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_knowledge")
         .select("id, title, content, category, is_active")
         .eq("organization_id", orgId!)
+        .eq("agent_id", agent!.id)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return (data ?? []) as Knowledge[];
@@ -145,13 +157,14 @@ function AiPage() {
   });
 
   const examplesQuery = useQuery({
-    queryKey: ["ai-examples", orgId],
-    enabled: Boolean(orgId),
+    queryKey: ["ai-examples", orgId, agent?.id],
+    enabled: Boolean(orgId && agent?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_training_examples")
         .select("id, input, expected_output, example_type, is_active")
         .eq("organization_id", orgId!)
+        .eq("agent_id", agent!.id)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
       return (data ?? []) as Example[];
@@ -160,19 +173,50 @@ function AiPage() {
 
   const createAgent = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("ensure_ai_agent", { _organization_id: orgId! });
+      if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
+      if (!canManage) throw new Error("Apenas OWNER ou ADMIN pode criar agentes.");
+      const { data, error } = await supabase
+        .from("ai_agents")
+        .insert({
+          organization_id: orgId,
+          name: "Novo agente",
+          purpose: "autoreply",
+          is_active: false,
+        })
+        .select(AGENT_FIELDS)
+        .single();
+      if (error) throw new Error(error.message);
+      return data as unknown as Agent;
+    },
+    onSuccess: (created) => {
+      setSelectedAgentId(created.id);
+      toast.success("Agente criado. Configure-o antes de o activar.");
+      void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteAgent = useMutation({
+    mutationFn: async (agentId: string) => {
+      if (!orgId || !canManage) throw new Error("Apenas OWNER ou ADMIN pode eliminar agentes.");
+      const { error } = await supabase.from("ai_agents")
+        .delete().eq("organization_id", orgId).eq("id", agentId);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {
-      toast.success("Agente criado. Agora preencha a configuração.");
-      void qc.invalidateQueries({ queryKey: ["ai-agent", orgId] });
+    onSuccess: (_result, deletedId) => {
+      if (selectedAgentId === deletedId) setSelectedAgentId(null);
+      toast.success("Agente eliminado.");
+      void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
+      void qc.invalidateQueries({ queryKey: ["ai-knowledge", orgId] });
+      void qc.invalidateQueries({ queryKey: ["ai-examples", orgId] });
+      void qc.invalidateQueries({ queryKey: ["agent-whatsapp-assignments", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   if (!orgId) {
     return (
-      <AppShell title="Inteligência Artificial" description="Agente de atendimento da sua empresa">
+      <AppShell title="Inteligência Artificial" description="Agentes de atendimento da sua empresa">
         <p className="text-sm text-muted-foreground">A carregar a organização…</p>
       </AppShell>
     );
@@ -181,70 +225,263 @@ function AiPage() {
   return (
     <AppShell
       title="Inteligência Artificial"
-      description="Configure, treine e teste o assistente da sua empresa"
+      description="Crie vários agentes, treine cada um e escolha o WhatsApp que cada agente atende"
     >
-      {agentQuery.isLoading ? (
-        <p className="text-sm text-muted-foreground">A carregar…</p>
-      ) : !agent ? (
-        <div className="rounded-xl border border-border bg-card p-8 text-center">
-          <Sparkles className="mx-auto h-8 w-8 text-primary" />
-          <h2 className="mt-4 font-display text-lg font-semibold">Ainda não tem um agente de IA</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Crie o agente da sua empresa e depois diga-lhe como deve atender os seus clientes:
-            objetivo, produtos, horários, formas de pagamento e regras.
-          </p>
-          <Button className="mt-5" onClick={() => createAgent.mutate()} disabled={createAgent.isPending}>
-            {createAgent.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Criar agente da minha empresa
-          </Button>
-        </div>
-      ) : (
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="overview">Visão geral</TabsTrigger>
-            <TabsTrigger value="config">Configuração</TabsTrigger>
-            <TabsTrigger value="knowledge">Conhecimento</TabsTrigger>
-            <TabsTrigger value="examples">Exemplos de treinamento</TabsTrigger>
-            <TabsTrigger value="test">Testar IA</TabsTrigger>
-          </TabsList>
+      <div className="space-y-5">
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-base font-semibold">Os meus agentes</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Cada agente tem a sua configuração, conhecimento, exemplos e números WhatsApp associados.
+              </p>
+            </div>
+            {canManage && (
+              <Button onClick={() => createAgent.mutate()} disabled={createAgent.isPending} className="w-full sm:w-auto">
+                {createAgent.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                Criar agente
+              </Button>
+            )}
+          </div>
 
-          <TabsContent value="overview">
-            <Overview
-              agent={agent}
-              knowledgeCount={knowledgeQuery.data?.length ?? 0}
-              exampleCount={examplesQuery.data?.length ?? 0}
-              orgId={orgId}
-            />
-          </TabsContent>
+          {agentQuery.isLoading ? (
+            <p className="mt-4 text-sm text-muted-foreground">A carregar agentes…</p>
+          ) : agentQuery.isError ? (
+            <p role="alert" className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              Não foi possível carregar os agentes: {(agentQuery.error as Error).message}
+            </p>
+          ) : agents.length === 0 ? (
+            <div className="mt-5 rounded-lg border border-dashed border-border p-6 text-center">
+              <Sparkles className="mx-auto h-8 w-8 text-primary" />
+              <p className="mt-3 font-medium">Ainda não tem agentes de IA</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                Crie o primeiro agente e configure o nome, a empresa, os produtos, as regras e o conhecimento antes de o activar.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {agents.map((item) => (
+                <div
+                  key={item.id}
+                  className={`flex min-w-0 items-stretch gap-2 rounded-lg border p-3 ${agent?.id === item.id ? "border-primary bg-primary/5" : "border-border"}`}
+                >
+                  <button
+                    type="button"
+                    aria-pressed={agent?.id === item.id}
+                    onClick={() => setSelectedAgentId(item.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <span className="block truncate font-medium">{item.name}</span>
+                    <span className="mt-1 block truncate text-xs text-muted-foreground">
+                      {item.company_name || "Empresa por configurar"}
+                    </span>
+                    <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs ${item.is_active ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                      {item.is_active ? "Activo" : "Inactivo"}
+                    </span>
+                  </button>
+                  {canManage && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Eliminar agente ${item.name}`}
+                      title="Eliminar agente"
+                      disabled={deleteAgent.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Eliminar o agente “${item.name}”? Os conhecimentos e exemplos deste agente também serão eliminados. As conversas e mensagens serão preservadas.`)) {
+                          deleteAgent.mutate(item.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {!canManage && <p className="mt-3 text-xs text-muted-foreground">Apenas OWNER ou ADMIN pode criar ou eliminar agentes.</p>}
+        </section>
 
-          <TabsContent value="config">
-            <ConfigForm agent={agent} orgId={orgId} />
-          </TabsContent>
+        {agent && (
+          <Tabs key={agent.id} defaultValue="overview" className="space-y-6">
+            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+              <TabsTrigger value="overview">Visão geral</TabsTrigger>
+              <TabsTrigger value="config">Configuração</TabsTrigger>
+              <TabsTrigger value="knowledge">Conhecimento</TabsTrigger>
+              <TabsTrigger value="examples">Exemplos de treinamento</TabsTrigger>
+              <TabsTrigger value="test">Testar IA</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="knowledge">
-            <KnowledgePanel
-              orgId={orgId}
-              agentId={agent.id}
-              items={knowledgeQuery.data ?? []}
-              loading={knowledgeQuery.isLoading}
-            />
-          </TabsContent>
+            <TabsContent value="overview" className="space-y-6">
+              <Overview
+                agent={agent}
+                knowledgeCount={knowledgeQuery.data?.length ?? 0}
+                exampleCount={examplesQuery.data?.length ?? 0}
+                orgId={orgId}
+              />
+              <AgentWhatsAppAssignments
+                orgId={orgId}
+                agentId={agent.id}
+                agentName={agent.name}
+                agents={agents}
+                canManage={canManage}
+              />
+            </TabsContent>
 
-          <TabsContent value="examples">
-            <ExamplesPanel
-              orgId={orgId}
-              agentId={agent.id}
-              items={examplesQuery.data ?? []}
-              loading={examplesQuery.isLoading}
-            />
-          </TabsContent>
+            <TabsContent value="config">
+              <ConfigForm agent={agent} orgId={orgId} />
+            </TabsContent>
 
-          <TabsContent value="test">
-            <TestPanel orgId={orgId} agentName={agent.name} />
-          </TabsContent>
-        </Tabs>
-      )}
+            <TabsContent value="knowledge">
+              <KnowledgePanel
+                orgId={orgId}
+                agentId={agent.id}
+                items={knowledgeQuery.data ?? []}
+                loading={knowledgeQuery.isLoading}
+              />
+            </TabsContent>
+
+            <TabsContent value="examples">
+              <ExamplesPanel
+                orgId={orgId}
+                agentId={agent.id}
+                items={examplesQuery.data ?? []}
+                loading={examplesQuery.isLoading}
+              />
+            </TabsContent>
+
+            <TabsContent value="test">
+              <TestPanel orgId={orgId} agentId={agent.id} agentName={agent.name} />
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
     </AppShell>
+  );
+}
+
+function AgentWhatsAppAssignments({
+  orgId,
+  agentId,
+  agentName,
+  agents,
+  canManage,
+}: {
+  orgId: string;
+  agentId: string;
+  agentName: string;
+  agents: Agent[];
+  canManage: boolean;
+}) {
+  const qc = useQueryClient();
+  const numbersQuery = useQuery({
+    queryKey: ["agent-whatsapp-numbers", orgId],
+    enabled: Boolean(orgId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("whatsapp_numbers")
+        .select("id, display_name, phone_e164, provider, status")
+        .eq("organization_id", orgId).is("deleted_at", null)
+        .order("created_at", { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Array<{ id: string; display_name: string | null; phone_e164: string | null; provider: string | null; status: string }>;
+    },
+  });
+  const assignmentsQuery = useQuery({
+    queryKey: ["agent-whatsapp-assignments", orgId],
+    enabled: Boolean(orgId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("ai_agent_whatsapp_numbers")
+        .select("whatsapp_number_id, agent_id")
+        .eq("organization_id", orgId);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Array<{ whatsapp_number_id: string; agent_id: string }>;
+    },
+  });
+  const assign = useMutation({
+    mutationFn: async (input: { numberId: string; checked: boolean }) => {
+      if (!canManage) throw new Error("Apenas OWNER ou ADMIN pode associar agentes.");
+      if (input.checked) {
+        const { error } = await supabase.from("ai_agent_whatsapp_numbers").upsert({
+          organization_id: orgId,
+          agent_id: agentId,
+          whatsapp_number_id: input.numberId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "whatsapp_number_id" });
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase.from("ai_agent_whatsapp_numbers").delete()
+          .eq("organization_id", orgId)
+          .eq("agent_id", agentId)
+          .eq("whatsapp_number_id", input.numberId);
+        if (error) throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Associação WhatsApp actualizada.");
+      void qc.invalidateQueries({ queryKey: ["agent-whatsapp-assignments", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const numbers = numbersQuery.data ?? [];
+  const assignments = assignmentsQuery.data ?? [];
+  const currentAgentNumberCount = assignments.filter((item) => item.agent_id === agentId).length;
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div>
+        <h3 className="font-display text-base font-semibold">WhatsApps associados a {agentName}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Cada número pode ter um único agente associado. Se associares um número que já pertence a outro agente, a associação será transferida.
+        </p>
+      </div>
+      {numbersQuery.isLoading || assignmentsQuery.isLoading ? (
+        <p className="mt-4 text-sm text-muted-foreground">A carregar números WhatsApp…</p>
+      ) : numbers.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">Ainda não há números WhatsApp activos nesta organização. Liga um número na aba WhatsApp para o associar aqui.</p>
+      ) : (
+        <div className="mt-4 divide-y divide-border">
+          {numbers.map((number) => {
+            const current = assignments.find((item) => item.whatsapp_number_id === number.id);
+            const isAssigned = current?.agent_id === agentId;
+            const assignedAgent = current ? agents.find((item) => item.id === current.agent_id) : null;
+            return (
+              <div key={number.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-medium">{number.display_name || number.phone_e164 || "WhatsApp sem nome"}</p>
+                  <p className="text-xs text-muted-foreground">{number.phone_e164 || "Número ainda não identificado"} · {number.provider === "qr" ? "QR Code" : "Meta Cloud API"} · {number.status}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isAssigned ? "Este agente atende este número." : current ? `Associado a: ${assignedAgent?.name ?? "outro agente"}` : "Sem agente específico; será usado o comportamento padrão."}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">{isAssigned ? "Associado" : "Associar"}</span>
+                  <Switch
+                    checked={isAssigned}
+                    disabled={!canManage || assign.isPending}
+                    onCheckedChange={(checked) => {
+                      if (checked && current && current.agent_id !== agentId) {
+                        const previousName = agents.find((item) => item.id === current.agent_id)?.name ?? "outro agente";
+                        if (!window.confirm(`Este número está associado a “${previousName}”. Transferir para “${agentName}”?`)) return;
+                      }
+                      assign.mutate({ numberId: number.id, checked });
+                    }}
+                    aria-label={`Associar ${number.display_name || number.phone_e164 || "WhatsApp"} a ${agentName}`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {currentAgentNumberCount === 0 && numbers.length > 0 && (
+        <p className="mt-3 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
+          Nenhum número está associado especificamente a este agente. Enquanto não associares um, o motor mantém a seleção padrão do agente activo mais antigo.
+        </p>
+      )}
+      {!canManage && <p className="mt-3 text-xs text-muted-foreground">Apenas OWNER ou ADMIN pode alterar associações.</p>}
+    </section>
   );
 }
 
