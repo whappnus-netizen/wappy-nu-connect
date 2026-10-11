@@ -168,7 +168,7 @@ function DashboardPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assinatura e utilização</p>
               <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{periodEnd ? (expired ? "Período terminado" : "Válido até " + periodEnd.toLocaleDateString("pt-PT")) : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de conversas com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
             </div>
             <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
           </div>
