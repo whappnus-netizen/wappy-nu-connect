@@ -176,7 +176,8 @@ export const getMessageMediaSignedUrl = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error("Não foi possível carregar o anexo da mensagem.");
     if (!message) throw new Error("Mensagem não encontrada nesta organização.");
-    const path = message.direction === "inbound" ? message.wa_media_id : message.media_url;
+    // Outbound media is stored in wa_media_id by legacy sendOutgoingMessage; prefer media_url for newer records.
+    const path = message.direction === "inbound" ? message.wa_media_id : (message.media_url || message.wa_media_id);
     if (!path || !path.startsWith(data.organizationId + "/") || path.includes("..")) {
       return { url: null, messageType: message.message_type };
     }
