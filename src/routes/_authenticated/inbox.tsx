@@ -35,6 +35,7 @@ type Conversation = {
   status: string;
   priority: string;
   last_message_at: string | null;
+  unread_count?: number;
   contact_id: string | null;
   whatsapp_number_id: string | null;
   ai_enabled: boolean | null;
@@ -83,7 +84,7 @@ function InboxPage() {
       let q = supabase
         .from("conversations")
         .select(
-          "id, status, priority, last_message_at, contact_id, whatsapp_number_id, ai_enabled, assigned_to, contacts(full_name, phone_e164), whatsapp_numbers(provider)",
+          "id, status, priority, last_message_at, unread_count, contact_id, whatsapp_number_id, ai_enabled, assigned_to, contacts(full_name, phone_e164), whatsapp_numbers(provider)",
         )
 
         .eq("organization_id", orgId!)
@@ -316,7 +317,7 @@ function InboxPage() {
               list.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => { setSelected(c.id); setNotice(null); setError(null); }}
+                  onClick={() => { setSelected(c.id); setNotice(null); setError(null); if ((c.unread_count ?? 0) > 0) { void supabase.from("conversations").update({ unread_count: 0 }).eq("id", c.id).eq("organization_id", orgId!); void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] }); } }}
                   className={`w-full rounded-lg p-3 text-left transition-colors ${
                     selected === c.id ? "bg-secondary" : "hover:bg-secondary"
                   }`}
@@ -325,7 +326,7 @@ function InboxPage() {
                     <span className="truncate text-sm font-medium">
                       {c.contacts?.full_name ?? c.contacts?.phone_e164 ?? "Contacto"}
                     </span>
-                    <Badge variant="secondary" className="text-[10px]">{c.status}</Badge>
+                    <span className="flex shrink-0 items-center gap-1.5">{(c.unread_count ?? 0) > 0 && <Badge className="min-w-5 justify-center rounded-full px-1.5 text-[10px]">{c.unread_count}</Badge>}<Badge variant="secondary" className="text-[10px]">{c.status}</Badge></span>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {c.last_message_at ? new Date(c.last_message_at).toLocaleString("pt-PT") : "Sem mensagens"}
