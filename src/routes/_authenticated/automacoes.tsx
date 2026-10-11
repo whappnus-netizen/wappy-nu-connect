@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated/automacoes")({
 });
 
 type TriggerType = "keyword_match" | "conversation_created" | "outside_business_hours" | "auto_assignment" | "auto_crm_lead";
-type AutomationStep = { id: string; kind: "text" | "image" | "audio"; content: string; file: File | null; durationMs?: number; previewUrl?: string };
+type AutomationStep = { id: string; kind: "text" | "image" | "audio"; content: string; file: File | null; durationMs?: number | undefined; previewUrl?: string | undefined };
 type StoredAutomationStep = { id: string; kind: "text" | "image" | "audio"; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string; durationMs?: number };
 type Rule = {
   id: string;
