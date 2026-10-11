@@ -130,6 +130,19 @@ export const qrProvider: WhatsAppProvider = {
     return { waMessageId: out.waMessageId ?? null, provider: "qr" };
   },
 
+  async reactToMessage(input: {
+    organizationId: string;
+    whatsappNumberId: string;
+    to: string;
+    waMessageId: string;
+    emoji: string;
+  }): Promise<void> {
+    await bridgeFetch(
+      `/sessions/${encodeURIComponent(qrSessionKey(input))}/reactions`,
+      { method: "POST", body: { to: input.to, waMessageId: input.waMessageId, emoji: input.emoji } },
+    );
+  },
+
   async getConnectionStatus(ref: SessionRef): Promise<StatusResult> {
     const s = await bridgeFetch<BridgeSession>(
       `/sessions/${encodeURIComponent(qrSessionKey(ref))}`,
