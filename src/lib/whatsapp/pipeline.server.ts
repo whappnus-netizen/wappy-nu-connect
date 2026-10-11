@@ -689,7 +689,7 @@ export async function sendOutgoingMessage(input: {
       conversation_id: input.conversationId,
       direction: "outbound",
       message_type: input.media?.kind ?? "text",
-      body: input.media?.caption ?? input.body ?? "",
+      body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
       media_id: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
