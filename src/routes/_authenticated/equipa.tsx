@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { UsersRound, Trash2, ShieldCheck } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
+import { addExistingTeamMember } from "@/lib/team.server";
 
 export const Route = createFileRoute("/_authenticated/equipa")({
   head: () => ({
@@ -43,6 +46,9 @@ function TeamPage() {
   const queryClient = useQueryClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState<Role>("AGENT");
+  const addMemberFn = useServerFn(addExistingTeamMember);
 
   const teamQuery = useQuery({
     queryKey: ["team", orgId],
@@ -92,6 +98,20 @@ function TeamPage() {
     onError: (e: Error) => { setErrorMessage(e.message); setNotice(null); },
   });
 
+  const addMember = useMutation({
+    mutationFn: async () => {
+      if (!orgId || !canManage) throw new Error("Apenas OWNER ou ADMIN pode adicionar membros.");
+      return addMemberFn({ data: { organizationId: orgId, email: newEmail.trim(), role: newRole } });
+    },
+    onSuccess: (result) => {
+      setNewEmail("");
+      setErrorMessage(null);
+      setNotice("Membro adicionado: " + (result.email ?? newEmail.trim()) + ".");
+      void queryClient.invalidateQueries({ queryKey: ["team", orgId] });
+    },
+    onError: (e: Error) => { setErrorMessage(e.message); setNotice(null); },
+  });
+
   const members = teamQuery.data ?? [];
 
   return (
@@ -100,6 +120,12 @@ function TeamPage() {
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
         <div className="min-w-0"><p className="text-sm font-medium">Permissões da organização</p><p className="mt-1 text-xs leading-5 text-muted-foreground">OWNER e ADMIN podem alterar funções. A conta OWNER e a tua própria conta ficam protegidas contra remoção acidental. Remover um membro retira apenas o acesso à organização; não apaga a conta nem o histórico.</p></div>
       </div>
+
+      {canManage && <form className="mb-4 grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_200px_auto]" onSubmit={(e) => { e.preventDefault(); addMember.mutate(); }}>
+        <div className="space-y-1"><label htmlFor="team-member-email" className="text-sm font-medium">Adicionar conta existente</label><Input id="team-member-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="email@exemplo.com" required maxLength={254} /><p className="text-xs text-muted-foreground">A pessoa já precisa ter criado uma conta Wapnus.</p></div>
+        <div className="space-y-1"><label htmlFor="team-member-role" className="text-sm font-medium">Função inicial</label><select id="team-member-role" value={newRole} onChange={(e) => setNewRole(e.target.value as Role)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="AGENT">Agente</option><option value="SUPERVISOR">Supervisor</option><option value="ADMIN">Administrador</option><option value="OWNER" disabled={currentRole !== "OWNER"}>Proprietário</option></select></div>
+        <div className="flex items-end"><Button type="submit" disabled={addMember.isPending || !newEmail.trim()} className="w-full md:w-auto">{addMember.isPending ? "A adicionar…" : "Adicionar membro"}</Button></div>
+      </form>}
 
       {notice && <p role="status" className="mb-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">{notice}</p>}
       {errorMessage && <p role="alert" className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{errorMessage}</p>}
@@ -148,7 +174,7 @@ function TeamPage() {
         </div>
       )}
       {!canManage && <p className="mt-3 text-xs text-muted-foreground">Podes consultar a equipa, mas apenas OWNER ou ADMIN pode alterar funções ou remover membros.</p>}
-      <p className="mt-4 text-xs text-muted-foreground">Convites por email para pessoas que ainda não têm conta Wapnus ainda não estão ligados. Esta entrega gere os membros que já pertencem à organização.</p>
+      <p className="mt-4 text-xs text-muted-foreground">Convites automáticos por email ainda não estão ligados. Para adicionar alguém, essa pessoa deve criar primeiro uma conta Wapnus; depois podes associá-la à organização aqui.</p>
     </AppShell>
   );
 }
