@@ -110,3 +110,53 @@ values (
 )
 on conflict (id) do update
 set public = false, file_size_limit = 20971520, allowed_mime_types = excluded.allowed_mime_types;
+
+-- Private assets for automation steps (pre-recorded audio and images).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'automation-media',
+  'automation-media',
+  false,
+  20971520,
+  array['image/jpeg','image/png','image/webp','image/gif','audio/ogg','audio/mpeg','audio/mp4','audio/aac','audio/amr','audio/wav']
+)
+on conflict (id) do update
+set public = false, file_size_limit = 20971520, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists automation_media_read_member on storage.objects;
+create policy automation_media_read_member
+on storage.objects for select to authenticated
+using (
+  bucket_id = 'automation-media'
+  and exists (
+    select 1 from public.memberships m
+    where m.organization_id::text = (storage.foldername(name))[1]
+      and m.user_id = auth.uid()
+  )
+);
+
+drop policy if exists automation_media_insert_admin on storage.objects;
+create policy automation_media_insert_admin
+on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'automation-media'
+  and exists (
+    select 1 from public.memberships m
+    where m.organization_id::text = (storage.foldername(name))[1]
+      and m.user_id = auth.uid()
+      and m.role in ('OWNER', 'ADMIN')
+  )
+);
+
+drop policy if exists automation_media_delete_admin on storage.objects;
+create policy automation_media_delete_admin
+on storage.objects for delete to authenticated
+using (
+  bucket_id = 'automation-media'
+  and exists (
+    select 1 from public.memberships m
+    where m.organization_id::text = (storage.foldername(name))[1]
+      and m.user_id = auth.uid()
+      and m.role in ('OWNER', 'ADMIN')
+  )
+);
