@@ -12,12 +12,16 @@ import {
   Settings,
   LogOut,
   Menu,
+  Bell,
+  Check,
 } from "lucide-react";
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { useSubscriptionAccess } from "@/lib/subscription";
+import { supabase } from "@/lib/supabase/client";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -54,6 +58,32 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, membership, signOut } = useAuth();
   const subscription = useSubscriptionAccess(membership?.organization_id);
+  const queryClient = useQueryClient();
+  const organizationId = membership?.organization_id;
+  const { data: notifications } = useQuery({
+    queryKey: ["organization-notifications", organizationId],
+    enabled: Boolean(organizationId),
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("organization_notifications")
+        .select("id,title,body,created_at")
+        .eq("organization_id", organizationId!)
+        .is("read_at", null)
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  });
+  const markNotificationRead = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("organization_notifications")
+        .update({ read_at: new Date().toISOString() }).eq("id", id).eq("organization_id", organizationId!);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] }),
+  });
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -122,6 +152,21 @@ export function AppShell({
             </div>
             <Button asChild size="sm"><a href="/#planos">Ver planos</a></Button>
           </div>
+        )}
+        {notifications && notifications.length > 0 && (
+          <section aria-label="Notificações recentes" className="space-y-2 border-b border-primary/20 bg-primary/5 px-4 py-3 lg:px-8">
+            {notifications.map((notification) => (
+              <div key={notification.id} className="flex items-start gap-3 rounded-lg border border-primary/15 bg-card p-3">
+                <Bell className="mt-0.5 size-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">{notification.title}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{notification.body}</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">{new Date(notification.created_at).toLocaleString("pt-AO")}</p>
+                </div>
+                <Button variant="ghost" size="icon" aria-label="Marcar notificação como lida" disabled={markNotificationRead.isPending} onClick={() => markNotificationRead.mutate(notification.id)}><Check className="size-4" /></Button>
+              </div>
+            ))}
+          </section>
         )}
         <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
