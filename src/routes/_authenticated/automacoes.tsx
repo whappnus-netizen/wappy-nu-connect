@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/automacoes")({
   component: AutomationsPage,
 });
 
-type TriggerType = "keyword_match" | "conversation_created" | "outside_business_hours";
+type TriggerType = "keyword_match" | "conversation_created" | "outside_business_hours" | "message_received" | "contact_created" | "deal_stage_changed";
 type Rule = {
   id: string;
   name: string;
