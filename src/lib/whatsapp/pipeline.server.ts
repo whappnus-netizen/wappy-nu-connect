@@ -772,7 +772,7 @@ export async function sendOutgoingMessage(input: {
       ...(outgoingMedia ? { media: outgoingMedia } : {}),
       ...(metaCreds ? { meta: metaCreds } : {}),
     });
-    const { error: persistError } = await admin.from("messages").insert({
+    const { data: persistedMessage, error: persistError } = await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
       contact_id: (conv as unknown as { contact_id: string | null }).contact_id ?? null,
@@ -782,10 +782,14 @@ export async function sendOutgoingMessage(input: {
       body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
       wa_media_id: input.media?.storagePath ?? null,
       status: "sent",
+      sent_at: new Date().toISOString(),
       wa_message_id: sent.waMessageId,
       sent_by: input.sentBy ?? null,
       is_ai: Boolean(input.isAi),
-    });
+    }).select("id").single();
+    if (!persistError && !persistedMessage?.id) {
+      throw new Error("A mensagem foi enviada, mas o Supabase não confirmou o registo no inbox.");
+    }
     if (persistError) {
       console.error("[wappnus] WhatsApp enviou a mensagem, mas a gravação no inbox falhou:", {
         conversationId: input.conversationId,
@@ -810,7 +814,7 @@ export async function sendOutgoingMessage(input: {
     await logWhatsAppEvent(input.organizationId, "message_sent", {
       whatsappNumberId: number.id,
       provider: providerName,
-      detail: { ai: Boolean(input.isAi) },
+      detail: { ai: Boolean(input.isAi), messagePersisted: true },
     });
     return { waMessageId: sent.waMessageId, provider: providerName };
   } catch (e) {
