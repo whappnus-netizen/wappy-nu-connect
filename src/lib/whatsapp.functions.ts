@@ -157,3 +157,31 @@ export const sendWhatsAppMessage = createServerFn({ method: "POST" })
     return { ok: true, waMessageId: sent.waMessageId, provider: sent.provider };
   });
 
+
+
+/** Generates a short-lived media URL only for a message owned by the caller's organization. */
+export const getMessageMediaSignedUrl = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    organizationId: z.string().uuid(),
+    messageId: z.string().uuid(),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    await requireOrgRole(data.organizationId, ["OWNER", "ADMIN", "SUPERVISOR", "AGENT"]);
+    const admin = serviceClient();
+    const { data: message, error } = await admin.from("messages")
+      .select("id,organization_id,direction,message_type,media_url,wa_media_id")
+      .eq("id", data.messageId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (error) throw new Error("Não foi possível carregar o anexo da mensagem.");
+    if (!message) throw new Error("Mensagem não encontrada nesta organização.");
+    const path = message.direction === "inbound" ? message.wa_media_id : message.media_url;
+    if (!path || !path.startsWith(data.organizationId + "/") || path.includes("..")) {
+      return { url: null, messageType: message.message_type };
+    }
+    const bucket = message.direction === "inbound" ? "whatsapp-incoming-media" : "automation-media";
+    const { data: signed, error: signError } = await admin.storage.from(bucket).createSignedUrl(path, 600);
+    if (signError || !signed?.signedUrl) return { url: null, messageType: message.message_type };
+    return { url: signed.signedUrl, messageType: message.message_type };
+  });
