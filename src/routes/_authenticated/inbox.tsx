@@ -448,7 +448,7 @@ function MessageMediaPreview({ organizationId, messageId, messageType, direction
   const { data, isLoading } = useQuery({
     queryKey: ["message-media-url", organizationId, messageId],
     queryFn: () => getMediaUrl({ data: { organizationId, messageId } }),
-    staleTime: 5 * 60_000,
+    staleTime: 45 * 60_000,
     enabled: Boolean(organizationId && messageId),
   });
   if (isLoading) return <div className="my-2 h-20 w-40 animate-pulse rounded-lg bg-muted/60" />;
