@@ -7,7 +7,7 @@ export type Role = "OWNER" | "ADMIN" | "SUPERVISOR" | "AGENT";
 export type Membership = {
   organization_id: string;
   role: Role;
-  organizations: { id: string; name: string; slug: string | null } | null;
+  organizations: { id: string; name: string; slug: string | null; timezone: string; currency: string } | null;
 };
 
 type AuthState = {
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMembershipError(null);
     const { data, error } = await supabase
       .from("memberships")
-      .select("organization_id, role, organizations(id, name, slug)")
+      .select("organization_id, role, organizations(id, name, slug, timezone, currency)")
       .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
