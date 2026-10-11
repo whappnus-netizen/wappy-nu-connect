@@ -155,7 +155,7 @@ export async function processIncomingMessage(
   // Quando uma regra responde, não chamamos os modelos para a mesma mensagem,
   // evitando que a automação e a IA enviem duas respostas.
   const inboundText = (incoming.body ?? "").trim().toLocaleLowerCase();
-  if (inboundText) {
+  if (inboundText && res.conversation_id) {
     const { data: rules, error: rulesError } = await admin
       .from("automation_rules")
       .select("id, name, config")
