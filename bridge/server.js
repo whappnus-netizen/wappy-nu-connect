@@ -244,6 +244,15 @@ app.use((req, res, next) => {
 
 app.get("/health", (_req, res) => res.json({ ok: true, sessions: sessions.size }));
 
+app.get("/sessions/:sessionId/groups", async (req, res) => {
+  const state = sessions.get(req.params.sessionId);
+  if (!state?.sock || state.status !== "connected") return res.status(409).json({ error: "sessão não está ligada" });
+  try {
+    const groups = await state.sock.groupFetchAllParticipating();
+    return res.json({ groups: Object.values(groups).map((group) => ({ id: group.id, subject: group.subject || group.id, participants: Array.isArray(group.participants) ? group.participants.length : 0, announce: Boolean(group.announce) })) });
+  } catch (e) { return res.status(502).json({ error: e.message }); }
+});
+
 app.post("/sessions", async (req, res) => {
   try {
     const { sessionId } = req.body || {};
@@ -278,15 +287,29 @@ app.post("/sessions/:sessionId/messages", async (req, res) => {
   if (!state?.sock || state.status !== "connected") {
     return res.status(409).json({ error: "sessão não está ligada" });
   }
-  const { to, body } = req.body || {};
-  if (!to || !body) return res.status(400).json({ error: "to e body são obrigatórios" });
+  const { to, body = "", media } = req.body || {};
+  if (!to || (!String(body).trim() && !media)) return res.status(400).json({ error: "to e body ou media são obrigatórios" });
   try {
-    const jid = `${String(to).replace(/\D/g, "")}@s.whatsapp.net`;
-    const sent = await state.sock.sendMessage(jid, { text: String(body) });
+    const rawTo = String(to);
+    const jid = rawTo.endsWith("@g.us") || rawTo.endsWith("@s.whatsapp.net") ? rawTo : String(to).replace(/\D/g, "") + "@s.whatsapp.net";
+    let payload;
+    if (!media) { payload = { text: String(body) }; }
+    else {
+      if (!["image", "audio", "video", "document"].includes(media.kind) || typeof media.url !== "string" || !/^https:\/\//i.test(media.url)) return res.status(400).json({ error: "media inválida" });
+      const response = await fetch(media.url);
+      if (!response.ok) throw new Error("Falha ao descarregar mídia (" + response.status + ")");
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length || buffer.length > 20 * 1024 * 1024) throw new Error("O ficheiro está vazio ou excede 20 MB");
+      const mimeType = String(media.mimeType || response.headers.get("content-type") || "application/octet-stream").split(";")[0];
+      const caption = String(media.caption || body || "");
+      if (media.kind === "image") payload = { image: buffer, mimetype: mimeType, ...(caption ? { caption } : {}) };
+      else if (media.kind === "video") payload = { video: buffer, mimetype: mimeType, ...(caption ? { caption } : {}) };
+      else if (media.kind === "document") payload = { document: buffer, mimetype: mimeType, fileName: String(media.fileName || "documento"), ...(caption ? { caption } : {}) };
+      else payload = { audio: buffer, mimetype: mimeType, ptt: mimeType.includes("ogg") };
+    }
+    const sent = await state.sock.sendMessage(jid, payload);
     return res.json({ waMessageId: sent?.key?.id ?? null });
-  } catch (e) {
-    return res.status(502).json({ error: e.message });
-  }
+  } catch (e) { return res.status(502).json({ error: e.message }); }
 });
 
 app.listen(PORT, () => log.info(`Wappy Nus QR bridge a escutar na porta ${PORT}`));
