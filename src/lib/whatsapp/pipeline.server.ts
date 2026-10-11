@@ -352,18 +352,19 @@ export async function processIncomingMessage(
                 candidates.sort((a, b) => (load.get(a.user_id) ?? 0) - (load.get(b.user_id) ?? 0));
                 const chosen = candidates[0];
                 if (chosen) {
-                  const { error: assignError } = await admin.from("conversations")
+                  const { data: assignedConversation, error: assignError } = await admin.from("conversations")
                     .update({ assigned_to: chosen.user_id, status: "open", updated_at: new Date().toISOString() })
                     .eq("id", res.conversation_id).eq("organization_id", number.organization_id)
-                    .eq("status", "open").is("assigned_to", null);
-                  if (assignError) {
+                    .eq("status", "open").is("assigned_to", null).select("assigned_to").maybeSingle();
+                  const assignedUserId = (assignedConversation as { assigned_to: string | null } | null)?.assigned_to;
+                  if (assignError || !assignedUserId) {
                     await logWhatsAppEvent(number.organization_id, "error", {
                       whatsappNumberId: number.id,
                       provider: incoming.provider,
-                      detail: { stage: "automation_assignment_update", error: assignError.message.slice(0, 200) },
+                      detail: { stage: "automation_assignment_update", error: assignError?.message?.slice(0, 200) ?? "Conversation was already assigned or its status changed" },
                     });
                   } else {
-                    currentAssignedTo = chosen.user_id;
+                    currentAssignedTo = assignedUserId;
                     currentStatus = "open";
                   }
                 }
