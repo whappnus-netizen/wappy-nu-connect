@@ -519,10 +519,10 @@ Deno.serve(async (req: Request) => {
       const mimeType = str(input.asset_mime_type, 120) || null;
       const fileName = str(input.asset_file_name, 180) || null;
       const caption = str(input.caption, 2000) || null;
-      if (!flowId || !Number.isInteger(position) || position < 0 || !["relative", "calendar"].includes(triggerMode) || !["text", "image", "audio", "video", "document"].includes(actionType)) return fail("Configuração da etapa inválida.");
+      if (!flowId || !Number.isInteger(position) || position < 0 || !["relative", "calendar"].includes(triggerMode) || !["text", "ai_text", "image", "audio", "video", "document"].includes(actionType)) return fail("Configuração da etapa inválida.");
       if (triggerMode === "relative" && (!Number.isInteger(delayMinutes) || Number(delayMinutes) < 0)) return fail("O atraso deve ser um número de minutos igual ou superior a zero.");
       if (triggerMode === "calendar" && (!scheduledAt || !Number.isFinite(Date.parse(scheduledAt)))) return fail("Escolha uma data e hora válidas.");
-      if (actionType === "text" && !textContent) return fail("O texto da etapa não pode estar vazio.");
+      if ((actionType === "text" || actionType === "ai_text") && !textContent) return fail("A etapa precisa de texto ou de uma instrução para a IA.");
       if (actionType !== "text" && (!assetPath || !mimeType)) return fail("As etapas multimédia precisam de um ficheiro guardado e MIME type.");
       const patch = { flow_id: flowId, position, trigger_mode: triggerMode, delay_minutes: delayMinutes, scheduled_at: scheduledAt, action_type: actionType, text_content: textContent || null, asset_path: assetPath, asset_mime_type: mimeType, asset_file_name: fileName, caption, status: "draft", updated_at: new Date().toISOString() };
       const result = id
