@@ -547,8 +547,8 @@ export async function processIncomingMessage(
                   kind: step.kind,
                   storagePath: step.storagePath,
                   mimeType: step.mimeType,
-                  caption: step.caption,
-                  fileName: step.fileName,
+                  ...(step.caption !== undefined ? { caption: step.caption } : {}),
+                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),
                 },
                 isAi: false,
               });
@@ -638,6 +638,7 @@ export async function processIncomingMessage(
       conversationId: res.conversation_id,
       body: ai.text,
       isAi: true,
+      ...(ai.reactionEmoji ? { reaction: { waMessageId: incoming.waMessageId, emoji: ai.reactionEmoji } } : {}),
     });
     return { ...base, aiReplied: true };
   } catch (e) {
@@ -687,6 +688,7 @@ export async function sendOutgoingMessage(input: {
   media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string };
   isAi?: boolean;
   sentBy?: string | null;
+  reaction?: { waMessageId: string; emoji: string };
 }): Promise<{ waMessageId: string | null; provider: string }> {
   const admin = serviceClient();
   const number = await loadNumber(input.whatsappNumberId);
@@ -732,14 +734,20 @@ export async function sendOutgoingMessage(input: {
       kind: input.media.kind,
       url: signed.signedUrl,
       mimeType: input.media.mimeType,
-      caption: input.media.caption,
-      fileName: input.media.fileName,
+      ...(input.media.caption !== undefined ? { caption: input.media.caption } : {}),
+      ...(input.media.fileName !== undefined ? { fileName: input.media.fileName } : {}),
       storagePath: input.media.storagePath,
     };
   }
 
   try {
-    const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
+    const sent = await provider.sendMessage({
+      ...ref,
+      to,
+      body: input.body,
+      ...(outgoingMedia ? { media: outgoingMedia } : {}),
+      ...(metaCreds ? { meta: metaCreds } : {}),
+    });
     await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
@@ -756,6 +764,25 @@ export async function sendOutgoingMessage(input: {
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", input.conversationId);
+
+    if (input.reaction && provider.sendReaction) {
+      try {
+        await provider.sendReaction({
+          ...ref,
+          to,
+          waMessageId: input.reaction.waMessageId,
+          emoji: input.reaction.emoji,
+          meta: metaCreds,
+        });
+      } catch (reactionError) {
+        // A falha da reação nunca invalida uma resposta que já foi entregue.
+        await logWhatsAppEvent(input.organizationId, "message_failed", {
+          whatsappNumberId: number.id,
+          provider: providerName,
+          detail: { stage: "ai_reaction", error: (reactionError as Error).message.slice(0, 200) },
+        });
+      }
+    }
 
     await logWhatsAppEvent(input.organizationId, "message_sent", {
       whatsappNumberId: number.id,

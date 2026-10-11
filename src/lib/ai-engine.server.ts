@@ -24,6 +24,7 @@ type GenerateResult = {
   latencyMs: number;
   usedKnowledge: number;
   agentId: string | null;
+  reactionEmoji: string | null;
 };
 
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
@@ -75,5 +76,6 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     latencyMs: Number(data["latencyMs"] ?? 0),
     usedKnowledge: Number(data["usedKnowledge"] ?? 0),
     agentId: typeof data["agentId"] === "string" ? (data["agentId"] as string) : null,
+    reactionEmoji: typeof data["reactionEmoji"] === "string" ? (data["reactionEmoji"] as string) : null,
   };
 }
