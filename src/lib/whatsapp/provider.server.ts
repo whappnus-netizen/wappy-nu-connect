@@ -51,6 +51,7 @@ export type OutgoingMedia = {
   caption?: string;
   fileName?: string;
   storagePath?: string;
+  durationMs?: number;
 };
 
 export type SendMessageInput = SessionRef & {
