@@ -151,6 +151,62 @@ export async function processIncomingMessage(
     contactId: res.contact_id,
   };
 
+  // Regras explícitas de palavra-chave são executadas antes da IA.
+  // Quando uma regra responde, não chamamos os modelos para a mesma mensagem,
+  // evitando que a automação e a IA enviem duas respostas.
+  const inboundText = (incoming.body ?? "").trim().toLocaleLowerCase();
+  if (inboundText && res.conversation_id && !res.assigned_to) {
+    const { data: rules, error: rulesError } = await admin
+      .from("automation_rules")
+      .select("id, name, config")
+      .eq("organization_id", number.organization_id)
+      .eq("trigger_type", "keyword_match")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(50);
+
+    if (rulesError) {
+      await logWhatsAppEvent(number.organization_id, "error", {
+        whatsappNumberId: number.id,
+        provider: incoming.provider,
+        detail: { stage: "automation_lookup", error: rulesError.message.slice(0, 200) },
+      });
+    } else {
+      const matchingRule = (rules ?? []).find((rule) => {
+        const config = (rule as { config?: { keyword?: unknown; reply?: unknown } }).config;
+        const keyword = typeof config?.keyword === "string" ? config.keyword.trim().toLocaleLowerCase() : "";
+        const reply = typeof config?.reply === "string" ? config.reply.trim() : "";
+        return keyword.length >= 2 && reply.length > 0 && inboundText.includes(keyword);
+      }) as { id: string; name: string; config: { keyword: string; reply: string } } | undefined;
+
+      if (matchingRule) {
+        try {
+          await sendOutgoingMessage({
+            organizationId: number.organization_id,
+            whatsappNumberId: number.id,
+            conversationId: res.conversation_id,
+            body: matchingRule.config.reply,
+            isAi: false,
+          });
+          await logWhatsAppEvent(number.organization_id, "message_sent", {
+            whatsappNumberId: number.id,
+            provider: incoming.provider,
+            detail: { automationRuleId: matchingRule.id, automation: true },
+          });
+          return { ...base, aiReplied: false, aiSkippedReason: "keyword_automation" };
+        } catch (e) {
+          await logWhatsAppEvent(number.organization_id, "message_failed", {
+            whatsappNumberId: number.id,
+            provider: incoming.provider,
+            detail: { stage: "keyword_automation", ruleId: matchingRule.id, error: (e as Error).message.slice(0, 200) },
+          });
+          // Não chamar a IA depois de uma falha ambígua de envio: evita respostas duplicadas.
+          return { ...base, aiReplied: false, aiSkippedReason: "keyword_automation_failed" };
+        }
+      }
+    }
+  }
+
   // 12 + 13. IA automática só quando ligada na organização E na conversa,
   // e nunca quando um atendente humano assumiu a conversa.
   const skip = !res.auto_reply

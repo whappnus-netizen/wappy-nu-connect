@@ -30,14 +30,15 @@ function TeamPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["team", orgId],
     enabled: Boolean(orgId),
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error: queryError } = await supabase
         .from("memberships")
         .select("user_id, role, created_at, profiles(full_name, email)")
         .eq("organization_id", orgId!);
+      if (queryError) throw new Error(queryError.message);
       return (data ?? []) as unknown as Member[];
     },
   });
@@ -48,11 +49,17 @@ function TeamPage() {
     <AppShell title="Equipa" description="Quem tem acesso a esta organização">
       {isLoading ? (
         <p className="text-sm text-muted-foreground">A carregar…</p>
+      ) : error ? (
+        <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="font-medium">Não foi possível carregar a equipa.</p>
+          <p className="mt-1 break-words">{error.message}</p>
+          <p className="mt-2 text-xs">Esta mensagem apresenta o erro real da consulta; não significa automaticamente que falta SQL.</p>
+        </div>
       ) : members.length === 0 ? (
         <EmptyState
           icon={UsersRound}
           title="Sem membros listados"
-          description="Ainda não é possível ler os membros desta organização. Depois de aplicar o SQL da base de dados, os utilizadores e funções aparecem aqui."
+          description="Ainda não há membros para apresentar nesta organização. Confirme que os utilizadores foram adicionados à equipa."
         />
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card">
