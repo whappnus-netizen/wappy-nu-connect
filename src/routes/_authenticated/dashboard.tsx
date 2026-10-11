@@ -91,11 +91,12 @@ function DashboardPage() {
           .select("status,current_period_start,current_period_end,amount_aoa,subscription_plans(name,code,limits)")
           .eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("organizations").select("status,suspension_reason").eq("id", orgId!).maybeSingle(),
-        supabase.from("ai_credit_accounts").select("balance,monthly_limit").eq("organization_id", orgId!).maybeSingle(),
+        supabase.from("ai_credit_ledger").select("metadata,created_at").eq("organization_id", orgId!).eq("reason", "ai_conversation").order("created_at", { ascending: false }).limit(10000),
       ]);
       if (subscriptionResult.error) throw new Error(subscriptionResult.error.message);
       if (orgResult.error) throw new Error(orgResult.error.message);
-      return { subscription: subscriptionResult.data, organization: orgResult.data, account: accountResult.data };
+      if (accountResult.error) throw new Error(accountResult.error.message);
+      return { subscription: subscriptionResult.data, organization: orgResult.data, ledger: accountResult.data ?? [] };
     },
   });
 
@@ -151,14 +152,18 @@ function DashboardPage() {
       {subscriptionData && (() => {
         const subscription = subscriptionData.subscription as any;
         const organization = subscriptionData.organization;
-        const account = subscriptionData.account;
+        const ledger = subscriptionData.ledger ?? [];
+        const periodStart = subscription?.current_period_start ? new Date(subscription.current_period_start).getTime() : 0;
         const periodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
         const expired = Boolean(periodEnd && periodEnd.getTime() <= Date.now());
         const suspended = !subscription || !["active", "trialing"].includes(subscription.status) || expired || ["suspended", "blocked", "cancelled"].includes(organization?.status ?? "");
         const plan = subscription?.subscription_plans as { name?: string; limits?: Record<string, unknown> } | null;
-        const limit = Number(plan?.limits?.ai_conversations_monthly ?? account?.monthly_limit ?? 0);
-        const remaining = Math.max(0, Number(account?.balance ?? 0));
-        const used = Math.max(0, limit - remaining);
+        const limit = Number(plan?.limits?.ai_conversations_monthly ?? 0);
+        const uniqueConversations = new Set(
+          ledger.filter((entry: any) => new Date(entry.created_at).getTime() >= periodStart && (!periodEnd || new Date(entry.created_at).getTime() < periodEnd.getTime()))
+            .map((entry: any) => entry.metadata?.conversation_id).filter((id: unknown) => typeof id === "string"),
+        );
+        const used = uniqueConversations.size;
         const progress = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
         return <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-soft">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
