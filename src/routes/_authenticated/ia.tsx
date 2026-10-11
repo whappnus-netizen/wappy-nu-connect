@@ -493,11 +493,13 @@ function Overview({
   knowledgeCount,
   exampleCount,
   orgId,
+  canManage,
 }: {
   agent: Agent;
   knowledgeCount: number;
   exampleCount: number;
   orgId: string;
+  canManage: boolean;
 }) {
   const qc = useQueryClient();
   const toggle = useMutation({
