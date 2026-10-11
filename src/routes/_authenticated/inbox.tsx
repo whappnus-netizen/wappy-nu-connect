@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,7 @@ function InboxPage() {
   );
 
   const active = list.find((c) => c.id === selected) ?? null;
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { data: messages } = useQuery({
     queryKey: ["messages", selected],
@@ -113,6 +114,12 @@ function InboxPage() {
       return ((data ?? []) as Message[]).reverse();
     },
   });
+
+  // Mantém a caixa com altura fixa e leva o scroll interno para a mensagem mais recente.
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
+  }, [messages, selected]);
 
   // Realtime: novas mensagens da organização actual
   useEffect(() => {
@@ -240,7 +247,7 @@ function InboxPage() {
 
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr_300px]">
+      <div className="grid min-h-0 items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)_300px]">
         <section className="rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
@@ -294,7 +301,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex h-[72vh] min-h-[480px] max-h-[820px] flex-col overflow-hidden rounded-xl border border-border bg-card">
+        <section className="flex h-[min(72vh,820px)] min-h-[420px] max-h-[820px] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -304,7 +311,7 @@ function InboxPage() {
               />
             </div>
           ) : (
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
+            <div ref={messagesContainerRef} className="min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto overscroll-contain p-4">
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
