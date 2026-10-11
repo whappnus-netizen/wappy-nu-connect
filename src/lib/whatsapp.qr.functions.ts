@@ -18,10 +18,11 @@ export const startQrSession = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    const { requireOrgRole, requireActiveSubscription, serviceClient } = await import("./whatsapp.server");
     const { qrProvider, qrBridgeConfigured } = await import("./whatsapp/qr.server");
     const { logWhatsAppEvent } = await import("./whatsapp/pipeline.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
+    await requireActiveSubscription(data.organizationId);
 
     const admin = serviceClient();
 
