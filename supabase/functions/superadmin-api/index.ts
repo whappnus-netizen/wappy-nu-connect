@@ -326,6 +326,57 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: { flows: flows.data ?? [], connections: connections.data ?? [], assets: assets.data ?? [], jobs: jobs.data ?? [], numbers: numbers.data ?? [], steps: steps.data ?? [] } });
     }
 
+    if (action === "group.asset.upload-url") {
+      const fileName = str(input.file_name, 180);
+      const mimeType = str(input.mime_type, 120).toLowerCase();
+      const fileSize = Number(input.file_size);
+      if (!fileName || !Number.isFinite(fileSize) || fileSize <= 0 || fileSize > 20 * 1024 * 1024) return fail("O ficheiro deve ter entre 1 byte e 20 MB.");
+      const allowed = new Set(["image/jpeg","image/png","image/webp","image/gif","audio/ogg","audio/mpeg","audio/wav","audio/mp4","video/mp4","video/quicktime","video/webm","application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","text/plain","text/csv","application/zip","application/octet-stream"]);
+      if (!allowed.has(mimeType)) return fail("Formato de ficheiro não permitido para assets de grupo.");
+      const bucket = "superadmin-group-assets";
+      const { data: buckets, error: bucketListError } = await db.storage.listBuckets();
+      if (bucketListError) throw bucketListError;
+      if (!(buckets ?? []).some((item: any) => item.name === bucket)) {
+        const { error: createBucketError } = await db.storage.createBucket(bucket, { public: false, fileSizeLimit: 20 * 1024 * 1024, allowedMimeTypes: [...allowed] });
+        if (createBucketError && !createBucketError.message.toLowerCase().includes("already exists")) throw createBucketError;
+      }
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "asset";
+      const storagePath = crypto.randomUUID() + "-" + safeName;
+      const { data, error } = await db.storage.from(bucket).createSignedUploadUrl(storagePath);
+      if (error) throw error;
+      await audit("group_asset.upload_authorized", "group_asset", null, null, { file_name: fileName, mime_type: mimeType, file_size: fileSize });
+      return json({ ok: true, data: { path: storagePath, token: data.token, signedUrl: data.signedUrl } });
+    }
+
+    if (action === "group.asset.save") {
+      const name = str(input.name, 180);
+      const assetType = str(input.asset_type, 20);
+      const storagePath = str(input.storage_path, 500);
+      const mimeType = str(input.mime_type, 120).toLowerCase();
+      const fileSize = Number(input.file_size);
+      if (!name || !storagePath || !mimeType || !Number.isFinite(fileSize) || fileSize <= 0 || fileSize > 20 * 1024 * 1024) return fail("Metadados do asset inválidos.");
+      if (!storagePath || storagePath.includes("..") || storagePath.startsWith("/")) return fail("Caminho do asset inválido.");
+      if (!["image","audio","video","document"].includes(assetType)) return fail("Tipo de asset inválido.");
+      const { data, error } = await db.from("superadmin_group_assets").insert({ name, asset_type: assetType, storage_path: storagePath, mime_type: mimeType, file_size: fileSize, created_by: actor.id }).select("id,name,asset_type,storage_path,mime_type,file_size,created_at").single();
+      if (error) throw error;
+      await audit("group_asset.created", "group_asset", data.id, null, { asset_type: assetType, file_size: fileSize });
+      return json({ ok: true, data });
+    }
+
+    if (action === "group.asset.delete") {
+      const id = str(input.id, 60);
+      if (!id) return fail("ID do asset inválido.");
+      const { data: asset, error: assetError } = await db.from("superadmin_group_assets").select("id,storage_path").eq("id", id).maybeSingle();
+      if (assetError) throw assetError;
+      if (!asset) return fail("Asset não encontrado.", 404);
+      const { error: removeError } = await db.storage.from("superadmin-group-assets").remove([asset.storage_path]);
+      if (removeError) throw removeError;
+      const { error } = await db.from("superadmin_group_assets").delete().eq("id", id);
+      if (error) throw error;
+      await audit("group_asset.deleted", "group_asset", id, null, {});
+      return json({ ok: true, data: { id } });
+    }
+
     if (action === "group.flow.save") {
       const id = str(input.id, 60);
       const name = str(input.name, 120);
