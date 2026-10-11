@@ -122,6 +122,13 @@ function SuperAdminPage() {
   const [groupName, setGroupName] = useState("");
   const [groupNumberId, setGroupNumberId] = useState("");
   const [groupFlowId, setGroupFlowId] = useState("");
+  const [groupStepType, setGroupStepType] = useState<"text" | "image" | "audio" | "video" | "document">("text");
+  const [groupStepText, setGroupStepText] = useState("");
+  const [groupStepDelay, setGroupStepDelay] = useState("0");
+  const [groupStepAt, setGroupStepAt] = useState("");
+  const [scheduleConnectionId, setScheduleConnectionId] = useState("");
+  const [scheduleStepId, setScheduleStepId] = useState("");
+  const [scheduleAt, setScheduleAt] = useState("");
   const client = useQueryClient();
 
   const overview = useQuery({ queryKey: ["superadmin", "dashboard"], queryFn: () => adminApi<{ metrics: Metrics; recentAudit: any[] }>("dashboard"), retry: false });
@@ -146,6 +153,18 @@ function SuperAdminPage() {
     onError: (error: Error) => toast.error(error.message),
   });
 
+  const saveGroupStep = useMutation({
+    mutationFn: () => adminApi<any>("group.step.save", { flow_id: groupFlowId, position: (groupCommander.data?.steps ?? []).filter((step: any) => step.flow_id === groupFlowId).length, trigger_mode: groupFlowMode, delay_minutes: groupFlowMode === "relative" ? Number(groupStepDelay) : null, scheduled_at: groupFlowMode === "calendar" && groupStepAt ? new Date(groupStepAt).toISOString() : null, action_type: groupStepType, text_content: groupStepType === "text" ? groupStepText.trim() : null }),
+    onSuccess: () => { toast.success("Etapa guardada."); setGroupStepText(""); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const scheduleGroupJob = useMutation({
+    mutationFn: () => adminApi<any>("group.job.schedule", { connection_id: scheduleConnectionId, step_id: scheduleStepId, due_at: new Date(scheduleAt).toISOString() }),
+    onSuccess: (result) => { toast.message(result?.note || "Agendamento colocado na fila."); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const toggleGroupConnection = useMutation({ mutationFn: (payload: { id: string; is_enabled: boolean }) => adminApi<any>("group.connection.toggle", payload), onSuccess: () => void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }), onError: (error: Error) => toast.error(error.message) });
+  const toggleGroupFlow = useMutation({ mutationFn: (payload: { id: string; is_active: boolean }) => adminApi<any>("group.flow.toggle", payload), onSuccess: () => void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }), onError: (error: Error) => toast.error(error.message) });
   const createOrganization = useMutation({
     mutationFn: () => adminApi<Organization>("organizations.create", { name: orgName.trim(), slug: orgSlug.trim() || slugify(orgName), owner_user_id: ownerId.trim() || undefined }),
     onSuccess: () => {
