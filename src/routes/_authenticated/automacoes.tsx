@@ -29,12 +29,18 @@ const triggerLabels: Record<TriggerType, string> = {
   keyword_match: "Palavra-chave",
   conversation_created: "Boas-vindas (primeira mensagem)",
   outside_business_hours: "Fora do horário de atendimento",
+  message_received: "Mensagem recebida",
+  contact_created: "Novo contacto",
+  deal_stage_changed: "Etapa do CRM alterada",
 };
 
 function triggerDescription(rule: Rule) {
   if (rule.trigger_type === "keyword_match") return `Quando a mensagem contém “${rule.config?.keyword ?? "palavra-chave"}”`;
   if (rule.trigger_type === "outside_business_hours") return `Quando a mensagem chega fora de ${rule.config?.startTime ?? "09:00"}–${rule.config?.endTime ?? "18:00"}`;
-  return "Na primeira mensagem de uma nova conversa";
+  if (rule.trigger_type === "conversation_created") return "Na primeira mensagem de uma nova conversa";
+  if (rule.trigger_type === "contact_created") return "Quando um novo contacto é criado";
+  if (rule.trigger_type === "deal_stage_changed") return "Quando a etapa de uma oportunidade muda";
+  return "Em cada mensagem recebida";
 }
 
 function AutomationsPage() {
@@ -160,7 +166,7 @@ function AutomationsPage() {
             <div className="space-y-3">{rules.map((rule) => (
               <article key={rule.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{rule.name}</h3><Badge variant={rule.is_active ? "default" : "secondary"}>{rule.is_active ? "Activa" : "Pausada"}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{triggerDescription(rule)}</p></div>
+                  <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{rule.name}</h3><Badge variant={rule.is_active ? "default" : "secondary"}>{rule.is_active ? "Activa" : "Pausada"}</Badge></div><div className="mt-1 flex flex-wrap items-center gap-2"><Badge variant="outline">{triggerLabels[rule.trigger_type]}</Badge><p className="text-xs text-muted-foreground">{triggerDescription(rule)}</p></div></div>
                   <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={!canManage || toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={!canManage || deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule.id); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
                 </div>
                 {rule.trigger_type === "outside_business_hours" && <p className="text-xs text-muted-foreground"><Clock3 className="mr-1 inline size-3" />Segunda a sexta · {rule.config?.startTime ?? "09:00"}–{rule.config?.endTime ?? "18:00"}</p>}
