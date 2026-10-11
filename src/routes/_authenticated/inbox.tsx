@@ -56,7 +56,7 @@ type Message = {
 const statuses = ["all", "open", "pending", "in_progress", "closed"] as const;
 
 function InboxPage() {
-  const { membership } = useAuth();
+  const { user, membership } = useAuth();
   const orgId = membership?.organization_id;
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<(typeof statuses)[number]>("all");
@@ -157,8 +157,22 @@ function InboxPage() {
 
   const updateStatus = useMutation({
     mutationFn: async (nextStatus: "open" | "pending" | "in_progress" | "closed") => {
+      const updates: { status: "open" | "pending" | "in_progress" | "closed"; updated_at: string; assigned_to?: string | null; ai_enabled?: boolean } = {
+        status: nextStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (nextStatus === "in_progress") {
+        if (!user?.id) throw new Error("Não foi possível identificar o utilizador para assumir a conversa.");
+        updates.assigned_to = user.id;
+        updates.ai_enabled = false;
+      } else if (nextStatus === "pending" || nextStatus === "closed") {
+        updates.assigned_to = null;
+        updates.ai_enabled = false;
+      } else if (nextStatus === "open") {
+        updates.assigned_to = null;
+      }
       const { error: err } = await supabase.from("conversations")
-        .update({ status: nextStatus, updated_at: new Date().toISOString() })
+        .update(updates)
         .eq("id", selected!).eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
     },
@@ -173,10 +187,11 @@ function InboxPage() {
   // 13. Ao assumir o atendimento, a IA automática desliga-se nesta conversa.
   const claim = useMutation({
     mutationFn: async () => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user?.id) throw new Error("Não foi possível identificar o utilizador para assumir a conversa.");
       const { error: err } = await supabase
         .from("conversations")
-        .update({ assigned_to: user.user?.id ?? null, status: "in_progress", ai_enabled: false })
+        .update({ assigned_to: authData.user.id, status: "in_progress", ai_enabled: false })
         .eq("id", selected!)
         .eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
@@ -231,6 +246,7 @@ function InboxPage() {
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="Pesquisar conversas" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
+            <p className="text-xs leading-5 text-muted-foreground">Aberta: disponível para atendimento. Pendente: pausada para seguimento. Em atendimento: atribuída ao utilizador e IA desligada. Encerrada: concluída; uma nova mensagem pode iniciar outra conversa.</p>
             <div className="flex flex-wrap gap-1">
               {statuses.map((s) => (
                 <button
@@ -364,16 +380,18 @@ function InboxPage() {
                 <div>
                   <p className="text-xs font-medium">IA automática</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {active.assigned_to
-                      ? "Atendimento humano activo"
-                      : active.ai_enabled
-                        ? "A IA responde automaticamente"
-                        : "As mensagens ficam só na caixa de entrada"}
+                    {active.status !== "open"
+                      ? "A IA só pode ser alterada em conversas abertas."
+                      : active.assigned_to
+                        ? "Atendimento humano activo"
+                        : active.ai_enabled
+                          ? "A IA responde automaticamente"
+                          : "As mensagens ficam só na caixa de entrada"}
                   </p>
                 </div>
                 <Switch
                   checked={Boolean(active.ai_enabled)}
-                  disabled={toggleAi.isPending}
+                  disabled={toggleAi.isPending || active.status !== "open" || Boolean(active.assigned_to)}
                   onCheckedChange={(v) => toggleAi.mutate(v)}
                 />
               </div>
