@@ -321,6 +321,7 @@ function AiPage() {
                 knowledgeCount={knowledgeQuery.data?.length ?? 0}
                 exampleCount={examplesQuery.data?.length ?? 0}
                 orgId={orgId}
+                canManage={canManage}
               />
               <AgentWhatsAppAssignments
                 orgId={orgId}
