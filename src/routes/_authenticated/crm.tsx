@@ -16,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/crm")({
 
 type Stage = { id: string; name: string; position: number };
 type Deal = { id: string; title: string; amount: number | null; currency: string | null; stage_id: string | null; contact_id: string | null; status: string };
+type Contact = { id: string; full_name: string | null; phone_e164: string };
 
 function CrmPage() {
   const { membership } = useAuth();
@@ -23,6 +24,7 @@ function CrmPage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
+  const [contactId, setContactId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const query = useQuery({
@@ -37,7 +39,7 @@ function CrmPage() {
       if (stagesRes.error) throw new Error(`Etapas do CRM: ${stagesRes.error.message}`);
       if (dealsRes.error) throw new Error(`Oportunidades: ${dealsRes.error.message}`);
       if (contactsRes.error) throw new Error(`Contactos: ${contactsRes.error.message}`);
-      return { stages: (stagesRes.data ?? []) as Stage[], deals: (dealsRes.data ?? []) as Deal[], contacts: contactsRes.data ?? [] };
+      return { stages: (stagesRes.data ?? []) as Stage[], deals: (dealsRes.data ?? []) as Deal[], contacts: (contactsRes.data ?? []) as Contact[] };
     },
   });
 
@@ -50,11 +52,11 @@ function CrmPage() {
       if (!firstStage) throw new Error("O funil ainda não tem etapas configuradas.");
       const { error: err } = await supabase.from("deals").insert({
         organization_id: orgId, title: cleanTitle, amount: amount.trim() ? Number(amount) : null,
-        currency: "AOA", stage_id: firstStage.id, status: "open",
+        currency: membership?.organizations?.currency ?? "AOA", stage_id: firstStage.id, status: "open", contact_id: contactId || null,
       });
       if (err) throw new Error(err.message);
     },
-    onSuccess: () => { setTitle(""); setAmount(""); setError(null); void queryClient.invalidateQueries({ queryKey: ["crm", orgId] }); },
+    onSuccess: () => { setTitle(""); setAmount(""); setContactId(""); setError(null); void queryClient.invalidateQueries({ queryKey: ["crm", orgId] }); },
     onError: (e: Error) => setError(e.message),
   });
 
@@ -74,9 +76,10 @@ function CrmPage() {
     <AppShell title="CRM" description="Acompanhe oportunidades comerciais associadas ao atendimento WhatsApp.">
       <section className="mb-5 rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 className="mb-3 font-display font-semibold">Criar oportunidade</h2>
-        <form className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
+        <form className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Pedido de catering para evento" maxLength={160} aria-label="Nome da oportunidade" />
           <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor em Kz (opcional)" type="number" min="0" step="1" aria-label="Valor em kwanzas" />
+          <div className="space-y-1"><label className="text-sm font-medium" htmlFor="deal-contact">Contacto (opcional)</label><select id="deal-contact" value={contactId} onChange={(e) => setContactId(e.target.value)} className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Associar contacto à oportunidade"><option value="">Sem contacto associado</option>{(query.data?.contacts ?? []).map((contact) => <option key={contact.id} value={contact.id}>{contact.full_name || contact.phone_e164}</option>)}</select></div>
           <Button type="submit" disabled={!orgId || createDeal.isPending}><Plus className="mr-2 size-4" />{createDeal.isPending ? "A guardar…" : "Adicionar"}</Button>
         </form>
         <p className="mt-2 text-xs text-muted-foreground">A criação manual funciona já. A conversão automática de conversas em oportunidades será activada apenas quando definirmos critérios comerciais claros, para não encher o CRM com falsos leads.</p>
