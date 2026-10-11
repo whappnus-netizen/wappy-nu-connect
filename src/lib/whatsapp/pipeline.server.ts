@@ -544,7 +544,7 @@ export async function processIncomingMessage(
                 conversationId: res.conversation_id,
                 body: step.caption ?? "",
                 media: {
-                  kind: step.kind,
+                  kind: step.kind as "image" | "audio" | "video" | "document",
                   storagePath: step.storagePath,
                   mimeType: step.mimeType,
                   ...(step.caption !== undefined ? { caption: step.caption } : {}),
