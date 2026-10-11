@@ -76,7 +76,7 @@ function CrmPage() {
     <AppShell title="CRM" description="Acompanhe oportunidades comerciais associadas ao atendimento WhatsApp.">
       <section className="mb-5 rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 className="mb-3 font-display font-semibold">Criar oportunidade</h2>
-        <form className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
+        <form className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Pedido de catering para evento" maxLength={160} aria-label="Nome da oportunidade" />
           <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor em Kz (opcional)" type="number" min="0" step="1" aria-label="Valor em kwanzas" />
           <div className="space-y-1"><label className="text-sm font-medium" htmlFor="deal-contact">Contacto (opcional)</label><select id="deal-contact" value={contactId} onChange={(e) => setContactId(e.target.value)} className="h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Associar contacto à oportunidade"><option value="">Sem contacto associado</option>{(query.data?.contacts ?? []).map((contact) => <option key={contact.id} value={contact.id}>{contact.full_name || contact.phone_e164}</option>)}</select></div>
