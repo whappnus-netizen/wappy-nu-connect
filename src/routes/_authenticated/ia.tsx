@@ -188,10 +188,10 @@ function AiPage() {
       if (error) throw new Error(error.message);
       return data as unknown as Agent;
     },
-    onSuccess: (created) => {
+    onSuccess: async (created) => {
+      await qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
       setSelectedAgentId(created.id);
       toast.success("Agente criado. Configure-o antes de o activar.");
-      void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -528,6 +528,7 @@ function Overview({
         <p className="mt-1 text-sm text-muted-foreground">
           {agent.company_name ?? "Empresa por definir"} · {agent.tone ?? "tom por definir"}
         </p>
+        {agent.products_services && <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{agent.products_services}</p>}
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
           {checklist.map((c) => (
             <div key={c.label} className="flex items-center gap-2 text-sm">
