@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
-import { sendWhatsAppMessage } from "@/lib/whatsapp.functions";
+import { getMessageMediaSignedUrl, sendWhatsAppMessage } from "@/lib/whatsapp.functions";
 import { setConversationAi } from "@/lib/whatsapp.qr.functions";
 import { Switch } from "@/components/ui/switch";
 
