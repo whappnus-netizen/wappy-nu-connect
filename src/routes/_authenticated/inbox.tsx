@@ -161,8 +161,9 @@ function InboxPage() {
         .eq("id", selected!).eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
     },
-    onSuccess: () => {
+    onSuccess: (_data, nextStatus) => {
       setError(null);
+      if (status !== "all") setStatus(nextStatus);
       void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] });
     },
     onError: (e: Error) => setError(e.message),
@@ -179,7 +180,10 @@ function InboxPage() {
         .eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] }),
+    onSuccess: () => {
+      if (status !== "all") setStatus("in_progress");
+      void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] });
+    },
     onError: (e: Error) => setError(e.message),
   });
 
