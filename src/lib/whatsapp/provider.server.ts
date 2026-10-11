@@ -97,6 +97,8 @@ export interface WhatsAppProvider {
   disconnect(input: SessionRef): Promise<void>;
   /** Envia uma mensagem de texto. */
   sendMessage(input: SendMessageInput): Promise<SendResult>;
+  /** Reage a uma mensagem recebida quando o provider suporta esta operação. */
+  reactToMessage?(input: SessionRef & { to: string; waMessageId: string; emoji: string }): Promise<void>;
   /** Estado actual da ligação. */
   getConnectionStatus(input: SessionRef): Promise<StatusResult>;
   /** Converte o payload cru do provedor no formato interno único. */
