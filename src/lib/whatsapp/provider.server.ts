@@ -45,7 +45,7 @@ export type ConnectResult = {
 export type StatusResult = ConnectResult;
 
 export type OutgoingMedia = {
-  kind: "image" | "audio";
+  kind: "image" | "audio" | "video" | "document";
   url: string;
   mimeType: string;
   caption?: string;
@@ -296,7 +296,8 @@ export const metaProvider: WhatsAppProvider = {
     }
     const to = input.to.replace(/^\+/, "");
     const mediaPayload: Record<string, unknown> = { link: input.media.url };
-    if (input.media.kind === "image" && input.media.caption) mediaPayload["caption"] = input.media.caption;
+    if (["image", "video", "document"].includes(input.media.kind) && input.media.caption) mediaPayload["caption"] = input.media.caption;
+    if (input.media.kind === "document" && input.media.fileName) mediaPayload["filename"] = input.media.fileName;
     const res = await fetch(`${GRAPH}/${input.meta.phoneNumberId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${input.meta.token}`, "content-type": "application/json" },
