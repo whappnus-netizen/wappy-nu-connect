@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
+import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
 import { previewExistingConversationDeals, syncExistingConversationDeals } from "@/lib/crm-backfill.server";
 
@@ -23,6 +24,7 @@ type Contact = { id: string; full_name: string | null; phone_e164: string };
 function CrmPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
+  const subscription = useSubscriptionAccess(orgId);
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -54,6 +56,7 @@ function CrmPage() {
   const createDeal = useMutation({
     mutationFn: async () => {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
+      if (!subscription.active) throw new Error("A assinatura está suspensa. Pode consultar e organizar oportunidades existentes, mas não criar novas até reactivar o plano.");
       const cleanTitle = title.trim();
       if (cleanTitle.length < 2) throw new Error("Indique o nome da oportunidade.");
       const firstStage = query.data?.stages[0];
@@ -110,6 +113,7 @@ function CrmPage() {
     <AppShell title="CRM" description="Acompanhe oportunidades comerciais associadas ao atendimento WhatsApp.">
       <section className="mb-5 rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 className="mb-3 font-display font-semibold">Criar oportunidade</h2>
+        {!subscription.active && <p className="mb-3 rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">A criação de novas oportunidades está bloqueada enquanto a assinatura estiver suspensa. Pode continuar a mover leads existentes entre as etapas e sincronizar conversas.</p>}
         <form className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.5fr)_auto]" onSubmit={(e) => { e.preventDefault(); createDeal.mutate(); }}>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Pedido de catering para evento" maxLength={160} aria-label="Nome da oportunidade" />
           <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Valor em Kz (opcional)" type="number" min="0" step="1" aria-label="Valor em kwanzas" />
