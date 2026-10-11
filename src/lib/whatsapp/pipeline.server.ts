@@ -190,14 +190,22 @@ export async function processIncomingMessage(
         detail: { stage: "automation_lookup", error: rulesError.message.slice(0, 200) },
       });
     } else {
+      type StoredStep = { kind?: string; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string };
       type AutomationRow = { id: string; name: string; trigger_type: string; config: Record<string, unknown> | null };
       const activeRules = (rules ?? []) as AutomationRow[];
       const getReply = (rule: AutomationRow) => {
         const value = rule.config?.["reply"];
         return typeof value === "string" ? value.trim() : "";
       };
+      const getSteps = (rule: AutomationRow): StoredStep[] =>
+        Array.isArray(rule.config?.["steps"]) ? rule.config["steps"] as StoredStep[] : [];
+      const hasActions = (rule: AutomationRow) =>
+        getReply(rule).length > 0 || getSteps(rule).some((step) =>
+          step.kind === "text" ? Boolean(step.text?.trim()) :
+          (step.kind === "image" || step.kind === "audio") && Boolean(step.storagePath && step.mimeType)
+        );
       const keywordRule = activeRules
-        .filter((rule) => rule.trigger_type === "keyword_match" && getReply(rule).length > 0)
+         .filter((rule) => rule.trigger_type === "keyword_match" && hasActions(rule))
         .sort((a, b) => {
           const aValue = a.config?.["keyword"];
           const bValue = b.config?.["keyword"];
@@ -231,7 +239,7 @@ export async function processIncomingMessage(
 
       // Fora de horário usa o fuso horário persistido na organização.
       if (!selectedRule) {
-        const outsideRules = activeRules.filter((rule) => rule.trigger_type === "outside_business_hours" && getReply(rule).length > 0);
+        const outsideRules = activeRules.filter((rule) => rule.trigger_type === "outside_business_hours" && hasActions(rule));
         if (outsideRules.length > 0) {
           const { data: org } = await admin.from("organizations").select("timezone").eq("id", number.organization_id).maybeSingle();
           const timezone = typeof org?.timezone === "string" && org.timezone ? org.timezone : "Africa/Luanda";
@@ -449,24 +457,49 @@ export async function processIncomingMessage(
 
       // Boas-vindas só na primeira mensagem recebida da conversa.
       if (!selectedRule && isFirstInbound) {
-        selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && getReply(rule).length > 0);
+        selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && hasActions(rule));
         if (selectedRule) selectedReason = "welcome_automation";
       }
 
       if (selectedRule) {
         const reply = getReply(selectedRule);
+        const configuredSteps = getSteps(selectedRule);
+        const executionSteps: StoredStep[] = configuredSteps.length
+          ? configuredSteps
+          : (reply ? [{ kind: "text", text: reply }] : []);
         try {
-          await sendOutgoingMessage({
-            organizationId: number.organization_id,
-            whatsappNumberId: number.id,
-            conversationId: res.conversation_id,
-            body: reply,
-            isAi: false,
-          });
+          for (const step of executionSteps) {
+            if (step.kind === "text") {
+              const body = (step.text ?? "").trim();
+              if (!body) continue;
+              await sendOutgoingMessage({
+                organizationId: number.organization_id,
+                whatsappNumberId: number.id,
+                conversationId: res.conversation_id,
+                body,
+                isAi: false,
+              });
+            } else if ((step.kind === "image" || step.kind === "audio") && step.storagePath && step.mimeType) {
+              await sendOutgoingMessage({
+                organizationId: number.organization_id,
+                whatsappNumberId: number.id,
+                conversationId: res.conversation_id,
+                body: step.caption ?? "",
+                media: {
+                  kind: step.kind,
+                  storagePath: step.storagePath,
+                  mimeType: step.mimeType,
+                  caption: step.caption,
+                  fileName: step.fileName,
+                },
+                isAi: false,
+              });
+            }
+          }
           await logWhatsAppEvent(number.organization_id, "message_sent", {
             whatsappNumberId: number.id,
             provider: incoming.provider,
-            detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type },
+            detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type, steps: executionSteps.length },
           });
           if (selectedReason !== "welcome_automation") {
             return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
