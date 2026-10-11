@@ -187,10 +187,11 @@ function InboxPage() {
   // 13. Ao assumir o atendimento, a IA automática desliga-se nesta conversa.
   const claim = useMutation({
     mutationFn: async () => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user?.id) throw new Error("Não foi possível identificar o utilizador para assumir a conversa.");
       const { error: err } = await supabase
         .from("conversations")
-        .update({ assigned_to: user.user?.id ?? null, status: "in_progress", ai_enabled: false })
+        .update({ assigned_to: authData.user.id, status: "in_progress", ai_enabled: false })
         .eq("id", selected!)
         .eq("organization_id", orgId!);
       if (err) throw new Error(err.message);
