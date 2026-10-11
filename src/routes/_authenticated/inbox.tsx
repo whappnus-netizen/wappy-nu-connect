@@ -106,10 +106,11 @@ function InboxPage() {
         .from("messages")
         .select("id, direction, message_type, body, status, created_at, sent_at")
         .eq("conversation_id", selected!)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(200);
       if (err) throw new Error(err.message);
-      return (data ?? []) as Message[];
+      // Trazer as mensagens mais recentes e inverter para manter a ordem cronológica.
+      return ((data ?? []) as Message[]).reverse();
     },
   });
 
