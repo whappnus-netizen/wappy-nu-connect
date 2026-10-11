@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,8 @@ function InboxPage() {
 
   const active = list.find((c) => c.id === selected) ?? null;
 
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
   const { data: messages } = useQuery({
     queryKey: ["messages", selected],
     enabled: Boolean(selected),
@@ -112,6 +114,10 @@ function InboxPage() {
       return (data ?? []) as Message[];
     },
   });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [selected, messages?.length]);
 
   // Realtime: novas mensagens da organização actual
   useEffect(() => {
@@ -293,7 +299,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex h-[72vh] min-h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-card lg:h-full lg:min-h-0">
+        <section className="flex h-[65vh] min-h-[420px] max-h-[780px] flex-col overflow-hidden rounded-xl border border-border bg-card lg:h-[70vh]">
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -324,6 +330,7 @@ function InboxPage() {
                     </p>
                   </div>
                 ))
+                <div ref={messagesEndRef} />
               )}
             </div>
           )}
