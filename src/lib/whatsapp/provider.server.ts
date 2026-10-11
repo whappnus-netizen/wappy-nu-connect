@@ -111,6 +111,12 @@ export interface WhatsAppProvider {
     body: string;
   }): Promise<SendResult>;
   markRead?(phoneNumberId: string, token: string, waMessageId: string): Promise<void>;
+  reactToMessage?(input: {
+    to: string;
+    waMessageId: string;
+    emoji: string;
+    meta?: { phoneNumberId: string; token: string };
+  }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +236,22 @@ export const metaProvider: WhatsAppProvider = {
     if (!res.ok) throw graphError(json, res.status);
     const waId = (json["messages"] as Array<{ id?: string }> | undefined)?.[0]?.id ?? null;
     return { waMessageId: waId, provider: "meta_cloud" };
+  },
+
+  async reactToMessage({ phoneNumberId, token, to, waMessageId, emoji }) {
+    const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to.replace(/^\\+/, ""),
+        type: "reaction",
+        reaction: { message_id: waMessageId, emoji },
+      }),
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) throw graphError(json, res.status);
   },
 
   async markRead(phoneNumberId, token, waMessageId) {
