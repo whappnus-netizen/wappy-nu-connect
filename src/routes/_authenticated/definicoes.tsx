@@ -82,8 +82,8 @@ function SettingsPage() {
           <div className="mt-2">
             <Row label="Email" value={user?.email ?? "—"} />
             <Row label="Nome" value={(user?.user_metadata?.["full_name"] as string) ?? "—"} />
-            <Row label="Fuso horário da organização" value={membership?.organizations?.timezone ?? "Africa/Luanda"} />
-            <Row label="Moeda da organização" value={membership?.organizations?.currency ?? "AOA"} />
+            <Row label="Fuso horário da organização" value={timezone} />
+            <Row label="Moeda da organização" value={currency} />
           </div>
         </section>
 
