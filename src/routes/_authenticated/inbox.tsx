@@ -329,7 +329,7 @@ function InboxPage() {
                       {new Date(m.sent_at ?? m.created_at).toLocaleTimeString("pt-PT")} · {m.status}
                     </p>
                   </div>
-                ))
+                ))}
                 <div ref={messagesEndRef} />
               )}
             </div>
