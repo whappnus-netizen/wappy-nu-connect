@@ -52,7 +52,7 @@ export const startQrSession = createServerFn({ method: "POST" })
         .from("whatsapp_numbers")
         .update({
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          ...(data.phoneE164 ? { phone_e164: data.phoneE164.replace(/\\s/g, "") } : {}),
+          ...(data.phoneE164 ? { phone_e164: data.phoneE164.replace(/\s/g, "") } : {}),
           status: "connecting",
           last_error: null,
         })
@@ -60,13 +60,13 @@ export const startQrSession = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId);
       if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
     } else {
-      await requireWhatsAppConnectionCapacity(data.organizationId, data.phoneE164?.replace(/\\s/g, ""));
+      await requireWhatsAppConnectionCapacity(data.organizationId, data.phoneE164?.replace(/\s/g, ""));
       const { data: createdNumber, error: createErr } = await admin
         .from("whatsapp_numbers")
         .insert({
           organization_id: data.organizationId,
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          phone_e164: data.phoneE164?.replace(/\\s/g, "") ?? null,
+          phone_e164: data.phoneE164?.replace(/\s/g, "") ?? null,
           provider: "qr",
           status: "connecting",
         })
@@ -169,7 +169,7 @@ export const requestQrPairingCode = createServerFn({ method: "POST" })
       .is("deleted_at", null).maybeSingle();
     if (error) throw new Error(error.message);
     if (!number || number.provider !== "qr") throw new Error("A ligação WhatsApp não pertence a esta organização.");
-    const phone = data.phoneE164.replace(/[\\s()-]/g, "");
+    const phone = data.phoneE164.replace(/[\s()-]/g, "");
     const code = await requestCode({ organizationId: data.organizationId, whatsappNumberId: data.numberId }, phone);
     const { error: updateError } = await admin.from("whatsapp_numbers")
       .update({ phone_e164: phone, status: "connecting", last_error: null, updated_at: new Date().toISOString() })
