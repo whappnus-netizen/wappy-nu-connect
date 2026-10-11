@@ -11,7 +11,6 @@ import {
   QrCode,
   Cloud,
   Power,
-  AlertTriangle,
   Trash2,
   Loader2,
 } from "lucide-react";
@@ -29,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
+import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
 import { connectWhatsAppNumber, checkWhatsAppNumber } from "@/lib/whatsapp.functions";
 import {
@@ -102,7 +102,7 @@ function WhatsAppPage() {
   const { membership, membershipLoading } = useAuth();
   const orgId = membership?.organization_id;
   const role = membership?.role;
-  const canManage = role === "OWNER" || role === "ADMIN";
+  const canManage = (role === "OWNER" || role === "ADMIN") && subscription.active;
   const queryClient = useQueryClient();
 
   const [method, setMethod] = useState<"meta_cloud" | "qr" | null>(null);
