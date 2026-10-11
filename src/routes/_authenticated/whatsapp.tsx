@@ -12,6 +12,7 @@ import {
   Cloud,
   Power,
   AlertTriangle,
+  Trash2,
   Loader2,
 } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
@@ -35,6 +36,7 @@ import {
   refreshQrSession,
   disconnectQrSession,
   reconnectQrSession,
+  archiveQrConnection,
 } from "@/lib/whatsapp.qr.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
@@ -172,6 +174,7 @@ function WhatsAppPage() {
   const refreshQrFn = useServerFn(refreshQrSession);
   const disconnectQrFn = useServerFn(disconnectQrSession);
   const reconnectQrFn = useServerFn(reconnectQrSession);
+  const archiveQrFn = useServerFn(archiveQrConnection);
 
   const connect = useMutation({
     mutationFn: async (form: {
@@ -237,6 +240,17 @@ function WhatsAppPage() {
     onSuccess: (res) => {
       setError(res.error ?? null);
       void queryClient.invalidateQueries({ queryKey: ["whatsapp_sessions", orgId] });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const archiveQr = useMutation({
+    mutationFn: async (numberId: string) => archiveQrFn({ data: { organizationId: orgId!, numberId } }),
+    onSuccess: (result) => {
+      setError(result.bridgeError ? `Ligação arquivada, mas o motor reportou: ${result.bridgeError}` : null);
+      setActiveQrNumber(null);
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp_sessions", orgId] });
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp_numbers", orgId] });
     },
     onError: (e: Error) => setError(e.message),
   });
