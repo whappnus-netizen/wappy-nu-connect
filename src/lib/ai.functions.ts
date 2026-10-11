@@ -13,6 +13,7 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
       .object({
         organizationId: z.string().uuid(),
         agentId: z.string().uuid().optional(),
+        conversationId: z.string().uuid().optional(),
         message: z.string().trim().min(1).max(2000),
         history: z.array(turn).max(20).optional(),
       })
@@ -47,6 +48,7 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
       organizationId: data.organizationId,
       whatsappNumberId: number.id,
       agentId: data.agentId ?? null,
+      conversationId: data.conversationId ?? null,
       text: data.message,
     });
     return {
