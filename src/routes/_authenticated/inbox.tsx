@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
-import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus, ArrowDown } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +70,10 @@ function InboxPage() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const messagesViewportRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const { data: conversations, isLoading } = useQuery({
     queryKey: ["conversations", orgId, status],
@@ -111,12 +115,42 @@ function InboxPage() {
         .from("messages")
         .select("id, direction, message_type, body, media_url, wa_media_id, is_ai, status, created_at, sent_at")
         .eq("conversation_id", selected!)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .limit(200);
       if (err) throw new Error(err.message);
-      return (data ?? []) as Message[];
+      return ((data ?? []) as Message[]).reverse();
     },
   });
+
+  const scrollMessagesToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
+    shouldStickToBottomRef.current = true;
+    setShowScrollToBottom(false);
+  };
+
+  useEffect(() => {
+    if (!selected) return;
+    shouldStickToBottomRef.current = true;
+    const frame = window.requestAnimationFrame(() => scrollMessagesToBottom(false));
+    return () => window.cancelAnimationFrame(frame);
+  }, [selected]);
+
+  useEffect(() => {
+    if (!messages?.length) return;
+    if (shouldStickToBottomRef.current) {
+      const frame = window.requestAnimationFrame(() => scrollMessagesToBottom(false));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    setShowScrollToBottom(true);
+  }, [messages]);
+
+  const onMessagesScroll = () => {
+    const el = messagesViewportRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    shouldStickToBottomRef.current = atBottom;
+    setShowScrollToBottom(!atBottom);
+  };
 
   // Realtime: novas mensagens da organização actual
   useEffect(() => {
@@ -245,8 +279,8 @@ function InboxPage() {
 
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr_300px]">
-        <section className="rounded-xl border border-border bg-card">
+      <div className="grid gap-4 overflow-hidden lg:h-[calc(100dvh-9rem)] lg:min-h-[560px] lg:grid-cols-[300px_minmax(0,1fr)_280px]">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -267,7 +301,7 @@ function InboxPage() {
               ))}
             </div>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {isLoading ? (
               <p className="p-4 text-sm text-muted-foreground">A carregar…</p>
             ) : list.length === 0 ? (
@@ -299,7 +333,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[60vh] flex-col rounded-xl border border-border bg-card">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -309,7 +343,7 @@ function InboxPage() {
               />
             </div>
           ) : (
-            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            <div ref={messagesViewportRef} onScroll={onMessagesScroll} className="relative min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
@@ -333,9 +367,11 @@ function InboxPage() {
                   </div>
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
           )}
-          <div className="border-t border-border p-3">
+          {active && showScrollToBottom && <Button type="button" size="icon" variant="secondary" aria-label="Ir para a mensagem mais recente" onClick={() => scrollMessagesToBottom(true)} className="absolute bottom-24 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-lg"><ArrowDown className="size-4" /></Button>}
+          <div className="shrink-0 border-t border-border bg-card p-3">
             <Textarea
               placeholder={active ? "Escreva a resposta…" : "Selecione uma conversa para responder"}
               rows={3}
