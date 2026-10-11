@@ -112,7 +112,8 @@ function AiPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
   const subscription = useSubscriptionAccess(orgId);
-  const canManage = (membership?.role === "OWNER" || membership?.role === "ADMIN") && subscription.active && subscription.features.ai !== false;
+  const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
+  const canCreateAgent = canManage && subscription.active && subscription.features.ai !== false;
   const qc = useQueryClient();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
@@ -178,7 +179,7 @@ function AiPage() {
   const createAgent = useMutation({
     mutationFn: async () => {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
-      if (!canManage) throw new Error("Apenas OWNER ou ADMIN com uma assinatura activa pode gerir agentes.");
+      if (!canCreateAgent) throw new Error("Para criar agentes, precisas de ser OWNER/ADMIN e ter uma assinatura activa com IA incluída.");
       const { count, error: countError } = await supabase.from("ai_agents").select("id", { count: "exact", head: true }).eq("organization_id", orgId);
       if (countError) throw new Error("Não foi possível verificar o limite de agentes: " + countError.message);
       const maxAgents = Number(subscription.limits.agents ?? 0);
@@ -246,7 +247,7 @@ function AiPage() {
               </p>
             </div>
             {canManage && (
-              <Button onClick={() => createAgent.mutate()} disabled={createAgent.isPending || !canManage || agentLimitReached} className="w-full sm:w-auto">
+              <Button onClick={() => createAgent.mutate()} disabled={createAgent.isPending || !canCreateAgent || agentLimitReached} className="w-full sm:w-auto">
                 {createAgent.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                 Criar agente
               </Button>
@@ -309,7 +310,7 @@ function AiPage() {
               ))}
             </div>
           )}
-          {!canManage && <p className="mt-3 text-xs text-muted-foreground">Apenas OWNER ou ADMIN pode criar ou eliminar agentes.</p>}
+          {!canManage && <p className="mt-3 text-xs text-muted-foreground">Apenas OWNER ou ADMIN da organização pode gerir agentes.</p>}{canManage && !subscription.active && <p className="mt-3 rounded-md bg-secondary p-2 text-xs text-muted-foreground">A assinatura do plano {subscription.planName} não está confirmada. Podes desactivar agentes existentes, mas a criação de novos fica bloqueada até regularizar o plano.</p>}{subscription.isError && <p role="alert" className="mt-2 text-xs text-destructive">Erro ao validar assinatura: {(subscription.error as Error)?.message ?? "consulta indisponível"}.</p>}
         </section>
 
         {agent && (
