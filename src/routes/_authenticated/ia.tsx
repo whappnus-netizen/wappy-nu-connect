@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquare, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
@@ -1070,12 +1070,13 @@ function ExamplesPanel({
 }
 
 function TestPanel({ orgId, agentId, agentName, canTest }: { orgId: string; agentId: string; agentName: string; canTest: boolean }) {
+  const testConversationId = useRef(crypto.randomUUID());
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
 
   const ask = useMutation({
     mutationFn: async (text: string) =>
-      testOrgAiAgent({ data: { organizationId: orgId, agentId, message: text, history: turns.slice(-10) } }),
+      testOrgAiAgent({ data: { organizationId: orgId, agentId, conversationId: testConversationId.current, message: text, history: turns.slice(-10) } }),
     onSuccess: (res, text) => {
       setTurns((t) => [...t, { role: "user", content: text }, { role: "assistant", content: res.reply }]);
       setMessage("");
