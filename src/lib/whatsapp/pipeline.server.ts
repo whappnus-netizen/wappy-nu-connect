@@ -374,6 +374,79 @@ export async function processIncomingMessage(
         }
       }
 
+      // Criação automática de oportunidade CRM na primeira mensagem, sem duplicar oportunidades abertas.
+      if (isFirstInbound) {
+        const crmRule = activeRules.find((rule) =>
+          rule.trigger_type === "conversation_created" && rule.config?.["actionType"] === "create_deal"
+        );
+        if (crmRule) {
+          if (!res.contact_id) {
+            await logWhatsAppEvent(number.organization_id, "error", {
+              whatsappNumberId: number.id,
+              provider: incoming.provider,
+              detail: { stage: "automation_crm_lead", error: "Conversation has no contact_id" },
+            });
+          } else {
+            const { data: existingDeal, error: existingDealError } = await admin
+              .from("deals").select("id")
+              .eq("organization_id", number.organization_id)
+              .eq("contact_id", res.contact_id).eq("status", "open")
+              .limit(1).maybeSingle();
+            if (existingDealError) {
+              await logWhatsAppEvent(number.organization_id, "error", {
+                whatsappNumberId: number.id,
+                provider: incoming.provider,
+                detail: { stage: "automation_crm_lookup", error: existingDealError.message.slice(0, 200) },
+              });
+            } else if (!existingDeal) {
+              const [{ data: firstStage, error: stageError }, { data: contact, error: contactError }, { data: organization, error: organizationError }] = await Promise.all([
+                admin.from("pipeline_stages").select("id").eq("organization_id", number.organization_id).order("position", { ascending: true }).limit(1).maybeSingle(),
+                admin.from("contacts").select("full_name, profile_name").eq("organization_id", number.organization_id).eq("id", res.contact_id).maybeSingle(),
+                admin.from("organizations").select("currency").eq("id", number.organization_id).maybeSingle(),
+              ]);
+              if (stageError || !firstStage) {
+                await logWhatsAppEvent(number.organization_id, "error", {
+                  whatsappNumberId: number.id,
+                  provider: incoming.provider,
+                  detail: { stage: "automation_crm_stage", error: stageError?.message?.slice(0, 200) ?? "No CRM stage configured" },
+                });
+              } else if (contactError) {
+                await logWhatsAppEvent(number.organization_id, "error", {
+                  whatsappNumberId: number.id,
+                  provider: incoming.provider,
+                  detail: { stage: "automation_crm_contact", error: contactError.message.slice(0, 200) },
+                });
+              } else if (organizationError) {
+                await logWhatsAppEvent(number.organization_id, "error", {
+                  whatsappNumberId: number.id,
+                  provider: incoming.provider,
+                  detail: { stage: "automation_crm_currency", error: organizationError.message.slice(0, 200) },
+                });
+              } else {
+                const contactName = contact?.full_name?.trim() || contact?.profile_name?.trim();
+                const title = contactName ? `Oportunidade — ${contactName}` : "Oportunidade WhatsApp";
+                const { error: createDealError } = await admin.from("deals").insert({
+                  organization_id: number.organization_id,
+                  contact_id: res.contact_id,
+                  stage_id: firstStage.id,
+                  owner_id: currentAssignedTo,
+                  title,
+                  currency: organization?.currency || "AOA",
+                  status: "open",
+                });
+                if (createDealError) {
+                  await logWhatsAppEvent(number.organization_id, "error", {
+                    whatsappNumberId: number.id,
+                    provider: incoming.provider,
+                    detail: { stage: "automation_crm_insert", error: createDealError.message.slice(0, 200) },
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Boas-vindas só na primeira mensagem recebida da conversa.
       if (!selectedRule && isFirstInbound) {
         selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && getReply(rule).length > 0);
