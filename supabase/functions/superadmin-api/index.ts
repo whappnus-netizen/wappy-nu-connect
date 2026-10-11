@@ -369,6 +369,23 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: result.data });
     }
 
+    if (action === "group.connection.toggle") {
+      const id = str(input.id, 60); const enabled = input.is_enabled === true;
+      if (!id) return fail("ID do grupo inválido.");
+      const { data, error } = await db.from("superadmin_group_connections").update({ is_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", id).select("id,group_jid,is_enabled").single();
+      if (error) throw error;
+      await audit("group_connection.toggled", "group_connection", id, null, { enabled });
+      return json({ ok: true, data });
+    }
+
+    if (action === "group.flow.toggle") {
+      const id = str(input.id, 60); const active = input.is_active === true;
+      if (!id) return fail("ID do funil inválido.");
+      const { data, error } = await db.from("superadmin_group_flows").update({ is_active: active, updated_at: new Date().toISOString() }).eq("id", id).select("id,name,is_active").single();
+      if (error) throw error;
+      await audit("group_flow.toggled", "group_flow", id, null, { active });
+      return json({ ok: true, data });
+    }
     if (action === "group.step.save") {
       const id = str(input.id, 60);
       const flowId = str(input.flow_id, 60);
