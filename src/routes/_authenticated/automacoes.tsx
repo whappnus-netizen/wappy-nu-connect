@@ -82,7 +82,7 @@ function AutomationsPage() {
       if (triggerType === "keyword_match" && cleanKeyword.length < 2) throw new Error("A palavra-chave deve ter pelo menos 2 caracteres.");
       if (triggerType === "outside_business_hours" && startTime === endTime) throw new Error("A hora inicial e final não podem ser iguais.");
       const usesActions = triggerType !== "auto_assignment" && triggerType !== "auto_crm_lead";
-      const usableSteps = steps.filter((step) => step.kind === "text" ? step.content.trim().length > 0 : Boolean(step.file));
+      const usableSteps = usesActions ? steps.filter((step) => step.kind === "text" ? step.content.trim().length > 0 : Boolean(step.file)) : [];
       if (usesActions && usableSteps.length === 0) throw new Error("Adicione pelo menos uma etapa de texto, imagem ou áudio.");
       if (usesActions && steps.some((step) => step.kind !== "text" && !step.file)) {
         throw new Error("Escolha um ficheiro para cada etapa de imagem ou áudio.");
