@@ -19,8 +19,9 @@ const connectSchema = z.object({
 export const connectWhatsAppNumber = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => connectSchema.parse(input))
   .handler(async ({ data }) => {
-    const { requireOrgRole, serviceClient, verifyMetaNumber } = await import("./whatsapp.server");
+    const { requireOrgRole, requireActiveSubscription, serviceClient, verifyMetaNumber } = await import("./whatsapp.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
+    await requireActiveSubscription(data.organizationId);
 
     // Nunca deixar o token de sistema vazar de volta para o browser numa mensagem de erro.
     const scrub = (message: string) => message.split(data.accessToken).join("***");
