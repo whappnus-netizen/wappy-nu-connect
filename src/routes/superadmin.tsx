@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
@@ -139,6 +140,10 @@ function SuperAdminPage() {
   const [groupStepText, setGroupStepText] = useState("");
   const [groupStepAssetPath, setGroupStepAssetPath] = useState("");
   const [groupAssetFile, setGroupAssetFile] = useState<File | null>(null);
+  const [groupAiPrompt, setGroupAiPrompt] = useState("");
+  const [groupAiPublicRules, setGroupAiPublicRules] = useState("");
+  const [groupAiPrivateRules, setGroupAiPrivateRules] = useState("");
+  const [groupAiActive, setGroupAiActive] = useState(false);
   const [groupStepDelay, setGroupStepDelay] = useState("0");
   const [groupStepAt, setGroupStepAt] = useState("");
   const [scheduleConnectionId, setScheduleConnectionId] = useState("");
@@ -156,11 +161,18 @@ function SuperAdminPage() {
   const team = useQuery({ queryKey: ["superadmin", "team"], queryFn: () => adminApi<any[]>("team.list"), enabled: tab === "team", retry: false });
   const notifications = useQuery({ queryKey: ["superadmin", "notifications"], queryFn: () => adminApi<any[]>("notifications.list"), enabled: tab === "notifications", retry: false, staleTime: 15_000 });
   const groupCommander = useQuery({ queryKey: ["superadmin", "group-commander"], queryFn: () => adminApi<any>("group.commander.list"), enabled: tab === "groups", retry: false, staleTime: 15_000 });
+  const groupAi = useQuery({ queryKey: ["superadmin", "group-ai"], queryFn: () => adminApi<any>("group.ai.get"), enabled: tab === "group-ai", retry: false, staleTime: 15_000 });
+  useEffect(() => { if (groupAi.data) { setGroupAiPrompt(groupAi.data.system_prompt ?? ""); setGroupAiPublicRules(groupAi.data.public_group_rules ?? ""); setGroupAiPrivateRules(groupAi.data.private_dm_rules ?? ""); setGroupAiActive(Boolean(groupAi.data.is_active)); } }, [groupAi.data]);
   const selectedGroupAsset = (groupCommander.data?.assets ?? []).find((asset: any) => asset.storage_path === groupStepAssetPath) ?? null;
   const discoverGroupsFn = useServerFn(listSuperAdminGroups);
   const discoverGroups = useMutation({
     mutationFn: () => discoverGroupsFn({ data: { numberId: groupNumberId } }),
     onSuccess: (groups) => { setDiscoveredGroups(groups); if (!groups.length) toast.message("A sessão está ligada, mas não devolveu grupos participantes."); else toast.success(`${groups.length} grupos encontrados na sessão WhatsApp.`); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const saveGroupAi = useMutation({
+    mutationFn: () => adminApi<any>("group.ai.save", { system_prompt: groupAiPrompt, public_group_rules: groupAiPublicRules, private_dm_rules: groupAiPrivateRules, is_active: groupAiActive }),
+    onSuccess: (result) => { toast.success(result.is_active ? "Configuração de treino guardada e activada." : "Configuração guardada; IA do funil desactivada."); void client.invalidateQueries({ queryKey: ["superadmin", "group-ai"] }); },
     onError: (error: Error) => toast.error(error.message),
   });
   const saveGroupFlow = useMutation({ mutationFn: () => adminApi<any>("group.flow.save", { name: groupFlowName.trim(), trigger_mode: groupFlowMode, is_active: false }), onSuccess: (flow) => { toast.success("Funil criado."); setGroupFlowName(""); setGroupFlowId(flow.id); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); }, onError: (error: Error) => toast.error(error.message) });
@@ -272,7 +284,7 @@ function SuperAdminPage() {
           {[
             ["overview", LayoutDashboard, "Visão geral"], ["organizations", Building2, "Organizações"],
             ["plans", CircleDollarSign, "Planos e preços"], ["subscriptions", CreditCard, "Assinaturas"], ["notifications", Sparkles, "Notificações"],
-            ["groups", Users, "Group Commander"], ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["audit", LockKeyhole, "Auditoria"],
+            ["groups", Users, "Group Commander"], ["group-ai", Sparkles, "Treinar IA"], ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["audit", LockKeyhole, "Auditoria"],
           ].map(([id, Icon, label]) => {
             const I = Icon as typeof LayoutDashboard;
             return <button key={id as string} onClick={() => setTab(id as string)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${tab === id ? "bg-emerald-400/10 font-semibold text-emerald-200 ring-1 ring-emerald-300/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><I className="size-4" />{label as string}{tab === id && <span className="ml-auto size-1.5 rounded-full bg-emerald-300" />}</button>;
@@ -286,7 +298,7 @@ function SuperAdminPage() {
 
       <main className="min-w-0 lg:pl-64">
         <header className="sticky top-0 z-10 flex min-h-20 items-center justify-between gap-4 border-b border-white/10 bg-[#07110e]/90 px-5 backdrop-blur-xl sm:px-8">
-          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "notifications" ? "Notificações" : tab === "groups" ? "Group Commander" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
+          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "notifications" ? "Notificações" : tab === "groups" ? "Group Commander" : tab === "group-ai" ? "Treinar IA do funil" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
           <div className="flex items-center gap-2"><Badge variant="outline" className="hidden border-emerald-300/20 text-emerald-200 sm:inline-flex">AOA · Africa/Luanda</Badge><Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10" onClick={refreshAll} aria-label="Atualizar"><RefreshCw className="size-4" /></Button></div>
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b border-white/10 px-3 py-2 lg:hidden">
@@ -365,6 +377,18 @@ function SuperAdminPage() {
             <SectionIntro title="Equipa administrativa" description="Apenas contas que já existem no Supabase Auth podem receber acesso. Usa o mínimo de permissões necessário." />
             <Card className="border-emerald-300/20 bg-[#0b1912] text-slate-100 shadow-none"><CardHeader><CardTitle className="text-base">Adicionar ou atualizar administrador</CardTitle><CardDescription className="text-slate-500">O UUID identifica a conta exata. Só o proprietário pode guardar alterações nesta área.</CardDescription></CardHeader><CardContent><form className="grid gap-3 md:grid-cols-[2fr_1fr_auto]" onSubmit={e => { e.preventDefault(); saveAdmin.mutate({ user_id: teamUserId.trim(), role: teamRole, is_active: true }); }}><div><label className="mb-1.5 block text-xs text-slate-400">UUID da conta existente</label><Input required value={teamUserId} onChange={e => setTeamUserId(e.target.value)} className="border-white/10 bg-black/20" placeholder="UUID do utilizador no Supabase Auth" /></div><div><label className="mb-1.5 block text-xs text-slate-400">Função</label><select value={teamRole} onChange={e => setTeamRole(e.target.value as "admin"|"support"|"billing"|"owner")} className="h-9 w-full rounded-md border border-white/10 bg-[#102219] px-3 text-sm"><option value="support">Suporte</option><option value="billing">Financeiro</option><option value="admin">Administrador</option><option value="owner">Proprietário</option></select></div><div className="flex items-end"><Button type="submit" disabled={saveAdmin.isPending || !teamUserId.trim()} className="bg-emerald-400 text-[#062016] hover:bg-emerald-300">{saveAdmin.isPending && <LoaderCircle className="size-4 animate-spin" />}Guardar acesso</Button></div></form><p className="mt-3 text-xs leading-5 text-amber-200/80">A função Proprietário concede controlo total. Não a atribuas a contas de clientes.</p></CardContent></Card>
             {team.isLoading ? <Loading /> : team.error ? <ErrorText error={team.error as Error} /> : <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1912]"><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Utilizador</TableHead><TableHead className="text-slate-500">Função</TableHead><TableHead className="text-slate-500">Estado</TableHead><TableHead className="text-slate-500">Criado</TableHead><TableHead className="text-right text-slate-500">Acesso</TableHead></TableRow></TableHeader><TableBody>{(team.data ?? []).map((member:any) => <TableRow key={member.user_id} className="border-white/[0.06]"><TableCell><div className="font-medium">{member.full_name ?? member.email ?? "Conta administrativa"}</div><div className="mt-1 text-xs text-slate-500">{member.email ?? member.user_id}</div></TableCell><TableCell><Badge variant={member.role === "owner" ? "default" : "secondary"}>{({owner:"Proprietário",admin:"Administrador",support:"Suporte",billing:"Financeiro"} as Record<string,string>)[member.role] ?? member.role}</Badge></TableCell><TableCell><Badge variant={member.is_active ? "default" : "destructive"}>{member.is_active ? "Ativo" : "Desativado"}</Badge></TableCell><TableCell className="text-xs text-slate-400">{date(member.created_at)}</TableCell><TableCell className="text-right"><Button size="sm" variant="outline" disabled={saveAdmin.isPending || member.role === "owner" && member.user_id === teamUserId} className="border-white/10" onClick={() => saveAdmin.mutate({ user_id: member.user_id, role: member.role, is_active: !member.is_active })}>{member.is_active ? "Desativar" : "Reativar"}</Button></TableCell></TableRow>)}</TableBody></Table></div>}
+          </section>}
+
+          {tab === "group-ai" && <section className="space-y-5">
+            <SectionIntro title="Treinar IA do Group Commander" description="Define o comportamento da IA que prepara e apoia os funis de grupo. As regras públicas e privadas são separadas para evitar misturar mensagens do grupo com atendimento individual." />
+            {groupAi.isLoading ? <Loading /> : groupAi.error ? <ErrorText error={groupAi.error as Error} /> : <Card className="border-emerald-300/20 bg-[#0b1912] text-slate-100 shadow-none"><CardHeader><CardTitle className="text-base">Instruções de treino</CardTitle><CardDescription className="text-slate-500">Guarda as instruções centrais, regras de transmissão para grupos e regras para conversas privadas. Mantém o envio limitado a grupos autorizados e etapas aprovadas.</CardDescription></CardHeader><CardContent className="space-y-4">
+              <div className="space-y-1.5"><label className="text-sm font-medium">Instrução principal da IA</label><Textarea value={groupAiPrompt} onChange={e => setGroupAiPrompt(e.target.value)} rows={7} maxLength={12000} placeholder="Define a função da IA, tom, objectivos do funil, limites, como escrever mensagens e o que nunca deve inventar." className="border-white/10 bg-[#102219]" /><p className="text-xs text-slate-500">{groupAiPrompt.length}/12000 caracteres</p></div>
+              <div className="space-y-1.5"><label className="text-sm font-medium">Regras para grupos públicos / transmissão do funil</label><Textarea value={groupAiPublicRules} onChange={e => setGroupAiPublicRules(e.target.value)} rows={4} maxLength={8000} placeholder="Ex.: só enviar etapas aprovadas, respeitar horários e intervalos, não responder a conversas alheias nem repetir envios." className="border-white/10 bg-[#102219]" /></div>
+              <div className="space-y-1.5"><label className="text-sm font-medium">Regras para mensagens privadas (DM)</label><Textarea value={groupAiPrivateRules} onChange={e => setGroupAiPrivateRules(e.target.value)} rows={4} maxLength={8000} placeholder="Define como distinguir um contacto privado de uma mensagem no grupo, quando encaminhar para atendimento e que dados nunca partilhar no grupo." className="border-white/10 bg-[#102219]" /></div>
+              <label className="flex items-center gap-3 rounded-lg border border-white/10 p-3 text-sm"><input type="checkbox" checked={groupAiActive} onChange={e => setGroupAiActive(e.target.checked)} className="size-4 accent-emerald-400" />Activar configuração de treino para os funis do Group Commander</label>
+              <p className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-5 text-amber-100/80">Segurança operacional: a IA não deve iniciar conversas privadas nem publicar conteúdo fora dos grupos e etapas autorizados. A configuração é guardada no servidor; a geração de texto por IA só será usada por etapas que explicitamente activem esse modo no worker.</p>
+              <Button className="bg-emerald-400 text-[#062016] hover:bg-emerald-300" disabled={saveGroupAi.isPending || groupAiActive && groupAiPrompt.trim().length < 20} onClick={() => saveGroupAi.mutate()}>{saveGroupAi.isPending ? "A guardar treino…" : "Guardar configuração de treino"}</Button>
+            </CardContent></Card>}
           </section>}
 
           {tab === "groups" && <section className="space-y-6">
