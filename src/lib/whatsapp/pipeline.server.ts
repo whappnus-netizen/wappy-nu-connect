@@ -214,8 +214,8 @@ export async function processIncomingMessage(
             const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
             const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
             return {
-              day: weekdayMap[values.weekday ?? ""] ?? 0,
-              minutes: Number(values.hour ?? "0") * 60 + Number(values.minute ?? "0"),
+              day: weekdayMap[values["weekday"] ?? ""] ?? 0,
+              minutes: Number(values["hour"] ?? "0") * 60 + Number(values["minute"] ?? "0"),
             };
           };
 
@@ -225,8 +225,11 @@ export async function processIncomingMessage(
             const startParts = startText.split(":").map(Number);
             const endParts = endText.split(":").map(Number);
             if (startParts.length !== 2 || endParts.length !== 2 || startParts.some(Number.isNaN) || endParts.some(Number.isNaN)) continue;
-            const startMinutes = startParts[0] * 60 + startParts[1];
-            const endMinutes = endParts[0] * 60 + endParts[1];
+            const startHour = startParts[0], startMinute = startParts[1];
+            const endHour = endParts[0], endMinute = endParts[1];
+            if (startHour === undefined || startMinute === undefined || endHour === undefined || endMinute === undefined) continue;
+            const startMinutes = startHour * 60 + startMinute;
+            const endMinutes = endHour * 60 + endMinute;
             if (startMinutes === endMinutes) continue;
             const configuredDays = Array.isArray(rule.config?.days)
               ? rule.config.days.filter((day): day is number => typeof day === "number" && day >= 0 && day <= 6)
