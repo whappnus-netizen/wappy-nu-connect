@@ -49,6 +49,9 @@ type Message = {
   direction: "inbound" | "outbound";
   message_type: string;
   body: string | null;
+  media_url?: string | null;
+  wa_media_id?: string | null;
+  is_ai?: boolean;
   status: string;
   created_at: string;
   sent_at: string | null;
@@ -106,7 +109,7 @@ function InboxPage() {
     queryFn: async () => {
       const { data, error: err } = await supabase
         .from("messages")
-        .select("id, direction, message_type, body, status, created_at, sent_at")
+        .select("id, direction, message_type, body, media_url, wa_media_id, is_ai, status, created_at, sent_at")
         .eq("conversation_id", selected!)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -320,7 +323,9 @@ function InboxPage() {
                     }`}
                   >
                     <p className="whitespace-pre-wrap break-words">
-                      {m.body ?? `[${m.message_type}]`}
+                      {(m.media_url || m.wa_media_id) && <MessageMediaPreview organizationId={orgId!} messageId={m.id} messageType={m.message_type} direction={m.direction} />}
+                      {m.body && !((m.media_url || m.wa_media_id) && ["[Imagem enviada]", "[Áudio enviado]", "[O cliente enviou um anexo, mas não foi possível processá-lo. Não descrevas o conteúdo; pede ao cliente para reenviar ou descrever o que enviou.]"].includes(m.body)) ? m.body : (!m.body && !m.media_url && !m.wa_media_id ? `[${m.message_type}]` : null)}
+                      {m.is_ai && <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide opacity-70">Resposta da IA</span>}
                     </p>
                     <p className="mt-1 text-[10px] opacity-70">
                       {new Date(m.sent_at ?? m.created_at).toLocaleTimeString("pt-PT")} · {m.status}
@@ -430,4 +435,26 @@ function InboxPage() {
       </div>
     </AppShell>
   );
+}
+
+
+function MessageMediaPreview({ organizationId, messageId, messageType, direction }: {
+  organizationId: string;
+  messageId: string;
+  messageType: string;
+  direction: "inbound" | "outbound";
+}) {
+  const getMediaUrl = useServerFn(getMessageMediaSignedUrl);
+  const { data, isLoading } = useQuery({
+    queryKey: ["message-media-url", organizationId, messageId],
+    queryFn: () => getMediaUrl({ data: { organizationId, messageId } }),
+    staleTime: 5 * 60_000,
+    enabled: Boolean(organizationId && messageId),
+  });
+  if (isLoading) return <div className="my-2 h-20 w-40 animate-pulse rounded-lg bg-muted/60" />;
+  if (!data?.url) return <p className="my-2 text-xs opacity-70">Anexo indisponível para pré-visualização.</p>;
+  if (messageType === "image") return <a href={data.url} target="_blank" rel="noreferrer"><img src={data.url} alt={direction === "inbound" ? "Imagem recebida" : "Imagem enviada"} loading="lazy" className="my-2 max-h-72 max-w-full rounded-lg object-contain" /></a>;
+  if (messageType === "audio") return <audio controls preload="metadata" src={data.url} className="my-2 w-full max-w-xs">O navegador não suporta áudio.</audio>;
+  if (messageType === "video") return <video controls preload="metadata" src={data.url} className="my-2 max-h-72 max-w-full rounded-lg" />;
+  return <a href={data.url} target="_blank" rel="noreferrer" className="my-2 inline-block underline">Abrir anexo</a>;
 }
