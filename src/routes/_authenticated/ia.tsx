@@ -112,7 +112,7 @@ function AiPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
   const subscription = useSubscriptionAccess(orgId);
-  const canManage = (membership?.role === "OWNER" || membership?.role === "ADMIN") && subscription.active;
+  const canManage = (membership?.role === "OWNER" || membership?.role === "ADMIN") && subscription.active && subscription.features.ai !== false;
   const qc = useQueryClient();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
@@ -131,6 +131,8 @@ function AiPage() {
   });
 
   const agents = agentQuery.data ?? [];
+  const agentLimit = Number(subscription.limits.agents ?? 0);
+  const agentLimitReached = agentLimit > 0 && agents.length >= agentLimit;
   const agent = agents.find((item) => item.id === selectedAgentId) ?? agents[0] ?? null;
 
   useEffect(() => {
@@ -176,7 +178,11 @@ function AiPage() {
   const createAgent = useMutation({
     mutationFn: async () => {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
-      if (!canManage) throw new Error("Apenas OWNER ou ADMIN pode criar agentes.");
+      if (!canManage) throw new Error("Apenas OWNER ou ADMIN com uma assinatura activa pode gerir agentes.");
+      const { count, error: countError } = await supabase.from("ai_agents").select("id", { count: "exact", head: true }).eq("organization_id", orgId);
+      if (countError) throw new Error("Não foi possível verificar o limite de agentes: " + countError.message);
+      const maxAgents = Number(subscription.limits.agents ?? 0);
+      if (maxAgents > 0 && (count ?? 0) >= maxAgents) throw new Error(`O plano ${subscription.planName} permite ${maxAgents} agentes de IA. Já atingiste esse limite; elimina ou actualiza o plano para criar outro.`);
       const { data, error } = await supabase
         .from("ai_agents")
         .insert({
@@ -236,10 +242,11 @@ function AiPage() {
               <h2 className="font-display text-base font-semibold">Os meus agentes</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Cada agente tem a sua configuração, conhecimento, exemplos e números WhatsApp associados.
+                {agentLimit > 0 && <span className="mt-1 block text-xs">Plano {subscription.planName}: {agents.length} de {agentLimit} agentes utilizados.</span>}
               </p>
             </div>
             {canManage && (
-              <Button onClick={() => createAgent.mutate()} disabled={createAgent.isPending} className="w-full sm:w-auto">
+              <Button onClick={() => createAgent.mutate()} disabled={createAgent.isPending || !canManage || agentLimitReached} className="w-full sm:w-auto">
                 {createAgent.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                 Criar agente
               </Button>
