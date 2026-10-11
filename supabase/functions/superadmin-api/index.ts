@@ -312,6 +312,112 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: { ...data, plan_name: plan.name } });
     }
 
+
+    if (action === "group.commander.list") {
+      const [flows, connections, assets, jobs] = await Promise.all([
+        db.from("superadmin_group_flows").select("id,name,description,trigger_mode,is_active,created_at,updated_at").order("created_at", { ascending: false }).limit(200),
+        db.from("superadmin_group_connections").select("id,label,whatsapp_number_id,group_jid,group_name,active_flow_id,is_enabled,created_at,whatsapp_numbers(display_name,phone_e164)").order("created_at", { ascending: false }).limit(300),
+        db.from("superadmin_group_assets").select("id,name,asset_type,storage_path,mime_type,file_size,created_at").order("created_at", { ascending: false }).limit(300),
+        db.from("superadmin_group_jobs").select("id,connection_id,flow_id,step_id,due_at,status,attempts,last_error,created_at,sent_at").order("due_at", { ascending: true }).limit(300),
+      ]);
+      for (const result of [flows, connections, assets, jobs]) if (result.error) throw result.error;
+      return json({ ok: true, data: { flows: flows.data ?? [], connections: connections.data ?? [], assets: assets.data ?? [], jobs: jobs.data ?? [] } });
+    }
+
+    if (action === "group.flow.save") {
+      const id = str(input.id, 60);
+      const name = str(input.name, 120);
+      const description = str(input.description, 1000);
+      const triggerMode = str(input.trigger_mode, 20);
+      if (name.length < 2 || !["relative", "calendar"].includes(triggerMode)) return fail("Nome ou tipo de gatilho inválido.");
+      const patch = { name, description: description || null, trigger_mode: triggerMode, is_active: input.is_active === true, updated_at: new Date().toISOString(), created_by: actor.id };
+      const result = id
+        ? await db.from("superadmin_group_flows").update({ ...patch, created_by: undefined }).eq("id", id).select("*").single()
+        : await db.from("superadmin_group_flows").insert(patch).select("*").single();
+      if (result.error) throw result.error;
+      await audit(id ? "group_flow.updated" : "group_flow.created", "group_flow", result.data.id, null, { name, trigger_mode: triggerMode });
+      return json({ ok: true, data: result.data });
+    }
+
+    if (action === "group.connection.save") {
+      const id = str(input.id, 60);
+      const label = str(input.label, 120);
+      const groupJid = str(input.group_jid, 180);
+      const groupName = str(input.group_name, 180);
+      const numberId = str(input.whatsapp_number_id, 60);
+      const flowId = str(input.active_flow_id, 60) || null;
+      if (label.length < 2 || !groupJid.endsWith("@g.us") || groupName.length < 2) return fail("Informe um nome e um JID de grupo válido terminado em @g.us.");
+      if (numberId) {
+        const { data: number, error: numberError } = await db.from("whatsapp_numbers").select("id,provider,status").eq("id", numberId).maybeSingle();
+        if (numberError) throw numberError;
+        if (!number) return fail("Número WhatsApp não encontrado.");
+        if (number.provider !== "qr") return fail("A descoberta e gestão de grupos só está disponível para números ligados por QR/Baileys.");
+      }
+      if (flowId) {
+        const { data: flow, error: flowError } = await db.from("superadmin_group_flows").select("id").eq("id", flowId).maybeSingle();
+        if (flowError) throw flowError;
+        if (!flow) return fail("Funil não encontrado.");
+      }
+      const patch = { label, group_jid: groupJid, group_name: groupName, whatsapp_number_id: numberId || null, active_flow_id: flowId, is_enabled: input.is_enabled === true, updated_at: new Date().toISOString(), created_by: actor.id };
+      const result = id
+        ? await db.from("superadmin_group_connections").update({ ...patch, created_by: undefined }).eq("id", id).select("*").single()
+        : await db.from("superadmin_group_connections").insert(patch).select("*").single();
+      if (result.error) throw result.error;
+      await audit(id ? "group_connection.updated" : "group_connection.created", "group_connection", result.data.id, null, { group_jid: groupJid, enabled: result.data.is_enabled });
+      return json({ ok: true, data: result.data });
+    }
+
+    if (action === "group.step.save") {
+      const id = str(input.id, 60);
+      const flowId = str(input.flow_id, 60);
+      const position = Number(input.position);
+      const triggerMode = str(input.trigger_mode, 20);
+      const actionType = str(input.action_type, 20);
+      const delayMinutes = input.delay_minutes === null || input.delay_minutes === undefined || input.delay_minutes === "" ? null : Number(input.delay_minutes);
+      const scheduledAt = str(input.scheduled_at, 80) || null;
+      const textContent = str(input.text_content, 4000);
+      const assetPath = str(input.asset_path, 500) || null;
+      const mimeType = str(input.asset_mime_type, 120) || null;
+      const fileName = str(input.asset_file_name, 180) || null;
+      const caption = str(input.caption, 2000) || null;
+      if (!flowId || !Number.isInteger(position) || position < 0 || !["relative", "calendar"].includes(triggerMode) || !["text", "image", "audio", "video", "document"].includes(actionType)) return fail("Configuração da etapa inválida.");
+      if (triggerMode === "relative" && (!Number.isInteger(delayMinutes) || Number(delayMinutes) < 0)) return fail("O atraso deve ser um número de minutos igual ou superior a zero.");
+      if (triggerMode === "calendar" && (!scheduledAt || !Number.isFinite(Date.parse(scheduledAt)))) return fail("Escolha uma data e hora válidas.");
+      if (actionType === "text" && !textContent) return fail("O texto da etapa não pode estar vazio.");
+      if (actionType !== "text" && (!assetPath || !mimeType)) return fail("As etapas multimédia precisam de um ficheiro guardado e MIME type.");
+      const patch = { flow_id: flowId, position, trigger_mode: triggerMode, delay_minutes: delayMinutes, scheduled_at: scheduledAt, action_type: actionType, text_content: textContent || null, asset_path: assetPath, asset_mime_type: mimeType, asset_file_name: fileName, caption, status: "draft", updated_at: new Date().toISOString() };
+      const result = id
+        ? await db.from("superadmin_group_flow_steps").update(patch).eq("id", id).select("*").single()
+        : await db.from("superadmin_group_flow_steps").insert(patch).select("*").single();
+      if (result.error) throw result.error;
+      await audit(id ? "group_flow_step.updated" : "group_flow_step.created", "group_flow_step", result.data.id, null, { flow_id: flowId, action_type: actionType });
+      return json({ ok: true, data: result.data });
+    }
+
+    if (action === "group.job.schedule") {
+      const connectionId = str(input.connection_id, 60);
+      const stepId = str(input.step_id, 60);
+      const dueAt = str(input.due_at, 80);
+      if (!connectionId || !stepId || !Number.isFinite(Date.parse(dueAt)) || Date.parse(dueAt) <= Date.now()) return fail("Escolha um grupo, uma etapa e uma data futura.");
+      const [connection, step] = await Promise.all([
+        db.from("superadmin_group_connections").select("id,active_flow_id,is_enabled").eq("id", connectionId).maybeSingle(),
+        db.from("superadmin_group_flow_steps").select("*").eq("id", stepId).maybeSingle(),
+      ]);
+      if (connection.error) throw connection.error;
+      if (step.error) throw step.error;
+      if (!connection.data || !step.data) return fail("Grupo ou etapa não encontrado.");
+      if (!connection.data.is_enabled) return fail("Ative explicitamente a ligação ao grupo antes de agendar.");
+      if (connection.data.active_flow_id !== step.data.flow_id) return fail("A etapa não pertence ao funil activo deste grupo.");
+      const key = connectionId + ":" + stepId + ":" + new Date(dueAt).toISOString();
+      const result = await db.from("superadmin_group_jobs").upsert({
+        connection_id: connectionId, flow_id: step.data.flow_id, step_id: stepId, due_at: new Date(dueAt).toISOString(),
+        status: "queued", idempotency_key: key, payload: { action_type: step.data.action_type, text_content: step.data.text_content, asset_path: step.data.asset_path, asset_mime_type: step.data.asset_mime_type, asset_file_name: step.data.asset_file_name, caption: step.data.caption },
+      }, { onConflict: "idempotency_key", ignoreDuplicates: true }).select("*").maybeSingle();
+      if (result.error) throw result.error;
+      await audit("group_job.scheduled", "group_job", result.data?.id ?? null, null, { connection_id: connectionId, step_id: stepId, due_at: dueAt });
+      return json({ ok: true, data: result.data, queued: true, note: "A tarefa foi colocada na fila. O worker de envio agendado ainda precisa de ser activado para executar disparos." });
+    }
+
     if (action === "payments.list") {
       const { data, error } = await db.from("payment_transactions")
         .select("id,organization_id,subscription_id,provider,provider_payment_id,status,amount_aoa,currency,description,paid_at,failure_code,created_at,organizations(name,slug)")
