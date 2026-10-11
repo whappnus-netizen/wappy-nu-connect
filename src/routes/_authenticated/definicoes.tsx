@@ -98,8 +98,8 @@ function SettingsPage() {
     onSuccess: async () => {
       setPhotoFile(null);
       toast.success(photoTarget === "profile" ? "Foto pessoal actualizada." : "Logótipo da organização actualizado.");
-      await qc.invalidateQueries({ queryKey: ["settings-assets", user?.id, orgId] });
-      await qc.invalidateQueries();
+      await queryClient.invalidateQueries({ queryKey: ["settings-assets", user?.id, orgId] });
+      await queryClient.invalidateQueries();
     },
     onError: (e: Error) => toast.error(e.message),
   });
