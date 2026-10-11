@@ -194,6 +194,7 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
+  '/superadmin': typeof SuperadminRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -268,6 +269,7 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
+    | '/superadmin'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   id:
