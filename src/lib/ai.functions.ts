@@ -12,6 +12,7 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
     z
       .object({
         organizationId: z.string().uuid(),
+        agentId: z.string().uuid().optional(),
         message: z.string().trim().min(1).max(2000),
         history: z.array(turn).max(20).optional(),
       })
@@ -27,15 +28,25 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
       .from("whatsapp_numbers")
       .select("id")
       .eq("organization_id", data.organizationId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!number?.id) throw new Error("Esta organização ainda não tem um WhatsApp conectado.");
 
+    if (data.agentId) {
+      const { data: selectedAgent, error: agentError } = await admin
+        .from("ai_agents").select("id").eq("id", data.agentId)
+        .eq("organization_id", data.organizationId).maybeSingle();
+      if (agentError) throw new Error(agentError.message);
+      if (!selectedAgent) throw new Error("O agente selecionado não pertence a esta organização.");
+    }
+
     const result = await generateViaWhappNusAI({
       organizationId: data.organizationId,
       whatsappNumberId: number.id,
+      agentId: data.agentId ?? null,
       text: data.message,
     });
     return {
