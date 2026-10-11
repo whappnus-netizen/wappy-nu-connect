@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { Workflow, Plus, Power, Trash2, MessageSquareText, Clock3, Handshake, UsersRound } from "lucide-react";
+import { Workflow, Plus, Power, Trash2, MessageSquareText, Clock3, Handshake, UsersRound, ArrowUp, ArrowDown } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,15 +107,17 @@ function AutomationsPage() {
           if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("Cada ficheiro deve ter até 20 MB.");
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || (step.kind === "image" ? "imagem" : "audio");
           const storagePath = `${orgId}/${crypto.randomUUID()}-${safeName}`;
+          // Supabase guarda o MIME canónico; o parâmetro ";codecs=opus" é apenas um detalhe do MediaRecorder.
+          const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || file.type;
           const { error: uploadError } = await supabase.storage.from("automation-media")
-            .upload(storagePath, file, { contentType: file.type, upsert: false });
+            .upload(storagePath, file, { contentType: mimeType, upsert: false });
           if (uploadError) throw new Error("Falha ao carregar mídia: " + uploadError.message);
           uploadedPaths.push(storagePath);
           storedSteps.push({
             id: step.id,
             kind: step.kind,
             storagePath,
-            mimeType: file.type,
+            mimeType,
             fileName: file.name,
             ...(step.kind === "audio" && step.durationMs ? { durationMs: step.durationMs } : {}),
             ...(step.kind === "image" && step.content.trim() ? { caption: step.content.trim() } : {}),
@@ -178,6 +180,29 @@ function AutomationsPage() {
     },
     onSuccess: () => { setError(null); void queryClient.invalidateQueries({ queryKey: ["automations", orgId] }); },
     onError: (e: Error) => setError(e.message),
+  });
+
+  const reorderSteps = useMutation({
+    mutationFn: async ({ rule, fromIndex, toIndex }: { rule: Rule; fromIndex: number; toIndex: number }) => {
+      if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
+      const currentSteps = [...(rule.config?.steps ?? [])];
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= currentSteps.length || toIndex >= currentSteps.length) {
+        throw new Error("A ordem das etapas é inválida.");
+      }
+      const [moved] = currentSteps.splice(fromIndex, 1);
+      if (!moved) throw new Error("Não foi possível mover esta etapa.");
+      currentSteps.splice(toIndex, 0, moved);
+      const { error: updateError } = await supabase.from("automation_rules")
+        .update({ config: { ...(rule.config ?? {}), steps: currentSteps }, updated_at: new Date().toISOString() })
+        .eq("id", rule.id).eq("organization_id", orgId);
+      if (updateError) throw new Error(updateError.message);
+    },
+    onSuccess: () => {
+      setError(null);
+      setNotice("Ordem das etapas guardada automaticamente.");
+      void queryClient.invalidateQueries({ queryKey: ["automations", orgId] });
+    },
+    onError: (e: Error) => { setError("Não foi possível guardar a nova ordem: " + e.message); setNotice(null); },
   });
 
   const deleteRule = useMutation({
@@ -270,6 +295,20 @@ function AutomationsPage() {
                 {rule.config?.actionType === "assign_agent" && <p className="text-xs text-muted-foreground"><UsersRound className="mr-1 inline size-3" />Atribuição por menor carga, sem eliminar a resposta da IA.</p>}
                 {rule.config?.actionType === "create_deal" && <p className="text-xs text-muted-foreground"><Handshake className="mr-1 inline size-3" />Criação automática de oportunidade no CRM.</p>}
                 <p className="whitespace-pre-wrap break-words rounded-lg bg-secondary/60 p-3 text-sm">{rule.config?.reply ?? (rule.config?.actionType === "assign_agent" ? "Acção: distribuir a conversa por um membro disponível." : rule.config?.actionType === "create_deal" ? "Acção: criar oportunidade no CRM." : "Esta regra não tem resposta configurada.")}</p>
+                {Boolean(rule.config?.steps?.length) && <div className="space-y-2 rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-2"><h4 className="text-sm font-semibold">Etapas guardadas</h4><span className="text-xs text-muted-foreground">A ordem é guardada automaticamente</span></div>
+                  {rule.config!.steps!.map((step, index) => (
+                    <div key={step.id} className="flex items-start gap-2 rounded-md bg-background p-2">
+                      <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide">Etapa {index + 1} · {step.kind === "text" ? "Texto" : step.kind === "image" ? "Imagem" : "Áudio"}</p>
+                        <p className="mt-1 break-words whitespace-pre-wrap text-sm">{step.kind === "text" ? (step.text || "Texto vazio") : step.kind === "image" ? (step.fileName || "Imagem guardada") + (step.caption ? " — " + step.caption : "") : (step.fileName || "Áudio guardado") + (step.durationMs ? " · " + Math.floor(step.durationMs / 60000) + ":" + String(Math.floor(step.durationMs / 1000) % 60).padStart(2, "0") : "")}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button type="button" variant="ghost" size="sm" aria-label={`Mover etapa ${index + 1} para cima`} disabled={!canManage || index === 0 || reorderSteps.isPending} onClick={() => reorderSteps.mutate({ rule, fromIndex: index, toIndex: index - 1 })}><ArrowUp className="size-4" /></Button>
+                        <Button type="button" variant="ghost" size="sm" aria-label={`Mover etapa ${index + 1} para baixo`} disabled={!canManage || index === rule.config!.steps!.length - 1 || reorderSteps.isPending} onClick={() => reorderSteps.mutate({ rule, fromIndex: index, toIndex: index + 1 })}><ArrowDown className="size-4" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>}
               </article>
             ))}</div>}
           {error && !createRule.isError && <p role="alert" className="text-sm text-destructive">{error}</p>}
