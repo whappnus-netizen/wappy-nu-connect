@@ -280,7 +280,7 @@ function InboxPage() {
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
       <div className="grid gap-4 overflow-hidden lg:h-[calc(100dvh-9rem)] lg:min-h-[560px] lg:grid-cols-[300px_minmax(0,1fr)_280px]">
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
