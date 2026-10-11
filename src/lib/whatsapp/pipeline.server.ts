@@ -113,8 +113,8 @@ async function persistMetaAttachment(number: NumberRow, incoming: NormalizedInco
     if (!extensionByMime[mimeType]) throw new Error("Tipo MIME do anexo não suportado: " + mimeType);
     const fileResponse = await fetch(mediaUrl, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20000) });
     if (!fileResponse.ok) throw new Error("Falha ao descarregar mídia Meta (HTTP " + fileResponse.status + ").");
-    const bytes = new Uint8Array(await fileResponse.arrayBuffer());
-    if (!bytes.length || bytes.length > 20 * 1024 * 1024) throw new Error("Anexo vazio ou superior a 20 MB.");
+    const bytes = await fileResponse.arrayBuffer();
+    if (!bytes.byteLength || bytes.byteLength > 20 * 1024 * 1024) throw new Error("Anexo vazio ou superior a 20 MB.");
     const safeId = incoming.waMessageId.replace(/[^a-zA-Z0-9_-]/g, "_");
     const storagePath = `${number.organization_id}/${number.id}/${safeId}.${extensionByMime[mimeType]}`;
     const { error: uploadError } = await serviceClient().storage.from("whatsapp-incoming-media")
