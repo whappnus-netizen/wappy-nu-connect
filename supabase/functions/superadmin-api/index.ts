@@ -423,10 +423,53 @@ Deno.serve(async (req: Request) => {
     if (action === "group.connection.toggle") {
       const id = str(input.id, 60); const enabled = input.is_enabled === true;
       if (!id) return fail("ID do grupo inválido.");
-      const { data, error } = await db.from("superadmin_group_connections").update({ is_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", id).select("id,group_jid,is_enabled").single();
+      const { data: before, error: beforeError } = await db.from("superadmin_group_connections")
+        .select("id,active_flow_id,whatsapp_number_id,is_enabled").eq("id", id).maybeSingle();
+      if (beforeError) throw beforeError;
+      if (!before) return fail("Grupo não encontrado.", 404);
+      const { data, error } = await db.from("superadmin_group_connections")
+        .update({ is_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", id)
+        .select("id,group_jid,is_enabled,active_flow_id").single();
       if (error) throw error;
-      await audit("group_connection.toggled", "group_connection", id, null, { enabled });
-      return json({ ok: true, data });
+      let queued = 0;
+      if (!enabled) {
+        const { error: cancelError } = await db.from("superadmin_group_jobs").update({ status: "cancelled", last_error: "Cancelado porque a ligação ao grupo foi desactivada.", updated_at: new Date().toISOString() }).eq("connection_id", id).eq("status", "queued");
+        if (cancelError) throw cancelError;
+      } else if (data.active_flow_id) {
+        const { data: flow, error: flowError } = await db.from("superadmin_group_flows").select("id,is_active,trigger_mode").eq("id", data.active_flow_id).maybeSingle();
+        if (flowError) throw flowError;
+        if (!flow?.is_active) {
+          await db.from("superadmin_group_connections").update({ is_enabled: false, updated_at: new Date().toISOString() }).eq("id", id);
+          return fail("Activa primeiro o funil associado; a ligação ao grupo foi mantida desactivada.");
+        }
+        const { data: steps, error: stepsError } = await db.from("superadmin_group_flow_steps")
+          .select("id,flow_id,position,trigger_mode,delay_minutes,scheduled_at,action_type,text_content,asset_path,asset_mime_type,asset_file_name,caption")
+          .eq("flow_id", flow.id).order("position", { ascending: true });
+        if (stepsError) throw stepsError;
+        let cumulativeDelay = 0;
+        const now = Date.now();
+        for (const step of steps ?? []) {
+          let dueAt: Date;
+          if (step.trigger_mode === "relative") {
+            cumulativeDelay += Math.max(0, Number(step.delay_minutes ?? 0));
+            dueAt = new Date(now + cumulativeDelay * 60_000);
+          } else {
+            if (!step.scheduled_at || !Number.isFinite(Date.parse(step.scheduled_at))) continue;
+            dueAt = new Date(step.scheduled_at);
+            if (dueAt.getTime() <= now) continue;
+          }
+          const idempotencyKey = id + ":" + step.id + ":" + dueAt.toISOString();
+          const { error: queueError } = await db.from("superadmin_group_jobs").upsert({
+            connection_id: id, flow_id: flow.id, step_id: step.id, due_at: dueAt.toISOString(),
+            status: "queued", idempotency_key: idempotencyKey,
+            payload: { action_type: step.action_type, text_content: step.text_content, asset_path: step.asset_path, asset_mime_type: step.asset_mime_type, asset_file_name: step.asset_file_name, caption: step.caption },
+          }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+          if (queueError) throw queueError;
+          queued += 1;
+        }
+      }
+      await audit("group_connection.toggled", "group_connection", id, null, { enabled, queued });
+      return json({ ok: true, data, queued, note: enabled ? (queued ? `Ligação activada e ${queued} etapas colocadas na fila.` : "Ligação activada. Associa um funil activo com etapas para iniciar o calendário.") : "Ligação desactivada; tarefas pendentes canceladas." });
     }
 
     if (action === "group.flow.toggle") {
@@ -434,6 +477,10 @@ Deno.serve(async (req: Request) => {
       if (!id) return fail("ID do funil inválido.");
       const { data, error } = await db.from("superadmin_group_flows").update({ is_active: active, updated_at: new Date().toISOString() }).eq("id", id).select("id,name,is_active").single();
       if (error) throw error;
+      if (!active) {
+        const { error: cancelError } = await db.from("superadmin_group_jobs").update({ status: "cancelled", last_error: "Cancelado porque o funil foi pausado.", updated_at: new Date().toISOString() }).eq("flow_id", id).eq("status", "queued");
+        if (cancelError) throw cancelError;
+      }
       await audit("group_flow.toggled", "group_flow", id, null, { active });
       return json({ ok: true, data });
     }
@@ -485,7 +532,7 @@ Deno.serve(async (req: Request) => {
       }, { onConflict: "idempotency_key", ignoreDuplicates: true }).select("*").maybeSingle();
       if (result.error) throw result.error;
       await audit("group_job.scheduled", "group_job", result.data?.id ?? null, null, { connection_id: connectionId, step_id: stepId, due_at: dueAt });
-      return json({ ok: true, data: result.data, queued: true, note: "A tarefa foi colocada na fila. O worker de envio agendado ainda precisa de ser activado para executar disparos." });
+      return json({ ok: true, data: result.data, queued: true, note: "A tarefa foi colocada na fila de envio do motor WhatsApp no Railway." });
     }
 
     if (action === "payments.list") {
