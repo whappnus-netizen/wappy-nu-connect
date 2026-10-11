@@ -304,7 +304,10 @@ export async function processIncomingMessage(
             provider: incoming.provider,
             detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type },
           });
-          return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
+          if (selectedReason !== "welcome_automation") {
+            return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
+          }
+          // A saudação não deve impedir a IA de responder à pergunta da primeira mensagem.
         } catch (e) {
           await logWhatsAppEvent(number.organization_id, "message_failed", {
             whatsappNumberId: number.id,
