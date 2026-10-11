@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Workflow, Plus, Power, Trash2, MessageSquareText, Clock3, Handshake, UsersRound } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +16,8 @@ export const Route = createFileRoute("/_authenticated/automacoes")({
 });
 
 type TriggerType = "keyword_match" | "conversation_created" | "outside_business_hours" | "auto_assignment" | "auto_crm_lead";
-type AutomationStep = { id: string; kind: "text" | "image" | "audio"; content: string; file: File | null };
-type StoredAutomationStep = { id: string; kind: "text" | "image" | "audio"; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string };
+type AutomationStep = { id: string; kind: "text" | "image" | "audio"; content: string; file: File | null; durationMs?: number; previewUrl?: string };
+type StoredAutomationStep = { id: string; kind: "text" | "image" | "audio"; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string; durationMs?: number };
 type Rule = {
   id: string;
   name: string;
@@ -55,7 +55,7 @@ function AutomationsPage() {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [steps, setSteps] = useState<AutomationStep[]>([{ id: "step-initial", kind: "text", content: "", file: null }]);
-  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);\n  const [recordingStepId, setRecordingStepId] = useState<string | null>(null);\n  const recorderRef = useRef<MediaRecorder | null>(null);\n  const recordingStartedAtRef = useRef<number>(0);\n  const recordingChunksRef = useRef<Blob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -112,7 +112,7 @@ function AutomationsPage() {
             kind: step.kind,
             storagePath,
             mimeType: file.type,
-            fileName: file.name,
+            fileName: file.name,\n            ...(step.kind === "audio" && step.durationMs ? { durationMs: step.durationMs } : {}),
             ...(step.kind === "image" && step.content.trim() ? { caption: step.content.trim() } : {}),
           });
         }
@@ -231,7 +231,7 @@ function AutomationsPage() {
                     <select id={`step-kind-${step.id}`} value={step.kind} onChange={(e) => setSteps((current) => current.map((item) => item.id === step.id ? { ...item, kind: e.target.value as AutomationStep["kind"], file: null } : item))} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                       <option value="text">Enviar texto</option><option value="image">Enviar imagem</option><option value="audio">Enviar áudio</option>
                     </select>
-                    {step.kind !== "text" && <div className="space-y-1"><label className="text-xs font-medium" htmlFor={`step-file-${step.id}`}>{step.kind === "image" ? "Imagem (máx. 20 MB)" : "Áudio (máx. 20 MB)"}</label><Input id={`step-file-${step.id}`} type="file" accept={step.kind === "image" ? "image/*" : "audio/*"} onChange={(e) => setSteps((current) => current.map((item) => item.id === step.id ? { ...item, file: e.target.files?.[0] ?? null } : item))} />{step.file && <p className="text-xs text-muted-foreground">{step.file.name}</p>}</div>}
+                    {step.kind !== "text" && <div className="space-y-2"><label className="text-xs font-medium" htmlFor={"step-file-" + step.id}>{step.kind === "image" ? "Imagem (máx. 20 MB)" : "Áudio (máx. 20 MB)"}</label><Input id={"step-file-" + step.id} type="file" accept={step.kind === "image" ? "image/*" : "audio/*"} onChange={(e) => { const file = e.target.files?.[0] ?? null; const previewUrl = file && step.kind === "audio" ? URL.createObjectURL(file) : undefined; setSteps((current) => current.map((item) => item.id === step.id ? { ...item, file, ...(previewUrl ? { previewUrl } : {}), durationMs: undefined } : item)); if (file && step.kind === "audio" && previewUrl) { const audio = new Audio(); audio.preload = "metadata"; audio.onloadedmetadata = () => { const durationMs = Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : undefined; setSteps((current) => current.map((item) => item.id === step.id ? { ...item, ...(durationMs ? { durationMs } : {}) } : item)); }; audio.src = previewUrl; } }} />{step.file && <p className="text-xs text-muted-foreground">{step.file.name} · {(step.file.size / (1024 * 1024)).toFixed(2)} MB{step.durationMs ? " · " + Math.floor(step.durationMs / 60000) + ":" + String(Math.floor(step.durationMs / 1000) % 60).padStart(2, "0") : ""}</p>}{step.kind === "audio" && <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" size="sm" disabled={recordingStepId !== null && recordingStepId !== step.id} onClick={async () => { if (recordingStepId === step.id && recorderRef.current?.state === "recording") { recorderRef.current.stop(); return; } if (recordingStepId) return; if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setError("Este navegador não suporta gravação de áudio. Escolha um ficheiro."); return; } try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/webm"].find((type) => MediaRecorder.isTypeSupported(type)); const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream); recordingChunksRef.current = []; recorderRef.current = recorder; recordingStartedAtRef.current = Date.now(); recorder.ondataavailable = (event) => { if (event.data.size) recordingChunksRef.current.push(event.data); }; recorder.onerror = () => { stream.getTracks().forEach((track) => track.stop()); setRecordingStepId(null); setError("Não foi possível gravar o áudio. Verifique a permissão do microfone."); }; recorder.onstop = () => { const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "audio/webm" }); stream.getTracks().forEach((track) => track.stop()); recorderRef.current = null; setRecordingStepId(null); if (!blob.size) { setError("A gravação ficou vazia. Tente novamente."); return; } if (blob.size > 20 * 1024 * 1024) { setError("O áudio gravado ultrapassa 20 MB. Grave um áudio mais curto."); return; } const extension = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm"; const file = new File([blob], "gravacao-" + Date.now() + "." + extension, { type: blob.type }); const previewUrl = URL.createObjectURL(file); setSteps((current) => current.map((item) => item.id === step.id ? { ...item, file, durationMs: Date.now() - recordingStartedAtRef.current, previewUrl } : item)); setError(null); }; recorder.start(250); setRecordingStepId(step.id); setError(null); } catch { setError("Não foi possível aceder ao microfone. Autorize o acesso nas permissões do navegador."); } }}>{recordingStepId === step.id ? "Parar gravação" : "Gravar áudio"}</Button>{recordingStepId === step.id && <span className="text-xs text-destructive">A gravar…</span>}</div>}{step.kind === "audio" && step.previewUrl && <audio className="w-full" controls preload="metadata" src={step.previewUrl}>O navegador não suporta a pré-escuta de áudio.</audio>}</div>}
                     {(step.kind === "text" || step.kind === "image") && <div className="space-y-1"><label className="text-xs font-medium" htmlFor={`step-content-${step.id}`}>{step.kind === "image" ? "Legenda (opcional)" : "Texto a enviar"}</label><Textarea id={`step-content-${step.id}`} value={step.content} onChange={(e) => setSteps((current) => current.map((item) => item.id === step.id ? { ...item, content: e.target.value } : item))} rows={step.kind === "text" ? 3 : 2} maxLength={2000} placeholder={step.kind === "image" ? "Legenda da imagem..." : "Escreva a mensagem..."} /></div>}
                   </div>
                 ))}
