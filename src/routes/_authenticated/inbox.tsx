@@ -142,6 +142,7 @@ function InboxPage() {
       return () => window.cancelAnimationFrame(frame);
     }
     setShowScrollToBottom(true);
+    return undefined;
   }, [messages]);
 
   const onMessagesScroll = () => {
