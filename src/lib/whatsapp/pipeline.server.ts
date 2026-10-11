@@ -696,7 +696,7 @@ export async function sendOutgoingMessage(input: {
 
   const { data: conv, error: convErr } = await admin
     .from("conversations")
-    .select("id, contacts(phone_e164)")
+    .select("id, contact_id, whatsapp_number_id, contacts(phone_e164)")
     .eq("id", input.conversationId)
     .eq("organization_id", input.organizationId)
     .maybeSingle();
@@ -740,22 +740,40 @@ export async function sendOutgoingMessage(input: {
 
   try {
     const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
-    await admin.from("messages").insert({
+    const { error: persistError } = await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
+      contact_id: (conv as unknown as { contact_id: string | null }).contact_id ?? null,
+      whatsapp_number_id: (conv as unknown as { whatsapp_number_id: string | null }).whatsapp_number_id ?? input.whatsappNumberId,
       direction: "outbound",
       message_type: input.media?.kind ?? "text",
       body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
-      media_id: input.media?.storagePath ?? null,
+      wa_media_id: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
       sent_by: input.sentBy ?? null,
       is_ai: Boolean(input.isAi),
     });
-    await admin
+    if (persistError) {
+      console.error("[wappnus] WhatsApp enviou a mensagem, mas a gravação no inbox falhou:", {
+        conversationId: input.conversationId,
+        waMessageId: sent.waMessageId,
+        error: persistError.message,
+      });
+      await logWhatsAppEvent(input.organizationId, "message_failed", {
+        whatsappNumberId: input.whatsappNumberId,
+        provider: providerName,
+        detail: { stage: "persist_outbound_message", waMessageId: sent.waMessageId, error: persistError.message.slice(0, 250) },
+      });
+      throw new Error("A mensagem chegou ao WhatsApp, mas não foi possível registá-la no inbox: " + persistError.message);
+    }
+    const { error: conversationUpdateError } = await admin
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", input.conversationId);
+    if (conversationUpdateError) {
+      console.error("[wappnus] mensagem guardada, mas falhou a atualização da conversa:", conversationUpdateError.message);
+    }
 
     await logWhatsAppEvent(input.organizationId, "message_sent", {
       whatsappNumberId: number.id,
