@@ -353,13 +353,11 @@ export async function processIncomingMessage(
           : null;
 
   if (skip) {
-    if (skip) {
-      await logWhatsAppEvent(number.organization_id, "ai_skipped", {
-        whatsappNumberId: number.id,
-        provider: incoming.provider,
-        detail: { reason: skip },
-      });
-    }
+    await logWhatsAppEvent(number.organization_id, "ai_skipped", {
+      whatsappNumberId: number.id,
+      provider: incoming.provider,
+      detail: { reason: skip },
+    });
     return { ...base, aiReplied: false, aiSkippedReason: skip };
   }
 
