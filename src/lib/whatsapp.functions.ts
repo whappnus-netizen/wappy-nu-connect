@@ -181,7 +181,7 @@ export const getMessageMediaSignedUrl = createServerFn({ method: "POST" })
       return { url: null, messageType: message.message_type };
     }
     const bucket = message.direction === "inbound" ? "whatsapp-incoming-media" : "automation-media";
-    const { data: signed, error: signError } = await admin.storage.from(bucket).createSignedUrl(path, 600);
+    const { data: signed, error: signError } = await admin.storage.from(bucket).createSignedUrl(path, 3600);
     if (signError || !signed?.signedUrl) return { url: null, messageType: message.message_type };
     return { url: signed.signedUrl, messageType: message.message_type };
   });
