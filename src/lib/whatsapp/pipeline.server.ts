@@ -288,11 +288,20 @@ export async function processIncomingMessage(
             if (withinHours) continue;
 
             const reply = getReply(rule);
+            const cooldownMediaPath = getSteps(rule).find((step) =>
+              (step.kind === "image" || step.kind === "audio") && Boolean(step.storagePath)
+            )?.storagePath;
             const cooldownSince = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-            const { data: priorReply, error: priorReplyError } = await admin
-              .from("messages").select("id").eq("organization_id", number.organization_id)
-              .eq("conversation_id", res.conversation_id).eq("direction", "outbound")
-              .eq("body", reply).gte("created_at", cooldownSince).limit(1).maybeSingle();
+            let priorReplyQuery = admin.from("messages").select("id")
+              .eq("organization_id", number.organization_id)
+              .eq("conversation_id", res.conversation_id)
+              .eq("direction", "outbound")
+              .gte("created_at", cooldownSince)
+              .limit(1);
+            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("media_id", cooldownMediaPath);
+            else if (reply) priorReplyQuery = priorReplyQuery.eq("body", reply);
+            else continue;
+            const { data: priorReply, error: priorReplyError } = await priorReplyQuery.maybeSingle();
             if (priorReplyError) {
               await logWhatsAppEvent(number.organization_id, "error", {
                 whatsappNumberId: number.id,
