@@ -345,7 +345,7 @@ export async function processIncomingMessage(
               .eq("direction", "outbound")
               .gte("created_at", cooldownSince)
               .limit(1);
-            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("media_id", cooldownMediaPath);
+            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("wa_media_id", cooldownMediaPath);
             else if (reply) priorReplyQuery = priorReplyQuery.eq("body", reply);
             else continue;
             const { data: priorReply, error: priorReplyError } = await priorReplyQuery.maybeSingle();
@@ -639,6 +639,27 @@ export async function processIncomingMessage(
       body: ai.text,
       isAi: true,
     });
+
+    // Reações são opcionais e só são sugeridas pelo motor quando o utilizador
+    // activou essa função no agente e a mensagem expressa interesse/agradecimento.
+    const reactionProvider = providerByName(incoming.provider);
+    if (ai.reactionEmoji && reactionProvider.reactToMessage) {
+      try {
+        await reactionProvider.reactToMessage({
+          organizationId: number.organization_id,
+          whatsappNumberId: number.id,
+          to: incoming.fromWaId,
+          waMessageId: incoming.waMessageId,
+          emoji: ai.reactionEmoji,
+        });
+      } catch (reactionError) {
+        await logWhatsAppEvent(number.organization_id, "error", {
+          whatsappNumberId: number.id,
+          provider: incoming.provider,
+          detail: { stage: "ai_reaction", error: (reactionError as Error).message.slice(0, 200) },
+        });
+      }
+    }
     return { ...base, aiReplied: true };
   } catch (e) {
     await logWhatsAppEvent(number.organization_id, "message_failed", {
@@ -746,7 +767,7 @@ export async function sendOutgoingMessage(input: {
       direction: "outbound",
       message_type: input.media?.kind ?? "text",
       body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
-      media_id: input.media?.storagePath ?? null,
+      wa_media_id: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
       sent_by: input.sentBy ?? null,
