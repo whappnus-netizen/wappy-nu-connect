@@ -506,7 +506,7 @@ function Overview({
         .eq("organization_id", orgId);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["ai-agent", orgId] }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -918,13 +918,13 @@ function ExamplesPanel({
   );
 }
 
-function TestPanel({ orgId, agentName }: { orgId: string; agentName: string }) {
+function TestPanel({ orgId, agentId, agentName }: { orgId: string; agentId: string; agentName: string }) {
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
 
   const ask = useMutation({
     mutationFn: async (text: string) =>
-      testOrgAiAgent({ data: { organizationId: orgId, message: text, history: turns.slice(-10) } }),
+      testOrgAiAgent({ data: { organizationId: orgId, agentId, message: text, history: turns.slice(-10) } }),
     onSuccess: (res, text) => {
       setTurns((t) => [...t, { role: "user", content: text }, { role: "assistant", content: res.reply }]);
       setMessage("");
