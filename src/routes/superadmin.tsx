@@ -115,6 +115,13 @@ function SuperAdminPage() {
   const [notificationOrgId, setNotificationOrgId] = useState("");
   const [notificationTitle, setNotificationTitle] = useState("Aviso de renovação da assinatura");
   const [notificationBody, setNotificationBody] = useState("");
+  const [groupFlowName, setGroupFlowName] = useState("");
+  const [groupFlowMode, setGroupFlowMode] = useState<"relative" | "calendar">("relative");
+  const [groupLabel, setGroupLabel] = useState("");
+  const [groupJid, setGroupJid] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [groupNumberId, setGroupNumberId] = useState("");
+  const [groupFlowId, setGroupFlowId] = useState("");
   const client = useQueryClient();
 
   const overview = useQuery({ queryKey: ["superadmin", "dashboard"], queryFn: () => adminApi<{ metrics: Metrics; recentAudit: any[] }>("dashboard"), retry: false });
@@ -126,6 +133,9 @@ function SuperAdminPage() {
   const audit = useQuery({ queryKey: ["superadmin", "audit"], queryFn: () => adminApi<any[]>("audit.list"), enabled: tab === "audit", retry: false });
   const team = useQuery({ queryKey: ["superadmin", "team"], queryFn: () => adminApi<any[]>("team.list"), enabled: tab === "team", retry: false });
   const notifications = useQuery({ queryKey: ["superadmin", "notifications"], queryFn: () => adminApi<any[]>("notifications.list"), enabled: tab === "notifications", retry: false, staleTime: 15_000 });
+  const groupCommander = useQuery({ queryKey: ["superadmin", "group-commander"], queryFn: () => adminApi<any>("group.commander.list"), enabled: tab === "groups", retry: false, staleTime: 15_000 });
+  const saveGroupFlow = useMutation({ mutationFn: () => adminApi<any>("group.flow.save", { name: groupFlowName.trim(), trigger_mode: groupFlowMode, is_active: false }), onSuccess: (flow) => { toast.success("Funil criado."); setGroupFlowName(""); setGroupFlowId(flow.id); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); }, onError: (error: Error) => toast.error(error.message) });
+  const saveGroupConnection = useMutation({ mutationFn: () => adminApi<any>("group.connection.save", { label: groupLabel.trim(), group_jid: groupJid.trim(), group_name: groupName.trim(), whatsapp_number_id: groupNumberId, active_flow_id: groupFlowId || null, is_enabled: false }), onSuccess: () => { toast.success("Grupo registado desactivado."); setGroupLabel(""); setGroupJid(""); setGroupName(""); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); }, onError: (error: Error) => toast.error(error.message) });
   const sendNotification = useMutation({
     mutationFn: (payload: { organization_id: string; title: string; body: string }) => adminApi<any>("notifications.send", payload),
     onSuccess: () => {
@@ -199,7 +209,7 @@ function SuperAdminPage() {
           {[
             ["overview", LayoutDashboard, "Visão geral"], ["organizations", Building2, "Organizações"],
             ["plans", CircleDollarSign, "Planos e preços"], ["subscriptions", CreditCard, "Assinaturas"], ["notifications", Sparkles, "Notificações"],
-            ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["audit", LockKeyhole, "Auditoria"],
+            ["groups", Users, "Group Commander"], ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["audit", LockKeyhole, "Auditoria"],
           ].map(([id, Icon, label]) => {
             const I = Icon as typeof LayoutDashboard;
             return <button key={id as string} onClick={() => setTab(id as string)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${tab === id ? "bg-emerald-400/10 font-semibold text-emerald-200 ring-1 ring-emerald-300/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><I className="size-4" />{label as string}{tab === id && <span className="ml-auto size-1.5 rounded-full bg-emerald-300" />}</button>;
@@ -213,13 +223,13 @@ function SuperAdminPage() {
 
       <main className="min-w-0 lg:pl-64">
         <header className="sticky top-0 z-10 flex min-h-20 items-center justify-between gap-4 border-b border-white/10 bg-[#07110e]/90 px-5 backdrop-blur-xl sm:px-8">
-          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "notifications" ? "Notificações" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
+          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "notifications" ? "Notificações" : tab === "groups" ? "Group Commander" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
           <div className="flex items-center gap-2"><Badge variant="outline" className="hidden border-emerald-300/20 text-emerald-200 sm:inline-flex">AOA · Africa/Luanda</Badge><Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10" onClick={refreshAll} aria-label="Atualizar"><RefreshCw className="size-4" /></Button></div>
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b border-white/10 px-3 py-2 lg:hidden">
           {([
             ["overview", "Resumo"], ["organizations", "Clientes"], ["plans", "Planos"],
-            ["subscriptions", "Assinaturas"], ["notifications", "Notificações"], ["payments", "Pagamentos"], ["health", "Saúde"], ["team", "Equipa"], ["audit", "Auditoria"],
+            ["subscriptions", "Assinaturas"], ["notifications", "Notificações"], ["groups", "Grupos"], ["payments", "Pagamentos"], ["health", "Saúde"], ["team", "Equipa"], ["audit", "Auditoria"],
           ] as [string, string][]).map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium ${tab === id ? "bg-emerald-300/10 text-emerald-200" : "text-slate-400 hover:bg-white/5"}`}>{label}</button>)}
         </nav>
 
