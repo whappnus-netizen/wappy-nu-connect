@@ -57,6 +57,25 @@ export function qrSessionKey(ref: SessionRef): string {
   return `${ref.organizationId}:${ref.whatsappNumberId}`;
 }
 
+export async function requestQrPairingCode(ref: SessionRef, phoneNumber: string): Promise<string> {
+  const normalized = phoneNumber.replace(/\D/g, "");
+  if (!/^\d{8,15}$/.test(normalized)) throw new Error("Introduz um número internacional válido, incluindo o indicativo do país.");
+  const response = await bridgeFetch<{ code?: string }>("/sessions/" + encodeURIComponent(qrSessionKey(ref)) + "/pairing-code", {
+    method: "POST",
+    body: { phoneNumber: normalized },
+  });
+  if (!response.code) throw new Error("O motor WhatsApp não devolveu um código de ligação.");
+  return response.code;
+}
+
+export async function listQrGroups(ref: SessionRef): Promise<Array<{ id: string; subject: string; participants: number; announce: boolean }>> {
+  const response = await bridgeFetch<{ groups?: Array<{ id: string; subject: string; participants: number; announce: boolean }> }>(
+    "/sessions/" + encodeURIComponent(qrSessionKey(ref)) + "/groups",
+    { method: "GET" },
+  );
+  return response.groups ?? [];
+}
+
 async function bridgeFetch<T>(
   path: string,
   init: { method: string; body?: unknown } = { method: "GET" },
