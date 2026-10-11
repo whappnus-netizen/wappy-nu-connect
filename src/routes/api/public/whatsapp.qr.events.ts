@@ -156,7 +156,7 @@ function timingSafeEqualText(a: string, b: string): boolean {
   const bb = enc.encode(b);
   if (aa.length !== bb.length) return false;
   let diff = 0;
-  for (let i = 0; i < aa.length; i += 1) diff |= aa[i] ^ bb[i];
+  for (let i = 0; i < aa.length; i += 1) diff |= (aa[i] ?? 0) ^ (bb[i] ?? 0);
   return diff === 0;
 }
 
