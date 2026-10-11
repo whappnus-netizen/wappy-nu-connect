@@ -257,7 +257,7 @@ function InboxPage() {
               list.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setSelected(c.id)}
+                  onClick={() => { setSelected(c.id); setNotice(null); setError(null); }}
                   className={`w-full rounded-lg p-3 text-left transition-colors ${
                     selected === c.id ? "bg-secondary" : "hover:bg-secondary"
                   }`}
@@ -354,7 +354,7 @@ function InboxPage() {
                 Estado: {active.status} · Prioridade: {active.priority}
               </p>
               <div className="mt-3 space-y-2">
-                <Button size="sm" variant="outline" className="w-full" disabled={!active.contact_id || createLead.isPending} onClick={() => createLead.mutate()}>
+                <Button size="sm" variant="outline" className="w-full" disabled={!active.contact_id || createLead.isPending || Boolean(notice)} onClick={() => createLead.mutate()}>
                   <Plus className="mr-1 size-4" />{createLead.isPending ? "A criar oportunidade…" : "Criar oportunidade no CRM"}
                 </Button>
                 {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">{notice}</p>}
