@@ -154,9 +154,10 @@ export const startQrSession = createServerFn({ method: "POST" })
 export const refreshQrSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => orgNumber.parse(input))
   .handler(async ({ data }) => {
-    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    const { requireOrgRole, requireActiveSubscription, serviceClient } = await import("./whatsapp.server");
     const { qrProvider, qrBridgeConfigured } = await import("./whatsapp/qr.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN", "SUPERVISOR"]);
+    await requireActiveSubscription(data.organizationId);
     if (!qrBridgeConfigured()) return { status: "error" as const, qr: null, error: "Bridge não configurado." };
 
     const admin = serviceClient();
@@ -232,10 +233,11 @@ export const disconnectQrSession = createServerFn({ method: "POST" })
 export const reconnectQrSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => orgNumber.parse(input))
   .handler(async ({ data }) => {
-    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    const { requireOrgRole, requireActiveSubscription, serviceClient } = await import("./whatsapp.server");
     const { qrProvider, qrBridgeConfigured } = await import("./whatsapp/qr.server");
     const { logWhatsAppEvent } = await import("./whatsapp/pipeline.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
+    await requireActiveSubscription(data.organizationId);
     if (!qrBridgeConfigured()) {
       return { status: "error" as const, qr: null, error: "Serviço de sessões não configurado." };
     }
@@ -280,8 +282,9 @@ export const setConversationAi = createServerFn({ method: "POST" })
     orgOnly.extend({ conversationId: z.string().uuid(), enabled: z.boolean() }).parse(input),
   )
   .handler(async ({ data }) => {
-    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    const { requireOrgRole, requireActiveSubscription, serviceClient } = await import("./whatsapp.server");
     await requireOrgRole(data.organizationId, ["OWNER", "ADMIN", "SUPERVISOR", "AGENT"]);
+    if (data.enabled) await requireActiveSubscription(data.organizationId);
     const admin = serviceClient();
     const { error } = await admin
       .from("conversations")
