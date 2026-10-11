@@ -67,6 +67,7 @@ create policy "admins delete agent WhatsApp assignments"
 on public.ai_agent_whatsapp_numbers for delete to authenticated
 using (public.has_org_role(organization_id, array['OWNER'::public.app_role, 'ADMIN'::public.app_role]));
 
+revoke all on public.ai_agent_whatsapp_numbers from public, anon;
 grant select, insert, update, delete on public.ai_agent_whatsapp_numbers to authenticated;
 grant all on public.ai_agent_whatsapp_numbers to service_role;
 
