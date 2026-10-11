@@ -97,6 +97,14 @@ export interface WhatsAppProvider {
   disconnect(input: SessionRef): Promise<void>;
   /** Envia uma mensagem de texto. */
   sendMessage(input: SendMessageInput): Promise<SendResult>;
+  /** Envia uma reação à mensagem recebida, quando o provedor suporta reações. */
+  sendReaction?(input: SessionRef & {
+    to: string;
+    waMessageId: string;
+    emoji: string;
+    meta?: { phoneNumberId: string; token: string } | undefined;
+  }): Promise<void>;
+
   /** Estado actual da ligação. */
   getConnectionStatus(input: SessionRef): Promise<StatusResult>;
   /** Converte o payload cru do provedor no formato interno único. */
@@ -232,6 +240,22 @@ export const metaProvider: WhatsAppProvider = {
     return { waMessageId: waId, provider: "meta_cloud" };
   },
 
+  async sendReaction({ phoneNumberId, token, to, waMessageId, emoji }) {
+    const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to.replace(/^\\+/, ""),
+        type: "reaction",
+        reaction: { message_id: waMessageId, emoji },
+      }),
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) throw graphError(json, res.status);
+  },
+
   async markRead(phoneNumberId, token, waMessageId) {
     const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
       method: "POST",
@@ -322,6 +346,10 @@ export const mockProvider: WhatsAppProvider = {
 
   async sendText({ to }) {
     return { waMessageId: `mock.${Date.now()}.${to.replace(/\D/g, "")}`, provider: "mock" };
+  },
+
+  async sendReaction() {
+    /* noop */
   },
 
   async markRead() {
