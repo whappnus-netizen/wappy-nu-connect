@@ -33,7 +33,7 @@ const nav = [
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("font-display text-lg font-bold tracking-tight", className)}>
-      Wappy<span className="text-primary">Nus</span>
+      Whapp<span className="text-primary">Nus</span>
     </span>
   );
 }
