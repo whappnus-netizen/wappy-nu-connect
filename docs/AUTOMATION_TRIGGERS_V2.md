@@ -12,3 +12,6 @@ The outside-hours UI currently defaults to Monday–Friday and lets the organiza
 
 ## Schema notes
 The organization locale and trigger-function hardening migrations use the exact version identifiers recorded by the connected Supabase project, so future migration pushes will not re-run them under a different version.
+
+
+Before merging this feature, the repository TypeScript check and both Netlify preview builds must pass.
