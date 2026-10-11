@@ -9,6 +9,7 @@ type GenerateInput = {
   fromWaId?: string | null;
   profileName?: string | null;
   text: string;
+  agentId?: string | null;
 };
 
 type GenerateResult = {
