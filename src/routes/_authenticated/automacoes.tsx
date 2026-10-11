@@ -27,6 +27,7 @@ type Rule = {
 function AutomationsPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
+  const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -110,6 +111,7 @@ function AutomationsPage() {
             <MessageSquareText className="size-5 text-primary" />
             <h2 className="font-display font-semibold">Criar resposta por palavra-chave</h2>
           </div>
+          {!canManage && <p className="rounded-md bg-secondary p-2 text-xs text-muted-foreground">Só OWNER ou ADMIN pode criar e gerir automações.</p>}
           <p className="text-sm text-muted-foreground">Quando uma mensagem recebida contiver a palavra-chave, a Wapnus envia esta resposta e não chama a IA para essa mesma mensagem, evitando respostas duplicadas.</p>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); createRule.mutate(); }}>
             <div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-name">Nome da regra</label><Input id="automation-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Horário de funcionamento" maxLength={80} /></div>
@@ -117,7 +119,7 @@ function AutomationsPage() {
             <div className="space-y-1"><label className="text-sm font-medium" htmlFor="automation-reply">Resposta automática</label><Textarea id="automation-reply" value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Escreva a resposta que será enviada..." rows={4} maxLength={2000} /></div>
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
             {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">{notice}</p>}
-            <Button type="submit" disabled={!orgId || createRule.isPending} className="w-full sm:w-auto"><Plus className="mr-2 size-4" />{createRule.isPending ? "A guardar…" : "Criar automação"}</Button>
+            <Button type="submit" disabled={!orgId || !canManage || createRule.isPending} className="w-full sm:w-auto"><Plus className="mr-2 size-4" />{createRule.isPending ? "A guardar…" : "Criar automação"}</Button>
           </form>
         </section>
 
@@ -130,7 +132,7 @@ function AutomationsPage() {
               <article key={rule.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{rule.name}</h3><Badge variant={rule.is_active ? "default" : "secondary"}>{rule.is_active ? "Activa" : "Pausada"}</Badge></div><p className="mt-1 text-xs text-muted-foreground">Se a mensagem contiver “{rule.config?.keyword ?? "palavra-chave"}”</p></div>
-                  <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule.id); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
+                  <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={!canManage || toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={!canManage || deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule.id); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
                 </div>
                 <p className="whitespace-pre-wrap break-words rounded-lg bg-secondary/60 p-3 text-sm">{rule.config?.reply ?? "Esta regra não tem resposta configurada."}</p>
               </article>
