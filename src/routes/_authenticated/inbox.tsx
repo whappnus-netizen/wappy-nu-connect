@@ -293,7 +293,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[60vh] flex-col rounded-xl border border-border bg-card">
+        <section className="flex h-[72vh] min-h-[480px] max-h-[820px] flex-col overflow-hidden rounded-xl border border-border bg-card">
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -303,7 +303,7 @@ function InboxPage() {
               />
             </div>
           ) : (
-            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
