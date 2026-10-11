@@ -556,7 +556,7 @@ function Overview({
                 Quando ativo, fica disponível para responder no atendimento.
               </p>
             </div>
-            <Switch checked={agent.is_active} onCheckedChange={(v) => toggle.mutate(v)} />
+            <Switch checked={agent.is_active} disabled={!canManage || toggle.isPending} onCheckedChange={(v) => toggle.mutate(v)} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -1069,7 +1069,7 @@ function ExamplesPanel({
   );
 }
 
-function TestPanel({ orgId, agentId, agentName }: { orgId: string; agentId: string; agentName: string }) {
+function TestPanel({ orgId, agentId, agentName, canTest }: { orgId: string; agentId: string; agentName: string; canTest: boolean }) {
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
 
