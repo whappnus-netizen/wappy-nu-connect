@@ -547,8 +547,8 @@ export async function processIncomingMessage(
                   kind: step.kind,
                   storagePath: step.storagePath,
                   mimeType: step.mimeType,
-                  caption: step.caption,
-                  fileName: step.fileName,
+                  ...(step.caption !== undefined ? { caption: step.caption } : {}),
+                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),
                 },
                 isAi: false,
               });
@@ -638,7 +638,7 @@ export async function processIncomingMessage(
       conversationId: res.conversation_id,
       body: ai.text,
       isAi: true,
-      reaction: ai.reactionEmoji ? { waMessageId: incoming.waMessageId, emoji: ai.reactionEmoji } : undefined,
+      ...(ai.reactionEmoji ? { reaction: { waMessageId: incoming.waMessageId, emoji: ai.reactionEmoji } } : {}),
     });
     return { ...base, aiReplied: true };
   } catch (e) {
@@ -734,14 +734,20 @@ export async function sendOutgoingMessage(input: {
       kind: input.media.kind,
       url: signed.signedUrl,
       mimeType: input.media.mimeType,
-      caption: input.media.caption,
-      fileName: input.media.fileName,
+      ...(input.media.caption !== undefined ? { caption: input.media.caption } : {}),
+      ...(input.media.fileName !== undefined ? { fileName: input.media.fileName } : {}),
       storagePath: input.media.storagePath,
     };
   }
 
   try {
-    const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
+    const sent = await provider.sendMessage({
+      ...ref,
+      to,
+      body: input.body,
+      ...(outgoingMedia ? { media: outgoingMedia } : {}),
+      ...(metaCreds ? { meta: metaCreds } : {}),
+    });
     await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
