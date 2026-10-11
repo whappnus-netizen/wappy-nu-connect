@@ -39,7 +39,7 @@ function DashboardPage() {
     queryFn: async () => {
       if (!orgId) throw new Error("Membership sem organization_id.");
       const id = orgId;
-      const [open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage] = await Promise.all([
+      const [open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage, allAutomations, allAgents] = await Promise.all([
         countRows("conversations", id, { status: "open" }),
         countRows("conversations", id, { status: "pending" }),
         countRows("conversations", id, { status: "in_progress" }),
@@ -52,8 +52,10 @@ function DashboardPage() {
         })(),
         countRows("ai_agents", id, { is_active: "true" }),
         countRows("ai_logs", id),
+        countRows("automation_rules", id),
+        countRows("ai_agents", id),
       ]);
-      return { open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage };
+      return { open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage, allAutomations, allAgents };
     },
   });
 
@@ -80,7 +82,7 @@ function DashboardPage() {
     },
   });
 
-  const { data: subscriptionData } = useQuery({
+  const { data: subscriptionData, isError: subscriptionError, error: subscriptionErrorValue } = useQuery({
     queryKey: ["dashboard-subscription", orgId],
     enabled: Boolean(orgId),
     refetchInterval: 15_000,
@@ -88,7 +90,7 @@ function DashboardPage() {
     queryFn: async () => {
       const [subscriptionResult, orgResult] = await Promise.all([
         supabase.from("organization_subscriptions")
-          .select("status,current_period_start,current_period_end,amount_aoa,subscription_plans(name,code,limits)")
+          .select("status,current_period_start,current_period_end,amount_aoa,subscription_plans(name,code,limits,features,price_aoa)")
           .eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("organizations").select("status,suspension_reason").eq("id", orgId!).maybeSingle(),
       ]);
@@ -153,6 +155,7 @@ function DashboardPage() {
         ))}
       </div>
 
+      {subscriptionError && <section role="alert" className="mt-6 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm"><p className="font-semibold">Não foi possível confirmar o plano desta organização.</p><p className="mt-1 text-muted-foreground">{(subscriptionErrorValue as Error)?.message ?? "Tenta actualizar a página."} As acções de gestão devem permanecer bloqueadas até a assinatura ser confirmada.</p></section>}
       {subscriptionData && (() => {
         const subscription = subscriptionData.subscription as any;
         const organization = subscriptionData.organization;
@@ -160,7 +163,7 @@ function DashboardPage() {
         const periodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
         const expired = Boolean(periodEnd && periodEnd.getTime() <= Date.now());
         const suspended = !subscription || !["active", "trialing"].includes(subscription.status) || expired || ["suspended", "blocked", "cancelled"].includes(organization?.status ?? "");
-        const plan = subscription?.subscription_plans as { name?: string; limits?: Record<string, unknown> } | null;
+        const plan = subscription?.subscription_plans as { name?: string; code?: string; price_aoa?: number; limits?: Record<string, unknown>; features?: Record<string, boolean> } | null;
         const limit = Number(plan?.limits?.["ai_conversations_monthly"] ?? 0);
         const used = Number(subscriptionData.usedConversations ?? 0);
         const progress = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
@@ -168,6 +171,8 @@ function DashboardPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assinatura e utilização</p>
               <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
+              <p className="mt-1 text-sm font-semibold text-primary">{new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(Number(subscription?.amount_aoa ?? plan?.price_aoa ?? 0))} / mês</p>
+              <p className="mt-1 text-xs text-muted-foreground">Código do plano: {plan?.code ?? "—"}</p>
               <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de conversas com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
             </div>
             <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
@@ -176,6 +181,14 @@ function DashboardPage() {
             <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Conversas com IA neste período</span><span className="font-semibold tabular-nums">{used.toLocaleString("pt-PT")} / {limit.toLocaleString("pt-PT")}</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: progress + "%" }} /></div>
             <p className="mt-2 text-xs text-muted-foreground">O histórico, os contactos e as oportunidades existentes permanecem guardados mesmo quando o período termina.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: "Números WhatsApp", used: data?.numbers ?? 0, limit: Number(plan?.limits?.["whatsapp_numbers"] ?? 0) },
+              { label: "Agentes de IA", used: data?.allAgents ?? 0, limit: Number(plan?.limits?.["agents"] ?? 0) },
+              { label: "Automações", used: data?.allAutomations ?? 0, limit: Number(plan?.limits?.["automations"] ?? 0) },
+              { label: "Membros da equipa", used: 1, limit: Number(plan?.limits?.["team_members"] ?? 0) },
+            ].map((item) => <div key={item.label} className="rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">{item.label}</p><p className="mt-1 text-base font-semibold tabular-nums">{item.used} / {item.limit > 0 ? item.limit : "—"}</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: item.limit > 0 ? Math.min(100, item.used / item.limit * 100) + "%" : "0%" }} /></div></div>)}
+          </div>
           </div>
           {suspended && <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm">A IA e as automações estão bloqueadas até a assinatura ser reactivada pelo administrador.</p><Button asChild size="sm"><a href="/#planos">Ver planos</a></Button></div>}
         </section>;
