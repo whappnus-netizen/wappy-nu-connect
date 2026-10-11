@@ -355,7 +355,7 @@ function AiPage() {
             </TabsContent>
 
             <TabsContent value="test">
-              <TestPanel orgId={orgId} agentId={agent.id} agentName={agent.name} />
+              <TestPanel orgId={orgId} agentId={agent.id} agentName={agent.name} canTest={subscription.active} />
             </TabsContent>
           </Tabs>
         )}
@@ -1122,13 +1122,15 @@ function TestPanel({ orgId, agentId, agentName, canTest }: { orgId: string; agen
       >
         <Input
           value={message}
+          disabled={!canTest}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Ex.: Vocês fazem entrega?"
         />
-        <Button type="submit" disabled={ask.isPending || message.trim().length === 0}>
+        <Button type="submit" disabled={!canTest || ask.isPending || message.trim().length === 0}>
           Enviar
         </Button>
       </form>
+      {!canTest && <p className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">O teste da IA está bloqueado enquanto a assinatura estiver suspensa. Consulte os planos para reactivar o acesso.</p>}
       <p className="text-xs text-muted-foreground">
         O teste usa apenas a configuração, o conhecimento e os exemplos da sua organização.
       </p>
