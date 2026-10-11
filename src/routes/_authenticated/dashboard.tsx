@@ -20,9 +20,9 @@ import { supabase } from "@/lib/supabase/client";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Wappy Nus" },
+      { title: "Dashboard — WhappNus" },
       { name: "description", content: "Visão geral do atendimento, contactos e automações da sua organização." },
-      { property: "og:title", content: "Dashboard — Wappy Nus" },
+      { property: "og:title", content: "Dashboard — WhappNus" },
       { property: "og:description", content: "Métricas de atendimento em tempo real." },
     ],
   }),
@@ -80,6 +80,23 @@ function DashboardPage() {
     },
   });
 
+  const { data: subscriptionData } = useQuery({
+    queryKey: ["dashboard-subscription", orgId],
+    enabled: Boolean(orgId),
+    queryFn: async () => {
+      const [subscriptionResult, orgResult, accountResult] = await Promise.all([
+        supabase.from("organization_subscriptions")
+          .select("status,current_period_start,current_period_end,amount_aoa,subscription_plans(name,code,limits)")
+          .eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("organizations").select("status,suspension_reason").eq("id", orgId!).maybeSingle(),
+        supabase.from("ai_credit_accounts").select("balance,monthly_limit").eq("organization_id", orgId!).maybeSingle(),
+      ]);
+      if (subscriptionResult.error) throw new Error(subscriptionResult.error.message);
+      if (orgResult.error) throw new Error(orgResult.error.message);
+      return { subscription: subscriptionResult.data, organization: orgResult.data, account: accountResult.data };
+    },
+  });
+
   const cards = [
     { icon: MessagesSquare, label: "Conversas abertas", value: data?.open },
     { icon: Clock, label: "Conversas pendentes", value: data?.pending },
@@ -129,6 +146,35 @@ function DashboardPage() {
         ))}
       </div>
 
+      {subscriptionData && (() => {
+        const subscription = subscriptionData.subscription as any;
+        const organization = subscriptionData.organization;
+        const account = subscriptionData.account;
+        const periodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
+        const expired = Boolean(periodEnd && periodEnd.getTime() <= Date.now());
+        const suspended = !subscription || !["active", "trialing"].includes(subscription.status) || expired || ["suspended", "blocked", "cancelled"].includes(organization?.status ?? "");
+        const plan = subscription?.subscription_plans as { name?: string; limits?: Record<string, unknown> } | null;
+        const limit = Number(plan?.limits?.ai_conversations_monthly ?? account?.monthly_limit ?? 0);
+        const remaining = Math.max(0, Number(account?.balance ?? 0));
+        const used = Math.max(0, limit - remaining);
+        const progress = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+        return <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-soft">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assinatura e utilização</p>
+              <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{periodEnd ? (expired ? "Período terminado" : "Válido até " + periodEnd.toLocaleDateString("pt-PT")) : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
+            </div>
+            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
+          </div>
+          <div className="mt-5">
+            <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Conversas com IA neste período</span><span className="font-semibold tabular-nums">{used.toLocaleString("pt-PT")} / {limit.toLocaleString("pt-PT")}</span></div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: progress + "%" }} /></div>
+            <p className="mt-2 text-xs text-muted-foreground">O histórico, os contactos e as oportunidades existentes permanecem guardados mesmo quando o período termina.</p>
+          </div>
+          {suspended && <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm">A IA e as automações estão bloqueadas até a assinatura ser reactivada pelo administrador.</p><Button asChild size="sm"><Link to="/#planos">Ver planos</Link></Button></div>}
+        </section>;
+      })()}
+
       {waNumbers && waNumbers.length > 0 ? (
         <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-soft">
           <h2 className="font-display text-base font-semibold">Ligações WhatsApp</h2>
@@ -138,7 +184,7 @@ function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium">{n.display_name ?? n.phone_e164}</p>
                   <p className="text-xs text-muted-foreground">
-                    {n.phone_e164} · {n.provider === "qr" ? "QR Code (não oficial)" : "Meta Cloud API"}
+                    {n.phone_e164} · {n.provider === "qr" ? "QR Code · sessão WhatsApp Web" : "Meta Cloud API"}
                   </p>
                 </div>
                 <span
