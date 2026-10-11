@@ -18,9 +18,9 @@ import { Switch } from "@/components/ui/switch";
 export const Route = createFileRoute("/_authenticated/inbox")({
   head: () => ({
     meta: [
-      { title: "Inbox — Wappy Nus" },
+      { title: "Inbox — WhappNus" },
       { name: "description", content: "Caixa de entrada única para o atendimento WhatsApp da sua equipa." },
-      { property: "og:title", content: "Inbox — Wappy Nus" },
+      { property: "og:title", content: "Inbox — WhappNus" },
       { property: "og:description", content: "Multiatendimento com filas, etiquetas e transferência." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -350,8 +350,8 @@ function InboxPage() {
               </Button>
               <span className="text-xs text-muted-foreground">
                 {active?.whatsapp_numbers?.provider === "qr"
-                  ? "Envio pela ligação WhatsApp — QR (não oficial da Meta)."
-                  : "Envio pela WhatsApp Cloud API oficial (janela de 24h aplica-se)."}
+                  ? "Envio pela sessão WhatsApp Web ligada por QR Code."
+                  : "Envio pela Cloud API da Meta (aplica-se a janela de 24 horas)."}
               </span>
             </div>
           </div>
