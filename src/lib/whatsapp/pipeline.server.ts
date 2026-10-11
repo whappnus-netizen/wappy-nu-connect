@@ -534,7 +534,12 @@ export async function processIncomingMessage(
       messageId: incoming.waMessageId,
       fromWaId: incoming.fromWaId,
       profileName: incoming.profileName,
-      text: incoming.body ?? `[${incoming.messageType}]`,
+      text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
+      messageType: incoming.messageType,
+      mediaPath: incoming.provider === "qr" && incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
+        ? incoming.mediaId
+        : null,
+      mediaMimeType: incoming.mediaMimeType ?? null,
     });
     await sendOutgoingMessage({
       organizationId: number.organization_id,
