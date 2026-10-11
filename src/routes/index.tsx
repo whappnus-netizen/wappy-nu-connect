@@ -47,6 +47,7 @@ function Landing() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Logo />
           <nav className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm"><a href="#planos">Planos</a></Button>
             <Button asChild variant="ghost" size="sm">
               <Link to="/auth/login">Entrar</Link>
             </Button>
@@ -68,8 +69,7 @@ function Landing() {
               O WhatsApp da sua empresa, finalmente organizado.
             </h1>
             <p className="mt-5 max-w-xl text-base text-muted-foreground">
-              WhappNus centraliza o atendimento, organiza os contactos e automatiza respostas — sobre a
-              infraestrutura oficial do WhatsApp Business Platform.
+              WhappNus centraliza o atendimento, organiza os contactos e automatiza respostas através da Cloud API da Meta ou de uma sessão WhatsApp por QR Code.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
