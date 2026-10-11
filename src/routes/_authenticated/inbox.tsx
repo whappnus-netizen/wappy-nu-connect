@@ -380,16 +380,18 @@ function InboxPage() {
                 <div>
                   <p className="text-xs font-medium">IA automática</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {active.assigned_to
-                      ? "Atendimento humano activo"
-                      : active.ai_enabled
-                        ? "A IA responde automaticamente"
-                        : "As mensagens ficam só na caixa de entrada"}
+                    {active.status !== "open"
+                      ? "A IA só pode ser alterada em conversas abertas."
+                      : active.assigned_to
+                        ? "Atendimento humano activo"
+                        : active.ai_enabled
+                          ? "A IA responde automaticamente"
+                          : "As mensagens ficam só na caixa de entrada"}
                   </p>
                 </div>
                 <Switch
                   checked={Boolean(active.ai_enabled)}
-                  disabled={toggleAi.isPending}
+                  disabled={toggleAi.isPending || active.status !== "open" || Boolean(active.assigned_to)}
                   onCheckedChange={(v) => toggleAi.mutate(v)}
                 />
               </div>
