@@ -197,15 +197,17 @@ export async function processIncomingMessage(
         const value = rule.config?.["reply"];
         return typeof value === "string" ? value.trim() : "";
       };
-      const getSteps = (rule: AutomationRow): StoredStep[] =>
-        Array.isArray(rule.config?.["steps"]) ? rule.config["steps"] as StoredStep[] : [];
+      const getSteps = (rule: AutomationRow): StoredStep[] => {
+        const steps = rule.config?.["steps"];
+        return Array.isArray(steps) ? steps as StoredStep[] : [];
+      }
       const hasActions = (rule: AutomationRow) =>
         getReply(rule).length > 0 || getSteps(rule).some((step) =>
           step.kind === "text" ? Boolean(step.text?.trim()) :
           (step.kind === "image" || step.kind === "audio") && Boolean(step.storagePath && step.mimeType)
         );
       const keywordRule = activeRules
-         .filter((rule) => rule.trigger_type === "keyword_match" && hasActions(rule))
+        .filter((rule) => rule.trigger_type === "keyword_match" && hasActions(rule))
         .sort((a, b) => {
           const aValue = a.config?.["keyword"];
           const bValue = b.config?.["keyword"];
