@@ -10,6 +10,9 @@ type GenerateInput = {
   profileName?: string | null;
   text: string;
   agentId?: string | null;
+  mediaPath?: string | null;
+  mediaMimeType?: string | null;
+  messageType?: "text" | "image" | "audio" | "video" | "document" | "system";
 };
 
 type GenerateResult = {
