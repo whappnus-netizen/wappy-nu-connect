@@ -240,8 +240,10 @@ export const metaProvider: WhatsAppProvider = {
     return { waMessageId: waId, provider: "meta_cloud" };
   },
 
-  async reactToMessage({ phoneNumberId, token, to, waMessageId, emoji }) {
-    const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`, {
+  async reactToMessage({ to, waMessageId, emoji, meta }) {
+    if (!meta?.phoneNumberId || !meta.token) throw new Error("Credenciais da Meta ausentes para enviar reação.");
+    const { phoneNumberId, token } = meta;
+    const res = await fetch(`${GRAPH}/${phoneNumberId}/messages`,
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({
