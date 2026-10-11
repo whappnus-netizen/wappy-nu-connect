@@ -65,7 +65,7 @@ export async function requireWhatsAppConnectionCapacity(organizationId: string, 
   if (subscriptionError || countError) throw new Error("Não foi possível validar o limite de números WhatsApp.");
   const plan = subscription?.subscription_plans as { limits?: Record<string, unknown> } | null;
   const limit = Number(plan?.limits?.["whatsapp_numbers"] ?? 0);
-  if ((count ?? 0) >= limit) throw new Error("PLAN_LIMIT_WHATSAPP_NUMBERS");
+  if ((count ?? 0) >= limit) throw new Error("O seu plano atingiu o limite de ligações WhatsApp. Escolha um plano superior para adicionar outro número.");
 }
 
 export async function requireActiveSubscription(organizationId: string): Promise<void> {
