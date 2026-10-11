@@ -158,7 +158,7 @@ function DashboardPage() {
         const expired = Boolean(periodEnd && periodEnd.getTime() <= Date.now());
         const suspended = !subscription || !["active", "trialing"].includes(subscription.status) || expired || ["suspended", "blocked", "cancelled"].includes(organization?.status ?? "");
         const plan = subscription?.subscription_plans as { name?: string; limits?: Record<string, unknown> } | null;
-        const limit = Number(plan?.limits?.ai_conversations_monthly ?? 0);
+        const limit = Number(plan?.limits?.["ai_conversations_monthly"] ?? 0);
         const uniqueConversations = new Set(
           ledger.filter((entry: any) => new Date(entry.created_at).getTime() >= periodStart && (!periodEnd || new Date(entry.created_at).getTime() < periodEnd.getTime()))
             .map((entry: any) => entry.metadata?.conversation_id).filter((id: unknown) => typeof id === "string"),
