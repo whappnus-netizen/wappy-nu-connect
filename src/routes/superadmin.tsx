@@ -18,11 +18,21 @@ import { supabase } from "@/lib/supabase/client";
 export const Route = createFileRoute("/superadmin")({
   ssr: false,
   beforeLoad: async () => {
+    // Auth storage may still be restoring after a hard refresh. Give Supabase one
+    // chance to restore/refresh the session before deciding that the user signed out.
+    let sessionResult = await supabase.auth.getSession();
+    if (!sessionResult.data.session || (sessionResult.data.session.expires_at ?? 0) * 1000 < Date.now() + 30_000) {
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.data.session) sessionResult = { data: { session: refreshed.data.session }, error: null };
+    }
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth/login" });
+    if (error || !data.user || !sessionResult.data.session) throw redirect({ to: "/auth/login" });
 
-    // The helper refreshes expired access tokens before validating this privileged route.
-    try { await adminApi("dashboard"); } catch { throw redirect({ to: "/dashboard" }); }
+    // Do not redirect to the regular dashboard for transient API/network errors.
+    // The Edge Function remains the authority and rejects non-admin users on every action.
+    try { await adminApi("dashboard"); } catch (error) {
+      console.warn("Super Admin API verification failed; keep route mounted for visible error/retry.", error);
+    }
   },
   head: () => ({ meta: [{ title: "Super Admin — WhappNus" }, { name: "description", content: "Painel de controlo da plataforma WhappNus." }] }),
   component: SuperAdminPage,
