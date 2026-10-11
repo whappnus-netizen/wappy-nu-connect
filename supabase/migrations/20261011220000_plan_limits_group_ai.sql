@@ -96,6 +96,5 @@ drop trigger if exists enforce_automation_plan_limit on public.automation_rules;
 create trigger enforce_automation_plan_limit before insert on public.automation_rules
 for each row execute function public.enforce_org_plan_resource_limits();
 
-drop trigger if exists enforce_membership_plan_limit on public.memberships;
-create trigger enforce_membership_plan_limit before insert on public.memberships
-for each row execute function public.enforce_org_plan_resource_limits();
+-- Membership creation is intentionally not guarded here: create_organization inserts OWNER before trial subscription creation.
+-- Team-member cap is enforced by the invitation flow after subscription is available.
