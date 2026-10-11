@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2 } from "lucide-react";
+import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,6 +170,20 @@ function InboxPage() {
     onError: (e: Error) => setError(e.message),
   });
 
+  const updateStatus = useMutation({
+    mutationFn: async (nextStatus: "open" | "pending" | "in_progress" | "closed") => {
+      const { error: err } = await supabase.from("conversations")
+        .update({ status: nextStatus, updated_at: new Date().toISOString() })
+        .eq("id", selected!).eq("organization_id", orgId!);
+      if (err) throw new Error(err.message);
+    },
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
   // 13. Ao assumir o atendimento, a IA automática desliga-se nesta conversa.
   const claim = useMutation({
     mutationFn: async () => {
@@ -186,7 +200,7 @@ function InboxPage() {
   });
 
   return (
-    <AppShell title="Inbox" description="Multiatendimento em tempo real">
+    <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
       <div className="grid gap-4 lg:grid-cols-[320px_1fr_300px]">
         <section className="rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
@@ -203,7 +217,7 @@ function InboxPage() {
                     status === s ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary"
                   }`}
                 >
-                  {s === "all" ? "Todas" : s}
+                  {{ all: "Todas", open: "Abertas", pending: "Pendentes", in_progress: "Em atendimento", closed: "Encerradas" }[s]}
                 </button>
               ))}
             </div>
@@ -246,7 +260,7 @@ function InboxPage() {
               <EmptyState
                 icon={MessagesSquare}
                 title="Selecione uma conversa"
-                description="As conversas aparecem aqui quando o webhook oficial da Meta recebe a primeira mensagem no número ligado."
+                description="Escolha uma conversa recebida através do WhatsApp ligado por QR Code ou pela API oficial, para consultar o histórico e responder."
               />
             </div>
           ) : (
@@ -338,6 +352,15 @@ function InboxPage() {
           ) : (
             <p className="text-sm text-muted-foreground">Sem conversa selecionada.</p>
           )}
+          <div className="space-y-2 border-t border-border pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estado da conversa</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" variant="outline" className="w-full" disabled={!active || updateStatus.isPending || active.status === "pending"} onClick={() => updateStatus.mutate("pending")}><Clock3 className="mr-1 size-4" />Pendente</Button>
+              <Button size="sm" variant="outline" className="w-full" disabled={!active || updateStatus.isPending || active.status === "open"} onClick={() => updateStatus.mutate("open")}><RotateCcw className="mr-1 size-4" />Reabrir</Button>
+              <Button size="sm" variant="outline" className="w-full" disabled={!active || updateStatus.isPending || active.status === "in_progress"} onClick={() => updateStatus.mutate("in_progress")}>Em atendimento</Button>
+              <Button size="sm" variant="outline" className="w-full" disabled={!active || updateStatus.isPending || active.status === "closed"} onClick={() => updateStatus.mutate("closed")}><CheckCircle2 className="mr-1 size-4" />Encerrar</Button>
+            </div>
+          </div>
           <div className="space-y-2 border-t border-border pt-4">
             <Button
               size="sm"
