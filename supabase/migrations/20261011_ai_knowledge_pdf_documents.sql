@@ -98,3 +98,15 @@ using (
 
 grant select, insert, delete on public.ai_knowledge_documents to authenticated;
 grant all on public.ai_knowledge_documents to service_role;
+
+-- Private bucket for inbound WhatsApp attachments. Only server service-role code may access it.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'whatsapp-incoming-media',
+  'whatsapp-incoming-media',
+  false,
+  20971520,
+  array['image/jpeg','image/png','image/webp','image/gif','audio/ogg','audio/mpeg','audio/mp4','audio/aac','audio/amr','audio/wav','application/pdf','video/mp4','video/3gpp']
+)
+on conflict (id) do update
+set public = false, file_size_limit = 20971520, allowed_mime_types = excluded.allowed_mime_types;
