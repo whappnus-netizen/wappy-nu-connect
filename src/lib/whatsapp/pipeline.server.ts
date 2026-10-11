@@ -750,18 +750,21 @@ export async function sendOutgoingMessage(input: {
       ...(outgoingMedia ? { media: outgoingMedia } : {}),
       ...(metaCreds ? { meta: metaCreds } : {}),
     });
-    await admin.from("messages").insert({
+    const { error: messageInsertError } = await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
+      whatsapp_number_id: input.whatsappNumberId,
       direction: "outbound",
       message_type: input.media?.kind ?? "text",
       body: input.media ? (input.media.caption || (input.media.kind === "image" ? "[Imagem enviada]" : "[Áudio enviado]")) : input.body,
-      media_id: input.media?.storagePath ?? null,
+      media_url: input.media?.storagePath ?? null,
       status: "sent",
       wa_message_id: sent.waMessageId,
+      sent_at: new Date().toISOString(),
       sent_by: input.sentBy ?? null,
       is_ai: Boolean(input.isAi),
     });
+    if (messageInsertError) throw new Error("Mensagem enviada, mas não foi possível gravar o histórico: " + messageInsertError.message);
     await admin
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
