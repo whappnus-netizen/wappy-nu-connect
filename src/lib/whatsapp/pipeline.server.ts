@@ -763,7 +763,7 @@ export async function sendOutgoingMessage(input: {
 
   try {
     const sent = await provider.sendMessage({ ...ref, to, body: input.body, media: outgoingMedia, meta: metaCreds });
-    await admin.from("messages").insert({
+    const { error: insertMessageError } = await admin.from("messages").insert({
       organization_id: input.organizationId,
       conversation_id: input.conversationId,
       direction: "outbound",
@@ -775,6 +775,9 @@ export async function sendOutgoingMessage(input: {
       sent_by: input.sentBy ?? null,
       is_ai: Boolean(input.isAi),
     });
+    if (insertMessageError) {
+      throw new Error("A mensagem foi enviada pelo WhatsApp, mas não foi registada no Inbox: " + insertMessageError.message);
+    }
     await admin
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
