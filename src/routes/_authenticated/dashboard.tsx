@@ -46,7 +46,10 @@ function DashboardPage() {
         countRows("contacts", id),
         countRows("deals", id),
         countRows("automation_rules", id, { is_active: "true" }),
-        countRows("whatsapp_numbers", id),
+        (async () => {
+          const { count, error } = await supabase.from("whatsapp_numbers").select("id", { count: "exact", head: true }).eq("organization_id", id).is("deleted_at", null);
+          return error ? null : (count ?? 0);
+        })(),
         countRows("ai_agents", id, { is_active: "true" }),
         countRows("ai_logs", id),
       ]);
