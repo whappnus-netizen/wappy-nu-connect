@@ -638,6 +638,7 @@ export async function processIncomingMessage(
       conversationId: res.conversation_id,
       body: ai.text,
       isAi: true,
+      reaction: ai.reactionEmoji ? { waMessageId: incoming.waMessageId, emoji: ai.reactionEmoji } : undefined,
     });
     return { ...base, aiReplied: true };
   } catch (e) {
@@ -687,6 +688,7 @@ export async function sendOutgoingMessage(input: {
   media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string };
   isAi?: boolean;
   sentBy?: string | null;
+  reaction?: { waMessageId: string; emoji: string };
 }): Promise<{ waMessageId: string | null; provider: string }> {
   const admin = serviceClient();
   const number = await loadNumber(input.whatsappNumberId);
@@ -756,6 +758,25 @@ export async function sendOutgoingMessage(input: {
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", input.conversationId);
+
+    if (input.reaction && provider.sendReaction) {
+      try {
+        await provider.sendReaction({
+          ...ref,
+          to,
+          waMessageId: input.reaction.waMessageId,
+          emoji: input.reaction.emoji,
+          meta: metaCreds,
+        });
+      } catch (reactionError) {
+        // A falha da reação nunca invalida uma resposta que já foi entregue.
+        await logWhatsAppEvent(input.organizationId, "message_failed", {
+          whatsappNumberId: number.id,
+          provider: providerName,
+          detail: { stage: "ai_reaction", error: (reactionError as Error).message.slice(0, 200) },
+        });
+      }
+    }
 
     await logWhatsAppEvent(input.organizationId, "message_sent", {
       whatsappNumberId: number.id,
