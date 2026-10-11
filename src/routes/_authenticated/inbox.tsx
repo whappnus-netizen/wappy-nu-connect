@@ -123,7 +123,9 @@ function InboxPage() {
   });
 
   const scrollMessagesToBottom = (smooth = true) => {
-    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
+    // Scroll only the messages viewport. scrollIntoView() can move the document itself.
+    const viewport = messagesViewportRef.current;
+    if (viewport) viewport.scrollTo({ top: viewport.scrollHeight, behavior: smooth ? "smooth" : "auto" });
     shouldStickToBottomRef.current = true;
     setShowScrollToBottom(false);
   };
