@@ -35,6 +35,15 @@ export const startQrSession = createServerFn({ method: "POST" })
     // reutilizamo-la; caso contrário criamos um whatsapp_number com phone_e164 = null.
     let numberId: string;
 
+    const requestedPhone = data.phoneE164?.replace(/\s/g, "");
+    if (requestedPhone) {
+      const { data: existingPhone, error: existingPhoneError } = await admin.from("whatsapp_numbers")
+        .select("id,status").eq("organization_id", data.organizationId).eq("provider", "qr")
+        .eq("phone_e164", requestedPhone).is("deleted_at", null).maybeSingle();
+      if (existingPhoneError) throw new Error("Base de dados: " + existingPhoneError.message);
+      if (existingPhone) throw new Error("Este número já está registado nesta organização. Abre a ligação existente e usa as opções de reconexão, ou arquiva-a antes de criar uma nova.");
+    }
+
     const { data: pendingNumber, error: pendingErr } = await admin
       .from("whatsapp_numbers")
       .select("id")
