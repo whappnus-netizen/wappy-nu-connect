@@ -173,10 +173,14 @@ export async function processIncomingMessage(
     } else {
       type AutomationRow = { id: string; name: string; trigger_type: string; config: Record<string, unknown> | null };
       const activeRules = (rules ?? []) as AutomationRow[];
-      const getReply = (rule: AutomationRow) => typeof rule.config?.["reply"] === "string" ? rule.config.reply.trim() : "";
+      const getReply = (rule: AutomationRow) => {
+        const value = rule.config?.["reply"];
+        return typeof value === "string" ? value.trim() : "";
+      };
       const keywordRule = activeRules.find((rule) => {
         if (rule.trigger_type !== "keyword_match") return false;
-        const keyword = typeof rule.config?.["keyword"] === "string" ? rule.config.keyword.trim().toLocaleLowerCase() : "";
+        const value = rule.config?.["keyword"];
+        const keyword = typeof value === "string" ? value.trim().toLocaleLowerCase() : "";
         return keyword.length >= 2 && getReply(rule).length > 0 && inboundText.includes(keyword);
       });
 
@@ -220,8 +224,10 @@ export async function processIncomingMessage(
           };
 
           for (const rule of outsideRules) {
-            const startText = typeof rule.config?.["startTime"] === "string" ? rule.config.startTime : "09:00";
-            const endText = typeof rule.config?.["endTime"] === "string" ? rule.config.endTime : "18:00";
+            const rawStart = rule.config?.["startTime"];
+            const rawEnd = rule.config?.["endTime"];
+            const startText = typeof rawStart === "string" ? rawStart : "09:00";
+            const endText = typeof rawEnd === "string" ? rawEnd : "18:00";
             const startParts = startText.split(":").map(Number);
             const endParts = endText.split(":").map(Number);
             if (startParts.length !== 2 || endParts.length !== 2 || startParts.some(Number.isNaN) || endParts.some(Number.isNaN)) continue;
@@ -231,8 +237,9 @@ export async function processIncomingMessage(
             const startMinutes = startHour * 60 + startMinute;
             const endMinutes = endHour * 60 + endMinute;
             if (startMinutes === endMinutes) continue;
-            const configuredDays = Array.isArray(rule.config?.["days"])
-              ? rule.config.days.filter((day): day is number => typeof day === "number" && day >= 0 && day <= 6)
+            const rawDays = rule.config?.["days"];
+            const configuredDays = Array.isArray(rawDays)
+              ? rawDays.filter((day): day is number => typeof day === "number" && day >= 0 && day <= 6)
               : [1, 2, 3, 4, 5];
             let localClock: { day: number; minutes: number };
             try { localClock = getLocalClock(safeDate, timezone); }
