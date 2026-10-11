@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth";
+import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/automacoes")({
@@ -47,7 +48,8 @@ function triggerDescription(rule: Rule) {
 function AutomationsPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
-  const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
+  const subscription = useSubscriptionAccess(orgId);
+  const canManage = (membership?.role === "OWNER" || membership?.role === "ADMIN") && subscription.active;
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState<TriggerType>("keyword_match");
