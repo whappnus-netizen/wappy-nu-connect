@@ -21,11 +21,8 @@ export const Route = createFileRoute("/superadmin")({
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth/login" });
 
-    // Do not render the privileged route unless the server authorizes this session.
-    const { data: access, error: accessError } = await supabase.functions.invoke("superadmin-api", {
-      body: { action: "dashboard" },
-    });
-    if (accessError || access?.ok !== true) throw redirect({ to: "/dashboard" });
+    // The helper refreshes expired access tokens before validating this privileged route.
+    try { await adminApi("dashboard"); } catch { throw redirect({ to: "/dashboard" }); }
   },
   head: () => ({ meta: [{ title: "Super Admin — WhappNus" }, { name: "description", content: "Painel de controlo da plataforma WhappNus." }] }),
   component: SuperAdminPage,
@@ -33,13 +30,36 @@ export const Route = createFileRoute("/superadmin")({
 
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 async function adminApi<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("superadmin-api", { body: { action, ...payload } });
+  const getFreshToken = async () => {
+    let session = (await supabase.auth.getSession()).data.session;
+    if (!session || (session.expires_at ?? 0) * 1000 < Date.now() + 60_000) {
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session) throw new Error("A sessão expirou. Inicia sessão novamente.");
+      session = refreshed.data.session;
+    }
+    return session.access_token;
+  };
+  let token = await getFreshToken();
+  let response = await supabase.functions.invoke("superadmin-api", {
+    body: { action, ...payload }, headers: { Authorization: `Bearer ${token}` },
+  });
+  const status = (response.error as { context?: Response } | null)?.context?.status;
+  if (status === 401) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (!refreshed.error && refreshed.data.session) {
+      token = refreshed.data.session.access_token;
+      response = await supabase.functions.invoke("superadmin-api", {
+        body: { action, ...payload }, headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+  }
+  const { data, error } = response;
   if (error) {
     let message = error.message || "Falha ao comunicar com o serviço administrativo.";
     try {
-      const response = (error as { context?: Response }).context;
-      if (response && typeof response.json === "function") {
-        const body = await response.clone().json() as { error?: string };
+      const context = (error as { context?: Response }).context;
+      if (context && typeof context.json === "function") {
+        const body = await context.clone().json() as { error?: string };
         if (body.error) message = body.error;
       }
     } catch { /* use the SDK error message */ }
@@ -92,16 +112,29 @@ function SuperAdminPage() {
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [teamUserId, setTeamUserId] = useState("");
   const [teamRole, setTeamRole] = useState<"admin" | "support" | "billing" | "owner">("support");
+  const [notificationOrgId, setNotificationOrgId] = useState("");
+  const [notificationTitle, setNotificationTitle] = useState("Aviso de renovação da assinatura");
+  const [notificationBody, setNotificationBody] = useState("");
   const client = useQueryClient();
 
   const overview = useQuery({ queryKey: ["superadmin", "dashboard"], queryFn: () => adminApi<{ metrics: Metrics; recentAudit: any[] }>("dashboard"), retry: false });
-  const organizations = useQuery({ queryKey: ["superadmin", "organizations", search], queryFn: () => adminApi<Organization[]>("organizations.list", { search }), enabled: tab === "organizations", retry: false });
-  const plans = useQuery({ queryKey: ["superadmin", "plans"], queryFn: () => adminApi<Plan[]>("plans.list"), enabled: tab === "plans" || tab === "subscriptions", retry: false });
-  const subscriptions = useQuery({ queryKey: ["superadmin", "subscriptions"], queryFn: () => adminApi<any[]>("subscriptions.list"), enabled: tab === "subscriptions", retry: false });
+  const organizations = useQuery({ queryKey: ["superadmin", "organizations", search], queryFn: () => adminApi<Organization[]>("organizations.list", { search }), enabled: tab === "organizations" || tab === "notifications", retry: false, staleTime: 30_000 });
+  const plans = useQuery({ queryKey: ["superadmin", "plans"], queryFn: () => adminApi<Plan[]>("plans.list"), enabled: tab === "plans" || tab === "subscriptions", retry: false, staleTime: 60_000 });
+  const subscriptions = useQuery({ queryKey: ["superadmin", "subscriptions"], queryFn: () => adminApi<any[]>("subscriptions.list"), enabled: tab === "subscriptions", retry: false, staleTime: 20_000 });
   const payments = useQuery({ queryKey: ["superadmin", "payments"], queryFn: () => adminApi<any[]>("payments.list"), enabled: tab === "payments", retry: false });
   const health = useQuery({ queryKey: ["superadmin", "health"], queryFn: () => adminApi<any>("health"), enabled: tab === "health", retry: false });
   const audit = useQuery({ queryKey: ["superadmin", "audit"], queryFn: () => adminApi<any[]>("audit.list"), enabled: tab === "audit", retry: false });
   const team = useQuery({ queryKey: ["superadmin", "team"], queryFn: () => adminApi<any[]>("team.list"), enabled: tab === "team", retry: false });
+  const notifications = useQuery({ queryKey: ["superadmin", "notifications"], queryFn: () => adminApi<any[]>("notifications.list"), enabled: tab === "notifications", retry: false, staleTime: 15_000 });
+  const sendNotification = useMutation({
+    mutationFn: (payload: { organization_id: string; title: string; body: string }) => adminApi<any>("notifications.send", payload),
+    onSuccess: () => {
+      toast.success("Notificação enviada para o centro de notificações da organização.");
+      setNotificationBody("");
+      void client.invalidateQueries({ queryKey: ["superadmin", "notifications"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const createOrganization = useMutation({
     mutationFn: () => adminApi<Organization>("organizations.create", { name: orgName.trim(), slug: orgSlug.trim() || slugify(orgName), owner_user_id: ownerId.trim() || undefined }),
@@ -165,7 +198,7 @@ function SuperAdminPage() {
         <nav className="mt-2 flex-1 space-y-1 px-3">
           {[
             ["overview", LayoutDashboard, "Visão geral"], ["organizations", Building2, "Organizações"],
-            ["plans", CircleDollarSign, "Planos e preços"], ["subscriptions", CreditCard, "Assinaturas"],
+            ["plans", CircleDollarSign, "Planos e preços"], ["subscriptions", CreditCard, "Assinaturas"], ["notifications", Sparkles, "Notificações"],
             ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["audit", LockKeyhole, "Auditoria"],
           ].map(([id, Icon, label]) => {
             const I = Icon as typeof LayoutDashboard;
@@ -180,13 +213,13 @@ function SuperAdminPage() {
 
       <main className="min-w-0 lg:pl-64">
         <header className="sticky top-0 z-10 flex min-h-20 items-center justify-between gap-4 border-b border-white/10 bg-[#07110e]/90 px-5 backdrop-blur-xl sm:px-8">
-          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
+          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "notifications" ? "Notificações" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
           <div className="flex items-center gap-2"><Badge variant="outline" className="hidden border-emerald-300/20 text-emerald-200 sm:inline-flex">AOA · Africa/Luanda</Badge><Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10" onClick={refreshAll} aria-label="Atualizar"><RefreshCw className="size-4" /></Button></div>
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b border-white/10 px-3 py-2 lg:hidden">
           {([
             ["overview", "Resumo"], ["organizations", "Clientes"], ["plans", "Planos"],
-            ["subscriptions", "Assinaturas"], ["payments", "Pagamentos"], ["health", "Saúde"], ["team", "Equipa"], ["audit", "Auditoria"],
+            ["subscriptions", "Assinaturas"], ["notifications", "Notificações"], ["payments", "Pagamentos"], ["health", "Saúde"], ["team", "Equipa"], ["audit", "Auditoria"],
           ] as [string, string][]).map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium ${tab === id ? "bg-emerald-300/10 text-emerald-200" : "text-slate-400 hover:bg-white/5"}`}>{label}</button>)}
         </nav>
 
@@ -226,6 +259,30 @@ function SuperAdminPage() {
 
           {tab === "subscriptions" && <section><SectionIntro title="Assinaturas" description="Estado, periodicidade, período e organização associada." />{subscriptions.isLoading ? <Loading /> : subscriptions.error ? <ErrorText error={subscriptions.error as Error} /> : <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1912]"><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Cliente</TableHead><TableHead className="text-slate-500">Plano</TableHead><TableHead className="text-slate-500">Estado</TableHead><TableHead className="text-slate-500">Valor</TableHead><TableHead className="text-slate-500">Renovação / fim</TableHead><TableHead className="text-slate-500">Criada</TableHead><TableHead className="text-slate-500">Acção administrativa</TableHead></TableRow></TableHeader><TableBody>{(subscriptions.data ?? []).map((s:any) => <TableRow key={s.id} className="border-white/[0.06]"><TableCell><div className="font-medium">{s.organizations?.name ?? "Organização"}</div><div className="text-xs text-slate-500">{s.organizations?.slug ?? s.organization_id}</div></TableCell><TableCell>{s.subscription_plans?.name ?? "Plano não associado"}<div className="text-xs text-slate-500">{s.billing_interval === "yearly" ? "Anual" : "Mensal"}</div></TableCell><TableCell><Badge variant={statusVariant(s.status)}>{statusLabel[s.status] ?? s.status}</Badge></TableCell><TableCell>{money(s.amount_aoa)}</TableCell><TableCell className="text-xs text-slate-400">{date(s.current_period_end)}</TableCell><TableCell className="text-xs text-slate-400">{date(s.created_at)}</TableCell><TableCell><div className="flex min-w-64 items-center gap-2"><select aria-label={"Plano para reactivar " + (s.organizations?.name ?? "organização")} value={subscriptionPlanSelections[s.id] ?? ""} onChange={e => setSubscriptionPlanSelections(v => ({ ...v, [s.id]: e.target.value }))} className="h-9 min-w-40 rounded-md border border-white/10 bg-[#102219] px-2 text-xs"><option value="">Escolher plano pago</option>{(plans.data ?? []).filter((p:Plan) => p.is_active && Number(p.price_aoa) > 0).map((p:Plan) => <option key={p.id} value={p.id}>{p.name} · {money(p.price_aoa)}</option>)}</select><Button size="sm" className="bg-emerald-400 text-[#062016] hover:bg-emerald-300" disabled={!subscriptionPlanSelections[s.id] || reactivateSubscription.isPending} onClick={() => reactivateSubscription.mutate({ subscription_id: s.id, plan_id: subscriptionPlanSelections[s.id] ?? "", period_days: 30 })}>Activar 30 dias</Button></div></TableCell></TableRow>)}</TableBody></Table></div>}</section>}
 
+          {tab === "notifications" && <section className="space-y-5">
+            <SectionIntro title="Notificações aos clientes" description="Envia avisos que ficam visíveis dentro da plataforma da organização. Usa esta área para alertas de renovação e prazo de assinatura." />
+            <Card className="border-white/10 bg-[#0b1912] text-slate-100 shadow-none">
+              <CardHeader><CardTitle className="text-base">Enviar notificação</CardTitle><CardDescription className="text-slate-500">A mensagem ficará no centro de notificações do cliente; não envia SMS nem WhatsApp externo.</CardDescription></CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm">Organização
+                  <select value={notificationOrgId} onChange={e => setNotificationOrgId(e.target.value)} className="h-10 rounded-md border border-white/10 bg-[#102219] px-3 text-sm">
+                    <option value="">Seleccionar organização</option>{(organizations.data ?? []).map(org => <option key={org.id} value={org.id}>{org.name} · {org.slug}</option>)}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm">Título
+                  <Input value={notificationTitle} onChange={e => setNotificationTitle(e.target.value)} maxLength={140} className="border-white/10 bg-[#102219]" />
+                </label>
+                <label className="grid gap-2 text-sm sm:col-span-2">Mensagem
+                  <textarea value={notificationBody} onChange={e => setNotificationBody(e.target.value)} maxLength={2000} rows={4} placeholder="Ex.: A sua assinatura WhappNus Pro termina dentro de 3 dias. Contacte a equipa para renovar e manter a IA activa." className="rounded-md border border-white/10 bg-[#102219] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-400/50" />
+                </label>
+                <div className="sm:col-span-2"><Button className="bg-emerald-400 text-[#062016] hover:bg-emerald-300" disabled={!notificationOrgId || notificationTitle.trim().length < 3 || notificationBody.trim().length < 3 || sendNotification.isPending} onClick={() => sendNotification.mutate({ organization_id: notificationOrgId, title: notificationTitle.trim(), body: notificationBody.trim() })}>{sendNotification.isPending ? "A enviar…" : "Enviar notificação"}</Button></div>
+              </CardContent>
+            </Card>
+            <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1912]">
+              <div className="border-b border-white/10 p-4 text-sm font-semibold">Histórico de notificações</div>
+              {notifications.isLoading ? <Loading /> : notifications.error ? <ErrorText error={notifications.error as Error} /> : (notifications.data ?? []).length === 0 ? <p className="p-4 text-sm text-slate-500">Ainda não foram enviadas notificações.</p> : <Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead>Organização</TableHead><TableHead>Título e mensagem</TableHead><TableHead>Enviada em</TableHead></TableRow></TableHeader><TableBody>{(notifications.data ?? []).map((n:any) => <TableRow key={n.id} className="border-white/[0.06]"><TableCell>{n.organizations?.name ?? "Organização"}</TableCell><TableCell><div className="font-medium">{n.title}</div><p className="mt-1 max-w-xl whitespace-pre-wrap text-xs text-slate-400">{n.body}</p></TableCell><TableCell className="whitespace-nowrap text-xs text-slate-400">{date(n.created_at)}</TableCell></TableRow>)}</TableBody></Table>}
+            </div>
+          </section>}
           {tab === "payments" && <section><SectionIntro title="Transações" description="Acompanhamento de pagamentos, referências do fornecedor e falhas." />{payments.isLoading ? <Loading /> : payments.error ? <ErrorText error={payments.error as Error} /> : <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1912]"><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Cliente</TableHead><TableHead className="text-slate-500">Fornecedor / referência</TableHead><TableHead className="text-slate-500">Estado</TableHead><TableHead className="text-slate-500">Valor</TableHead><TableHead className="text-slate-500">Pago em</TableHead><TableHead className="text-slate-500">Registado</TableHead></TableRow></TableHeader><TableBody>{(payments.data ?? []).map((p:any) => <TableRow key={p.id} className="border-white/[0.06]"><TableCell>{p.organizations?.name ?? "—"}</TableCell><TableCell><div>{p.provider}</div><div className="max-w-48 truncate text-xs text-slate-500">{p.provider_payment_id ?? "Sem referência"}</div></TableCell><TableCell><Badge variant={statusVariant(p.status)}>{statusLabel[p.status] ?? p.status}</Badge>{p.failure_code && <div className="mt-1 text-xs text-red-300">{p.failure_code}</div>}</TableCell><TableCell>{money(p.amount_aoa)}</TableCell><TableCell className="text-xs text-slate-400">{date(p.paid_at)}</TableCell><TableCell className="text-xs text-slate-400">{date(p.created_at)}</TableCell></TableRow>)}</TableBody></Table></div>}</section>}
 
           {tab === "health" && <section className="space-y-5"><SectionIntro title="Saúde operacional" description="Estado observado nas tabelas de sessão WhatsApp, eventos e registos da IA." />{health.isLoading ? <Loading /> : health.error ? <ErrorText error={health.error as Error} /> : <><Card className="border-white/10 bg-[#0b1912] text-slate-100 shadow-none"><CardHeader><CardTitle className="text-base">Sessões WhatsApp</CardTitle><CardDescription className="text-slate-500">Esta vista lê o estado registado; não reinicia nem termina sessões.</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Número / nome</TableHead><TableHead className="text-slate-500">Estado</TableHead><TableHead className="text-slate-500">Última ligação</TableHead><TableHead className="text-slate-500">Erro recente</TableHead></TableRow></TableHeader><TableBody>{(health.data?.sessions ?? []).map((s:any)=><TableRow key={s.id} className="border-white/[0.06]"><TableCell>{s.phone_number ?? s.display_name ?? s.whatsapp_number_id ?? "—"}</TableCell><TableCell><Badge variant={statusVariant(s.status)}>{statusLabel[s.status] ?? s.status}</Badge></TableCell><TableCell className="text-xs text-slate-400">{date(s.last_connected_at)}</TableCell><TableCell className="max-w-56 truncate text-xs text-red-300">{s.last_error ?? "—"}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card><Card className="border-white/10 bg-[#0b1912] text-slate-100 shadow-none"><CardHeader><CardTitle className="text-base">Eventos recentes da IA</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Evento</TableHead><TableHead className="text-slate-500">Estado</TableHead><TableHead className="text-slate-500">Modelo</TableHead><TableHead className="text-slate-500">Latência</TableHead><TableHead className="text-slate-500">Data</TableHead></TableRow></TableHeader><TableBody>{(health.data?.aiLogs ?? []).slice(0,20).map((log:any)=><TableRow key={log.id} className="border-white/[0.06]"><TableCell>{log.event_type}</TableCell><TableCell><Badge variant={statusVariant(log.status)}>{statusLabel[log.status] ?? log.status}</Badge></TableCell><TableCell className="text-xs text-slate-400">{log.model ?? "—"}</TableCell><TableCell>{log.latency_ms == null ? "—" : `${log.latency_ms} ms`}</TableCell><TableCell className="text-xs text-slate-400">{date(log.created_at)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card></>}</section>}
