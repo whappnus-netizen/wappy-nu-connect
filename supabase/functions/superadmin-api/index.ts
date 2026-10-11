@@ -171,6 +171,16 @@ Deno.serve(async (req: Request) => {
       const { data: before, error: readError } = await db.from("organizations").select("id,status,name").eq("id", id).maybeSingle();
       if (readError) throw readError;
       if (!before) return fail("Organização não encontrada.", 404);
+      if (["active", "trial"].includes(status)) {
+        const { data: subscription, error: subscriptionError } = await db.from("organization_subscriptions")
+          .select("status,current_period_end").eq("organization_id", id)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (subscriptionError) throw subscriptionError;
+        const periodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end).getTime() : null;
+        if (!subscription || !["active", "trialing"].includes(subscription.status) || (periodEnd !== null && periodEnd <= Date.now())) {
+          return fail("A organização só pode ser activada com uma assinatura válida. Usa a aba Assinaturas para escolher um plano pago e reactivar.", 409);
+        }
+      }
       const patch: Record<string, unknown> = { status, suspension_reason: ["suspended", "blocked"].includes(status) ? reason || null : null };
       patch.suspended_at = ["suspended", "blocked"].includes(status) ? new Date().toISOString() : null;
       const { data, error } = await db.from("organizations").update(patch).eq("id", id)
