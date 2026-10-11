@@ -104,7 +104,8 @@ function WhatsAppPage() {
   const orgId = membership?.organization_id;
   const subscription = useSubscriptionAccess(orgId);
   const role = membership?.role;
-  const canManage = (role === "OWNER" || role === "ADMIN") && subscription.active;
+  const canManage = role === "OWNER" || role === "ADMIN";
+  const canConnect = canManage && subscription.active && subscription.features.integrations !== false;
   const queryClient = useQueryClient();
 
   const [method, setMethod] = useState<"meta_cloud" | "qr" | "pairing" | null>(null);
@@ -304,10 +305,10 @@ function WhatsAppPage() {
       description="Números e ligações WhatsApp da sua organização"
       actions={
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={!orgId || !canManage} onClick={() => setMethod("meta_cloud")}>
+          <Button size="sm" variant="outline" disabled={!orgId || !canConnect} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
-          <Button size="sm" disabled={!orgId || !canManage || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
+          <Button size="sm" disabled={!orgId || !canConnect || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
             <QrCode className="size-4" /> Conectar WhatsApp
           </Button>
         </div>
@@ -361,9 +362,9 @@ function WhatsAppPage() {
       </div>
 
       {!canManage && !membershipLoading ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Apenas OWNER ou ADMIN podem ligar ou desligar números.
-        </p>
+        <p className="mt-4 text-sm text-muted-foreground">Só o OWNER ou ADMIN desta organização pode gerir ligações WhatsApp.</p>
+      ) : canManage && !canConnect && !subscription.isLoading ? (
+        <p className="mt-4 rounded-md border border-border bg-secondary p-3 text-sm text-muted-foreground">O plano {subscription.planName} não está validado para criar/reconectar ligações. Podes consultar e desligar sessões existentes; confirma a assinatura no Dashboard se o plano já foi actualizado.</p>
       ) : null}
       {error ? (
         <p className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -460,7 +461,7 @@ function WhatsAppPage() {
                         ) : (
                           <Button
                             size="sm"
-                            disabled={!canManage || reconnectQr.isPending}
+                            disabled={!canConnect || reconnectQr.isPending}
                             onClick={() => {
                               setActiveQrNumber(n.id);
                               reconnectQr.mutate(n.id);
@@ -516,10 +517,10 @@ function WhatsAppPage() {
             <DialogDescription>Escolha o método de ligação. Ambos associam o seu WhatsApp à organização actual.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3">
-            <Button className="w-full justify-start" onClick={() => { setMethod(null); setError(null); startQr.mutate({}); }} disabled={!canManage || startQr.isPending}>
+            <Button className="w-full justify-start" onClick={() => { setMethod(null); setError(null); startQr.mutate({}); }} disabled={!canConnect || startQr.isPending}>
               <QrCode className="mr-2 size-4" /> Conectar por QR Code
             </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => { setMethod("pairing"); setError(null); setPairingCode(null); }} disabled={!canManage || startPairing.isPending}>
+            <Button variant="outline" className="w-full justify-start" onClick={() => { setMethod("pairing"); setError(null); setPairingCode(null); }} disabled={!canConnect || startPairing.isPending}>
               <Smartphone className="mr-2 size-4" /> Conectar por código
             </Button>
           </div>
@@ -539,7 +540,7 @@ function WhatsAppPage() {
               <Label htmlFor="pairing-phone">Número WhatsApp</Label>
               <Input id="pairing-phone" type="tel" autoComplete="tel" placeholder="+244923456789" value={pairingPhone} onChange={(event) => setPairingPhone(event.target.value)} disabled={startPairing.isPending || Boolean(pairingCode)} />
             </div>
-            {!pairingCode ? <Button className="w-full" onClick={() => startPairing.mutate()} disabled={!canManage || startPairing.isPending || pairingPhone.trim().length < 8}>
+            {!pairingCode ? <Button className="w-full" onClick={() => startPairing.mutate()} disabled={!canConnect || startPairing.isPending || pairingPhone.trim().length < 8}>
               {startPairing.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Smartphone className="mr-2 size-4" />}
               {startPairing.isPending ? "A gerar código…" : "Gerar código"}
             </Button> : <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
