@@ -639,6 +639,34 @@ export async function processIncomingMessage(
       body: ai.text,
       isAi: true,
     });
+    // A reação é opcional, contextual e nunca pode bloquear a resposta textual.
+    if (ai.reactionEmoji && incoming.waMessageId) {
+      try {
+        const reactionProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
+        let reactionMeta: { phoneNumberId: string; token: string } | undefined;
+        if (number.provider !== "qr") {
+          if (!number.phone_number_id) throw new Error("Número sem Phone Number ID da Meta.");
+          const { metaTokenForNumber } = await import("../whatsapp.server");
+          reactionMeta = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
+        }
+        if (reactionProvider.reactToMessage) {
+          await reactionProvider.reactToMessage({
+            organizationId: number.organization_id,
+            whatsappNumberId: number.id,
+            to: incoming.fromWaId,
+            waMessageId: incoming.waMessageId,
+            emoji: ai.reactionEmoji,
+            meta: reactionMeta,
+          });
+        }
+      } catch (reactionError) {
+        await logWhatsAppEvent(number.organization_id, "message_failed", {
+          whatsappNumberId: number.id,
+          provider: incoming.provider,
+          detail: { stage: "message_reaction", error: (reactionError as Error).message.slice(0, 200) },
+        });
+      }
+    }
     return { ...base, aiReplied: true };
   } catch (e) {
     await logWhatsAppEvent(number.organization_id, "message_failed", {
