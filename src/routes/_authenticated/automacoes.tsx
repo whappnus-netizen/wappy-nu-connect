@@ -55,7 +55,11 @@ function AutomationsPage() {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [steps, setSteps] = useState<AutomationStep[]>([{ id: "step-initial", kind: "text", content: "", file: null }]);
-  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);\n  const [recordingStepId, setRecordingStepId] = useState<string | null>(null);\n  const recorderRef = useRef<MediaRecorder | null>(null);\n  const recordingStartedAtRef = useRef<number>(0);\n  const recordingChunksRef = useRef<Blob[]>([]);
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
+  const [recordingStepId, setRecordingStepId] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStartedAtRef = useRef<number>(0);
+  const recordingChunksRef = useRef<Blob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
