@@ -345,7 +345,7 @@ export async function processIncomingMessage(
               .eq("direction", "outbound")
               .gte("created_at", cooldownSince)
               .limit(1);
-            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("media_id", cooldownMediaPath);
+            if (cooldownMediaPath) priorReplyQuery = priorReplyQuery.eq("media_url", cooldownMediaPath);
             else if (reply) priorReplyQuery = priorReplyQuery.eq("body", reply);
             else continue;
             const { data: priorReply, error: priorReplyError } = await priorReplyQuery.maybeSingle();
