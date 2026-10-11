@@ -166,14 +166,14 @@ export async function processIncomingMessage(
     return { ...base, aiReplied: false, aiSkippedReason: "conversation_state_unavailable" };
   }
   const conversationState = conversationStateData as { status: string; assigned_to: string | null; ai_enabled: boolean };
-  const currentStatus = conversationState.status;
-  const currentAssignedTo = conversationState.assigned_to;
+  let currentStatus = conversationState.status;
+  let currentAssignedTo = conversationState.assigned_to;
   const currentAiEnabled = Boolean(conversationState.ai_enabled);
 
   // Automações activas são avaliadas antes da IA para evitar respostas duplicadas.
   // A ordem é intencional: palavra-chave específica, fora de horário, boas-vindas.
   const inboundText = (incoming.body ?? "").trim().toLocaleLowerCase();
-  if (currentStatus === "open" && !currentAssignedTo) {
+  if (currentStatus === "open" && (!currentAssignedTo || currentAiEnabled)) {
     const { data: rules, error: rulesError } = await admin
       .from("automation_rules")
       .select("id, name, trigger_type, config")
@@ -302,6 +302,82 @@ export async function processIncomingMessage(
         }
       }
 
+      // Distribuição automática: atribui a nova conversa ao membro elegível com menor carga.
+      // A atribuição mantém a conversa aberta e a IA activa; assumir atendimento desliga a IA.
+      if (isFirstInbound && !currentAssignedTo) {
+        const assignmentRule = activeRules.find((rule) =>
+          rule.trigger_type === "conversation_created" && rule.config?.["actionType"] === "assign_agent"
+        );
+        if (assignmentRule) {
+          const { data: memberRows, error: membersError } = await admin
+            .from("memberships").select("user_id, role, created_at")
+            .eq("organization_id", number.organization_id)
+            .in("role", ["AGENT", "SUPERVISOR", "ADMIN", "OWNER"])
+            .order("created_at", { ascending: true });
+          if (membersError) {
+            await logWhatsAppEvent(number.organization_id, "error", {
+              whatsappNumberId: number.id,
+              provider: incoming.provider,
+              detail: { stage: "automation_assignment_members", error: membersError.message.slice(0, 200) },
+            });
+          } else {
+            type TeamCandidate = { user_id: string; role: string; created_at: string | null };
+            const members = (memberRows ?? []) as TeamCandidate[];
+            const preferredRole = members.some((member) => member.role === "AGENT") ? "AGENT"
+              : members.some((member) => member.role === "SUPERVISOR") ? "SUPERVISOR"
+                : members.some((member) => member.role === "ADMIN") ? "ADMIN" : "OWNER";
+            const candidates = members.filter((member) => member.role === preferredRole && Boolean(member.user_id));
+            if (candidates.length === 0) {
+              await logWhatsAppEvent(number.organization_id, "error", {
+                whatsappNumberId: number.id,
+                provider: incoming.provider,
+                detail: { stage: "automation_assignment_members", error: "No eligible team member found" },
+              });
+            } else {
+              const { data: assignedRows, error: loadError } = await admin
+                .from("conversations").select("assigned_to")
+                .eq("organization_id", number.organization_id)
+                .in("status", ["open", "in_progress"]);
+              if (loadError) {
+                await logWhatsAppEvent(number.organization_id, "error", {
+                  whatsappNumberId: number.id,
+                  provider: incoming.provider,
+                  detail: { stage: "automation_assignment_load", error: loadError.message.slice(0, 200) },
+                });
+              } else {
+                const load = new Map<string, number>();
+                for (const row of (assignedRows ?? []) as Array<{ assigned_to: string | null }>) {
+                  if (row.assigned_to) load.set(row.assigned_to, (load.get(row.assigned_to) ?? 0) + 1);
+                }
+                candidates.sort((a, b) => (load.get(a.user_id) ?? 0) - (load.get(b.user_id) ?? 0));
+                const chosen = candidates[0];
+                if (chosen) {
+                  const { error: assignError } = await admin.from("conversations")
+                    .update({ assigned_to: chosen.user_id, status: "open", updated_at: new Date().toISOString() })
+                    .eq("id", res.conversation_id).eq("organization_id", number.organization_id)
+                    .eq("status", "open").is("assigned_to", null);
+                  if (assignError) {
+                    await logWhatsAppEvent(number.organization_id, "error", {
+                      whatsappNumberId: number.id,
+                      provider: incoming.provider,
+                      detail: { stage: "automation_assignment_update", error: assignError.message.slice(0, 200) },
+                    });
+                  } else {
+                    currentAssignedTo = chosen.user_id;
+                    currentStatus = "open";
+                    await logWhatsAppEvent(number.organization_id, "automation_assigned", {
+                      whatsappNumberId: number.id,
+                      provider: incoming.provider,
+                      detail: { ruleId: assignmentRule.id, assignedTo: chosen.user_id, role: chosen.role },
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       // Boas-vindas só na primeira mensagem recebida da conversa.
       if (!selectedRule && isFirstInbound) {
         selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && getReply(rule).length > 0);
@@ -342,7 +418,7 @@ export async function processIncomingMessage(
 
   // 12 + 13. IA automática só quando ligada na organização E na conversa,
   // e nunca quando um atendente humano assumiu a conversa.
-  const skip = currentAssignedTo
+  const skip = currentAssignedTo && !currentAiEnabled
     ? "human_agent"
     : currentStatus !== "open"
       ? "conversation_not_open"
