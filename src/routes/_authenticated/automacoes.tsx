@@ -49,7 +49,8 @@ function AutomationsPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
   const subscription = useSubscriptionAccess(orgId);
-  const canManage = (membership?.role === "OWNER" || membership?.role === "ADMIN") && subscription.active && subscription.features.automations !== false;
+  const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
+  const canCreateAutomation = canManage && subscription.active && subscription.features.automations !== false;
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState<TriggerType>("keyword_match");
@@ -86,7 +87,7 @@ function AutomationsPage() {
   const createRule = useMutation({
     mutationFn: async () => {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
-      if (!canManage) throw new Error("Apenas OWNER ou ADMIN com assinatura activa e automações incluídas pode gerir regras.");
+      if (!canCreateAutomation) throw new Error("Para criar automações, precisas de ser OWNER/ADMIN e ter uma assinatura activa com automações incluídas.");
       const { count, error: countError } = await supabase.from("automation_rules").select("id", { count: "exact", head: true }).eq("organization_id", orgId);
       if (countError) throw new Error("Não foi possível verificar o limite de automações: " + countError.message);
       if (automationLimit > 0 && (count ?? 0) >= automationLimit) throw new Error(`O plano ${subscription.planName} permite ${automationLimit} automações. Já atingiste esse limite.`);
@@ -242,7 +243,7 @@ function AutomationsPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <section className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
           <div className="flex items-center gap-2"><MessageSquareText className="size-5 text-primary" /><h2 className="font-display font-semibold">Criar automação</h2></div>
-          {!canManage && <p className="rounded-md bg-secondary p-2 text-xs text-muted-foreground">Só OWNER ou ADMIN com assinatura activa pode criar e gerir automações.</p>}
+          {!canManage && <p className="rounded-md bg-secondary p-2 text-xs text-muted-foreground">Só OWNER ou ADMIN da organização pode gerir automações.</p>}{canManage && !subscription.active && <p className="rounded-md bg-secondary p-2 text-xs text-muted-foreground">A assinatura do plano {subscription.planName} não está confirmada. Podes pausar ou eliminar regras existentes; criar novas fica bloqueado até regularizar o plano.</p>}{subscription.isError && <p role="alert" className="rounded-md bg-destructive/10 p-2 text-xs text-destructive">Erro ao validar assinatura: {(subscription.error as Error)?.message ?? "consulta indisponível"}.</p>}
           {automationLimit > 0 && <p className="rounded-md border border-border p-2 text-xs text-muted-foreground">Plano {subscription.planName}: {rules.length} de {automationLimit} automações utilizadas.</p>}
           {automationLimitReached && <p className="rounded-md bg-secondary p-2 text-xs text-muted-foreground">Limite atingido. Elimina uma automação ou actualiza o plano para criar outra.</p>}
           <p className="text-sm text-muted-foreground">Palavras-chave e respostas fora de horário substituem a resposta da IA para evitar duplicações. A saudação de boas-vindas pode ser seguida pela resposta da IA. A distribuição automática atribui um responsável, mantendo a IA activa até alguém assumir o atendimento. A regra CRM cria uma oportunidade na primeira mensagem, sem duplicar uma oportunidade aberta do mesmo contacto.</p>
@@ -289,7 +290,7 @@ function AutomationsPage() {
             )}
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
             {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">{notice}</p>}
-            <Button type="submit" disabled={!orgId || !canManage || automationLimitReached || createRule.isPending} className="w-full sm:w-auto"><Plus className="mr-2 size-4" />{createRule.isPending ? "A guardar…" : "Criar automação"}</Button>
+            <Button type="submit" disabled={!orgId || !canCreateAutomation || automationLimitReached || createRule.isPending} className="w-full sm:w-auto"><Plus className="mr-2 size-4" />{createRule.isPending ? "A guardar…" : "Criar automação"}</Button>
           </form>
         </section>
 
