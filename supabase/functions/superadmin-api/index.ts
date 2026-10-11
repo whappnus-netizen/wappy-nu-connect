@@ -314,14 +314,15 @@ Deno.serve(async (req: Request) => {
 
 
     if (action === "group.commander.list") {
-      const [flows, connections, assets, jobs] = await Promise.all([
+      const [flows, connections, assets, jobs, numbers] = await Promise.all([
         db.from("superadmin_group_flows").select("id,name,description,trigger_mode,is_active,created_at,updated_at").order("created_at", { ascending: false }).limit(200),
         db.from("superadmin_group_connections").select("id,label,whatsapp_number_id,group_jid,group_name,active_flow_id,is_enabled,created_at,whatsapp_numbers(display_name,phone_e164)").order("created_at", { ascending: false }).limit(300),
         db.from("superadmin_group_assets").select("id,name,asset_type,storage_path,mime_type,file_size,created_at").order("created_at", { ascending: false }).limit(300),
         db.from("superadmin_group_jobs").select("id,connection_id,flow_id,step_id,due_at,status,attempts,last_error,created_at,sent_at").order("due_at", { ascending: true }).limit(300),
+        db.from("whatsapp_numbers").select("id,organization_id,display_name,phone_e164,provider,status").eq("provider", "qr").is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
       ]);
-      for (const result of [flows, connections, assets, jobs]) if (result.error) throw result.error;
-      return json({ ok: true, data: { flows: flows.data ?? [], connections: connections.data ?? [], assets: assets.data ?? [], jobs: jobs.data ?? [] } });
+      for (const result of [flows, connections, assets, jobs, numbers]) if (result.error) throw result.error;
+      return json({ ok: true, data: { flows: flows.data ?? [], connections: connections.data ?? [], assets: assets.data ?? [], jobs: jobs.data ?? [], numbers: numbers.data ?? [] } });
     }
 
     if (action === "group.flow.save") {
