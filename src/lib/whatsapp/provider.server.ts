@@ -112,6 +112,8 @@ export interface WhatsAppProvider {
   }): Promise<SendResult>;
   markRead?(phoneNumberId: string, token: string, waMessageId: string): Promise<void>;
   reactToMessage?(input: {
+    organizationId: string;
+    whatsappNumberId: string;
     to: string;
     waMessageId: string;
     emoji: string;
