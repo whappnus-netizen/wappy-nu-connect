@@ -171,10 +171,15 @@ export const requestQrPairingCode = createServerFn({ method: "POST" })
     if (!number || number.provider !== "qr") throw new Error("A ligação WhatsApp não pertence a esta organização.");
     const phone = data.phoneE164.replace(/[\s()-]/g, "");
     const code = await requestCode({ organizationId: data.organizationId, whatsappNumberId: data.numberId }, phone);
+    const now = new Date().toISOString();
     const { error: updateError } = await admin.from("whatsapp_numbers")
-      .update({ phone_e164: phone, status: "connecting", last_error: null, updated_at: new Date().toISOString() })
+      .update({ phone_e164: phone, status: "connecting", last_error: null, updated_at: now })
       .eq("id", data.numberId).eq("organization_id", data.organizationId);
     if (updateError) throw new Error(updateError.message);
+    const { error: sessionUpdateError } = await admin.from("whatsapp_sessions")
+      .update({ status: "connecting", qr_code: null, qr_expires_at: null, last_error: null, updated_at: now })
+      .eq("organization_id", data.organizationId).eq("whatsapp_number_id", data.numberId);
+    if (sessionUpdateError) throw new Error(sessionUpdateError.message);
     return { code, numberId: data.numberId };
   });
 
