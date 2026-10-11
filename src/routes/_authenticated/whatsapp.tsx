@@ -37,6 +37,7 @@ import {
   disconnectQrSession,
   reconnectQrSession,
   archiveQrConnection,
+  requestQrPairingCode,
 } from "@/lib/whatsapp.qr.functions";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({
@@ -106,7 +107,10 @@ function WhatsAppPage() {
   const canManage = (role === "OWNER" || role === "ADMIN") && subscription.active;
   const queryClient = useQueryClient();
 
-  const [method, setMethod] = useState<"meta_cloud" | "qr" | null>(null);
+  const [method, setMethod] = useState<"meta_cloud" | "qr" | "pairing" | null>(null);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [pairingCopied, setPairingCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeQrNumber, setActiveQrNumber] = useState<string | null>(null);
@@ -177,6 +181,7 @@ function WhatsAppPage() {
   const disconnectQrFn = useServerFn(disconnectQrSession);
   const reconnectQrFn = useServerFn(reconnectQrSession);
   const archiveQrFn = useServerFn(archiveQrConnection);
+  const requestPairingFn = useServerFn(requestQrPairingCode);
 
   const connect = useMutation({
     mutationFn: async (form: {
@@ -210,6 +215,24 @@ function WhatsAppPage() {
       setError(res.error ?? null);
       setActiveQrNumber(res.numberId);
       setMethod(null);
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp_numbers", orgId] });
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp_sessions", orgId] });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const startPairing = useMutation({
+    mutationFn: async () => {
+      if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
+      const phoneE164 = pairingPhone.trim().replace(/[\s()-]/g, "");
+      if (!/^\+?[0-9]{8,15}$/.test(phoneE164)) throw new Error("Introduz o número com indicativo internacional, por exemplo +244923456789.");
+      const started = await startQrFn({ data: { organizationId: orgId, displayName: "WhatsApp (código)", phoneE164 } });
+      if (started.error) throw new Error(started.error);
+      return requestPairingFn({ data: { organizationId: orgId, numberId: started.numberId, phoneE164 } });
+    },
+    onSuccess: (result) => {
+      setPairingCode(result.code);
+      setError(null);
       void queryClient.invalidateQueries({ queryKey: ["whatsapp_numbers", orgId] });
       void queryClient.invalidateQueries({ queryKey: ["whatsapp_sessions", orgId] });
     },
@@ -284,8 +307,8 @@ function WhatsAppPage() {
           <Button size="sm" variant="outline" disabled={!orgId || !canManage} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
-          <Button size="sm" disabled={!orgId || !canManage || startQr.isPending} onClick={() => startQr.mutate({})}>
-            <QrCode className="size-4" /> {startQr.isPending ? "A gerar QR…" : "Conectar por QR Code"}
+          <Button size="sm" disabled={!orgId || !canManage || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
+            <QrCode className="size-4" /> Conectar WhatsApp
           </Button>
         </div>
       }
@@ -484,6 +507,60 @@ function WhatsAppPage() {
           </div>
         )}
       </div>
+
+      {/* Escolha do método de ligação WhatsApp */}
+      <Dialog open={method === "qr"} onOpenChange={(open) => { if (!open) setMethod(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Como pretende ligar o WhatsApp?</DialogTitle>
+            <DialogDescription>Escolha o método de ligação. Ambos associam o seu WhatsApp à organização actual.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <Button className="w-full justify-start" onClick={() => { setMethod(null); setError(null); startQr.mutate({}); }} disabled={!canManage || startQr.isPending}>
+              <QrCode className="mr-2 size-4" /> Conectar por QR Code
+            </Button>
+            <Button variant="outline" className="w-full justify-start" onClick={() => { setMethod("pairing"); setError(null); setPairingCode(null); }} disabled={!canManage || startPairing.isPending}>
+              <Smartphone className="mr-2 size-4" /> Conectar por código
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">QR Code: leia o código com o telefone. Código de ligação: introduza o seu número e confirme o código no WhatsApp.</p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: ligação por código */}
+      <Dialog open={method === "pairing"} onOpenChange={(open) => { if (!open) { setMethod(null); setPairingCode(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conectar por código</DialogTitle>
+            <DialogDescription>Introduza o número que pretende associar, incluindo o indicativo do país. Exemplo: +244923456789.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="pairing-phone">Número WhatsApp</Label>
+              <Input id="pairing-phone" type="tel" autoComplete="tel" placeholder="+244923456789" value={pairingPhone} onChange={(event) => setPairingPhone(event.target.value)} disabled={startPairing.isPending || Boolean(pairingCode)} />
+            </div>
+            {!pairingCode ? <Button className="w-full" onClick={() => startPairing.mutate()} disabled={!canManage || startPairing.isPending || pairingPhone.trim().length < 8}>
+              {startPairing.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Smartphone className="mr-2 size-4" />}
+              {startPairing.isPending ? "A gerar código…" : "Gerar código"}
+            </Button> : <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+              <p className="text-xs text-muted-foreground">Código de ligação</p>
+              <p className="my-3 font-mono text-2xl font-bold tracking-[0.22em]">{pairingCode}</p>
+              <Button variant="outline" className="w-full" onClick={() => { void navigator.clipboard.writeText(pairingCode); setPairingCopied(true); }}>
+                <Copy className="mr-2 size-4" /> {pairingCopied ? "Código copiado" : "Copiar código"}
+              </Button>
+              <ol className="mt-4 list-decimal space-y-1 pl-5 text-left text-xs text-muted-foreground">
+                <li>Abra o WhatsApp no telefone desse número.</li>
+                <li>Entre em Dispositivos conectados e toque em Conectar dispositivo.</li>
+                <li>Escolha a opção de conectar com número de telefone.</li>
+                <li>Introduza o código acima no telefone e aguarde a confirmação.</li>
+              </ol>
+              <Button variant="ghost" className="mt-3 w-full" onClick={() => { setPairingCode(null); setPairingCopied(false); setError(null); }}>Gerar outro código</Button>
+            </div>}
+            {error && method === "pairing" && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setMethod(null)}>Fechar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo: Cloud API */}
       <Dialog open={method === "meta_cloud"} onOpenChange={(o) => setMethod(o ? "meta_cloud" : null)}>
