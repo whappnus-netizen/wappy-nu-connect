@@ -114,7 +114,15 @@ export function AppShell({
           </div>
           {actions}
         </header>
-        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        {subscription.data && !subscription.active && (
+          <div role="alert" className="flex flex-col gap-3 border-b border-destructive/20 bg-destructive/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+            <div>
+              <p className="text-sm font-semibold">Acesso limitado — assinatura suspensa</p>
+              <p className="text-xs text-muted-foreground">Os dados e o histórico continuam disponíveis. A IA e as automações ficam pausadas até o administrador reactivar o plano.</p>
+            </div>
+            <Button asChild size="sm"><a href="/#planos">Ver planos</a></Button>
+          </div>
+        )}\n        <main className="flex-1 p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );
