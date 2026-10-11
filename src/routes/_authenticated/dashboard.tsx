@@ -157,6 +157,7 @@ function DashboardPage() {
         const subscription = subscriptionData.subscription as any;
         const organization = subscriptionData.organization;
 
+        const periodEnd = subscription?.current_period_end ? new Date(subscription.current_period_end) : null;
         const expired = Boolean(periodEnd && periodEnd.getTime() <= Date.now());
         const suspended = !subscription || !["active", "trialing"].includes(subscription.status) || expired || ["suspended", "blocked", "cancelled"].includes(organization?.status ?? "");
         const plan = subscription?.subscription_plans as { name?: string; limits?: Record<string, unknown> } | null;
