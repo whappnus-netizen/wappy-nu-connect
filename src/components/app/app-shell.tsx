@@ -17,6 +17,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { useSubscriptionAccess } from "@/lib/subscription";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,6 +53,7 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, membership, signOut } = useAuth();
+  const subscription = useSubscriptionAccess(membership?.organization_id);
 
   return (
     <div className="flex min-h-screen bg-surface">
