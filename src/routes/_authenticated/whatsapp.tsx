@@ -101,6 +101,7 @@ const providerLabel: Record<string, string> = {
 function WhatsAppPage() {
   const { membership, membershipLoading } = useAuth();
   const orgId = membership?.organization_id;
+  const subscription = useSubscriptionAccess(orgId);
   const role = membership?.role;
   const canManage = (role === "OWNER" || role === "ADMIN") && subscription.active;
   const queryClient = useQueryClient();
