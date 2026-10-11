@@ -237,7 +237,7 @@ export async function processIncomingMessage(
         detail: { stage: "automation_lookup", error: rulesError.message.slice(0, 200) },
       });
     } else {
-      type StoredStep = { kind?: string; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string };
+      type StoredStep = { kind?: string; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string; durationMs?: number };
       type AutomationRow = { id: string; name: string; trigger_type: string; config: Record<string, unknown> | null };
       const activeRules = (rules ?? []) as AutomationRow[];
       const getReply = (rule: AutomationRow) => {
@@ -548,7 +548,7 @@ export async function processIncomingMessage(
                   storagePath: step.storagePath,
                   mimeType: step.mimeType,
                   ...(step.caption !== undefined ? { caption: step.caption } : {}),
-                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),
+                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),\n                  ...(step.durationMs !== undefined ? { durationMs: step.durationMs } : {}),
                 },
                 isAi: false,
               });
@@ -685,7 +685,7 @@ export async function sendOutgoingMessage(input: {
   whatsappNumberId: string;
   conversationId: string;
   body: string;
-  media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string };
+  media?: { kind: "image" | "audio"; storagePath: string; mimeType: string; caption?: string; fileName?: string; durationMs?: number };
   isAi?: boolean;
   sentBy?: string | null;
   reaction?: { waMessageId: string; emoji: string };
@@ -736,7 +736,7 @@ export async function sendOutgoingMessage(input: {
       mimeType: input.media.mimeType,
       ...(input.media.caption !== undefined ? { caption: input.media.caption } : {}),
       ...(input.media.fileName !== undefined ? { fileName: input.media.fileName } : {}),
-      storagePath: input.media.storagePath,
+      storagePath: input.media.storagePath,\n      ...(input.media.durationMs !== undefined ? { durationMs: input.media.durationMs } : {}),
     };
   }
 
