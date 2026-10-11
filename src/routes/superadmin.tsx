@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Building2, CheckCircle2, CircleDollarSign, CreditCard, LayoutDashboard,
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
+import { listSuperAdminGroups } from "@/lib/whatsapp.qr.functions";
 
 export const Route = createFileRoute("/superadmin")({
   ssr: false,
@@ -129,6 +131,7 @@ function SuperAdminPage() {
   const [groupFlowMode, setGroupFlowMode] = useState<"relative" | "calendar">("relative");
   const [groupLabel, setGroupLabel] = useState("");
   const [groupJid, setGroupJid] = useState("");
+  const [discoveredGroups, setDiscoveredGroups] = useState<Array<{ id: string; subject: string; participants: number; announce: boolean }>>([]);
   const [groupName, setGroupName] = useState("");
   const [groupNumberId, setGroupNumberId] = useState("");
   const [groupFlowId, setGroupFlowId] = useState("");
@@ -151,6 +154,12 @@ function SuperAdminPage() {
   const team = useQuery({ queryKey: ["superadmin", "team"], queryFn: () => adminApi<any[]>("team.list"), enabled: tab === "team", retry: false });
   const notifications = useQuery({ queryKey: ["superadmin", "notifications"], queryFn: () => adminApi<any[]>("notifications.list"), enabled: tab === "notifications", retry: false, staleTime: 15_000 });
   const groupCommander = useQuery({ queryKey: ["superadmin", "group-commander"], queryFn: () => adminApi<any>("group.commander.list"), enabled: tab === "groups", retry: false, staleTime: 15_000 });
+  const discoverGroupsFn = useServerFn(listSuperAdminGroups);
+  const discoverGroups = useMutation({
+    mutationFn: () => discoverGroupsFn({ data: { numberId: groupNumberId } }),
+    onSuccess: (groups) => { setDiscoveredGroups(groups); if (!groups.length) toast.message("A sessão está ligada, mas não devolveu grupos participantes."); else toast.success(`${groups.length} grupos encontrados na sessão WhatsApp.`); },
+    onError: (error: Error) => toast.error(error.message),
+  });
   const saveGroupFlow = useMutation({ mutationFn: () => adminApi<any>("group.flow.save", { name: groupFlowName.trim(), trigger_mode: groupFlowMode, is_active: false }), onSuccess: (flow) => { toast.success("Funil criado."); setGroupFlowName(""); setGroupFlowId(flow.id); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); }, onError: (error: Error) => toast.error(error.message) });
   const saveGroupConnection = useMutation({ mutationFn: () => adminApi<any>("group.connection.save", { label: groupLabel.trim(), group_jid: groupJid.trim(), group_name: groupName.trim(), whatsapp_number_id: groupNumberId, active_flow_id: groupFlowId || null, is_enabled: false }), onSuccess: () => { toast.success("Grupo registado desactivado."); setGroupLabel(""); setGroupJid(""); setGroupName(""); void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] }); }, onError: (error: Error) => toast.error(error.message) });
   const sendNotification = useMutation({
@@ -346,8 +355,13 @@ function SuperAdminPage() {
                 <Card className="border-white/10 bg-[#0b1912] text-slate-100 shadow-none"><CardHeader><CardTitle className="text-base">Registar grupo</CardTitle><CardDescription className="text-slate-500">Usa o JID real do grupo e um número QR/Baileys ligado.</CardDescription></CardHeader><CardContent className="space-y-3">
                   <Input value={groupLabel} onChange={e => setGroupLabel(e.target.value)} placeholder="Etiqueta interna" className="border-white/10 bg-[#102219]" />
                   <Input value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="Nome do grupo" className="border-white/10 bg-[#102219]" />
-                  <Input value={groupJid} onChange={e => setGroupJid(e.target.value)} placeholder="JID do grupo terminado em @g.us" className="border-white/10 bg-[#102219]" />
-                  <select value={groupNumberId} onChange={e => setGroupNumberId(e.target.value)} className="h-10 w-full rounded-md border border-white/10 bg-[#102219] px-3 text-sm"><option value="">Seleccionar número QR/Baileys</option>{(groupCommander.data?.numbers ?? []).map((n: any) => <option key={n.id} value={n.id}>{n.display_name || n.phone_e164 || n.id} · {n.status}</option>)}</select>
+                  <div className="space-y-2">
+                  <Button type="button" variant="outline" disabled={!groupNumberId || discoverGroups.isPending} onClick={() => discoverGroups.mutate()}>{discoverGroups.isPending ? "A procurar grupos reais…" : "Descobrir grupos da sessão"}</Button>
+                  {discoveredGroups.length > 0 && <select value={groupJid} onChange={e => { const selected = discoveredGroups.find(g => g.id === e.target.value); setGroupJid(e.target.value); if (selected) { setGroupName(selected.subject); setGroupLabel(selected.subject); } }} className="h-10 w-full rounded-md border border-white/10 bg-[#102219] px-3 text-sm"><option value="">Seleccionar grupo descoberto</option>{discoveredGroups.map(g => <option key={g.id} value={g.id}>{g.subject} · {g.participants} participantes</option>)}</select>}
+                  <Input value={groupJid} onChange={e => setGroupJid(e.target.value)} placeholder="JID do grupo terminado em @g.us (ou escolha um grupo descoberto)" className="border-white/10 bg-[#102219]" />
+                  {discoveredGroups.length > 0 && <p className="text-xs text-slate-500">A lista vem directamente da sessão Baileys escolhida; se o grupo não aparecer, confirma que o WhatsApp está conectado e participa nesse grupo.</p>}
+                </div>
+                  <select value={groupNumberId} onChange={e => { setGroupNumberId(e.target.value); setDiscoveredGroups([]); setGroupJid(""); setGroupName(""); setGroupLabel(""); }} className="h-10 w-full rounded-md border border-white/10 bg-[#102219] px-3 text-sm"><option value="">Seleccionar número QR/Baileys</option>{(groupCommander.data?.numbers ?? []).map((n: any) => <option key={n.id} value={n.id}>{n.display_name || n.phone_e164 || n.id} · {n.status}</option>)}</select>
                   <select value={groupFlowId} onChange={e => setGroupFlowId(e.target.value)} className="h-10 w-full rounded-md border border-white/10 bg-[#102219] px-3 text-sm"><option value="">Sem funil associado</option>{(groupCommander.data?.flows ?? []).map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
                   <Button className="bg-emerald-400 text-[#062016] hover:bg-emerald-300" disabled={!groupNumberId || groupLabel.trim().length < 2 || groupName.trim().length < 2 || !groupJid.trim().endsWith("@g.us") || saveGroupConnection.isPending} onClick={() => saveGroupConnection.mutate()}>Guardar grupo desactivado</Button>
                 </CardContent></Card>
