@@ -9,7 +9,7 @@
 The Inbox status actions update the conversation row within the current organization. Claiming a conversation assigns it to the signed-in user, moves it to `in_progress`, and disables AI replies for that conversation.
 
 ## Keyword automations
-An active `automation_rules` row with `trigger_type = 'keyword'` may define:
+An active `automation_rules` row with `trigger_type = 'keyword_match'` may define:
 - `config.keyword`: phrase to look for, case-insensitive substring match.
 - `config.reply`: response to send when the phrase matches.
 
