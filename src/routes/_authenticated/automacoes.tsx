@@ -110,7 +110,9 @@ function AutomationsPage() {
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || (step.kind === "image" ? "imagem" : step.kind === "audio" ? "audio" : step.kind === "video" ? "video" : "documento");
           const storagePath = `${orgId}/${crypto.randomUUID()}-${safeName}`;
           // Supabase guarda o MIME canónico; o parâmetro ";codecs=opus" é apenas um detalhe do MediaRecorder.
-          const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || file.type;
+          const extension = file.name.toLowerCase().split(".").pop() ?? "";
+          const inferredMimeTypes: Record<string, string> = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", txt: "text/plain", csv: "text/csv", zip: "application/zip", mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", ogg: "audio/ogg", mp3: "audio/mpeg", wav: "audio/wav" };
+          const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || inferredMimeTypes[extension] || "application/octet-stream";
           const { error: uploadError } = await supabase.storage.from("automation-media")
             .upload(storagePath, file, { contentType: mimeType, upsert: false });
           if (uploadError) throw new Error("Falha ao carregar mídia: " + uploadError.message);
