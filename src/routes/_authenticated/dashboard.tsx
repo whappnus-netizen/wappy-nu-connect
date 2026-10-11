@@ -83,6 +83,8 @@ function DashboardPage() {
   const { data: subscriptionData } = useQuery({
     queryKey: ["dashboard-subscription", orgId],
     enabled: Boolean(orgId),
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const [subscriptionResult, orgResult, accountResult] = await Promise.all([
         supabase.from("organization_subscriptions")
