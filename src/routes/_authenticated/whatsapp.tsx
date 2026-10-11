@@ -42,13 +42,13 @@ import {
 export const Route = createFileRoute("/_authenticated/whatsapp")({
   head: () => ({
     meta: [
-      { title: "WhatsApp — Wappy Nus" },
+      { title: "WhatsApp — WhappNus" },
       {
         name: "description",
         content:
           "Ligue o WhatsApp da sua empresa pela Cloud API oficial da Meta ou por QR Code, com sessões isoladas por organização.",
       },
-      { property: "og:title", content: "WhatsApp — Wappy Nus" },
+      { property: "og:title", content: "WhatsApp — WhappNus" },
       { property: "og:description", content: "Cloud API oficial da Meta ou ligação por QR Code." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -330,13 +330,7 @@ function WhatsAppPage() {
                 Liga o WhatsApp do telemóvel como dispositivo ligado, sem processo de aprovação. Ideal para
                 começar rápido.
               </p>
-              <p className="mt-3 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <span>
-                  Esta é uma ligação <strong>não oficial da Meta</strong>. Não é coberta pelo suporte da Meta e
-                  pode ser interrompida pelo WhatsApp. Para uso regulado, use a Cloud API oficial.
-                </span>
-              </p>
+              <p className="mt-3 rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">A sessão por QR Code liga o WhatsApp como dispositivo associado. Para integrações empresariais pela API da Meta, escolha a Cloud API.</p>
             </div>
           </div>
         </div>
@@ -505,7 +499,7 @@ function WhatsAppPage() {
           <form onSubmit={submitMeta} className="space-y-3">
             <div className="grid gap-1.5">
               <Label htmlFor="displayName">Nome de exibição</Label>
-              <Input id="displayName" name="displayName" placeholder="Atendimento Wappy Nus" required />
+              <Input id="displayName" name="displayName" placeholder="Atendimento WhappNus" required />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="phoneE164">Telefone (E.164)</Label>
@@ -566,7 +560,7 @@ function WhatsAppPage() {
             ) : qrSession?.qr_code ? (
               <img
                 src={qrSession.qr_code}
-                alt="QR Code para ligar o WhatsApp ao Wappy Nus"
+                alt="QR Code para ligar o WhatsApp ao WhappNus"
                 className="size-64 rounded-lg border border-border bg-white p-2"
               />
             ) : (
