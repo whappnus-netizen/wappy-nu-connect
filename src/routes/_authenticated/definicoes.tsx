@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/definicoes")({
-  head: () => ({ meta: [{ title: "Definições — Wapnus" }] }),
+  head: () => ({ meta: [{ title: "Definições — WhappNus" }] }),
   component: SettingsPage,
 });
 
@@ -209,11 +209,7 @@ function SettingsPage() {
           {assetsQuery.isError && <p role="alert" className="mt-3 text-sm text-destructive">Não foi possível carregar as imagens actuais: {(assetsQuery.error as Error).message}</p>}
         </section>
 
-        <section className="rounded-xl border border-border bg-card p-5 lg:col-span-2">
-          <div className="flex items-center gap-2"><h2 className="font-display text-sm font-semibold">Módulos</h2><Badge variant="secondary">Fase 1</Badge></div>
-          <p className="mt-2 text-sm text-muted-foreground">WhatsApp por QR Code e Cloud API, multiatendimento, CRM, automações por palavra-chave e IA. Campanhas, webhooks avançados, integrações e analytics avançados permanecem para uma fase futura.</p>
-        </section>
-      </div>
+</div>
     </AppShell>
   );
 }
