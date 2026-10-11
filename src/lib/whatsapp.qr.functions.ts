@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 const phoneSchema = z.string().trim().regex(/^\+?[0-9\s()-]{8,20}$/, "Introduz o número com indicativo internacional, por exemplo +244923456789.");
@@ -153,6 +154,29 @@ export const startQrSession = createServerFn({ method: "POST" })
         error: message,
       };
     }
+  });
+
+/** Lista os grupos reais de uma sessão conectada. Só utilizadores Super Admin activos podem chamar esta operação. */
+export const listSuperAdminGroups = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ numberId: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { serviceClient } = await import("./whatsapp.server");
+    const { listQrGroups: fetchGroups } = await import("./whatsapp/qr.server");
+    const tokenHeader = getRequestHeader("authorization") ?? "";
+    const token = tokenHeader.toLowerCase().startsWith("bearer ") ? tokenHeader.slice(7) : "";
+    if (!token) throw new Error("Sessão ausente. Inicia sessão novamente.");
+    const admin = serviceClient();
+    const { data: userData, error: authError } = await admin.auth.getUser(token);
+    if (authError || !userData.user) throw new Error("Sessão inválida ou expirada.");
+    const { data: adminRow, error: adminError } = await admin.from("superadmin_users")
+      .select("user_id").eq("user_id", userData.user.id).eq("is_active", true).maybeSingle();
+    if (adminError) throw new Error(adminError.message);
+    if (!adminRow) throw new Error("A descoberta de grupos está reservada à equipa Super Admin.");
+    const { data: number, error } = await admin.from("whatsapp_numbers")
+      .select("id,organization_id,provider,status").eq("id", data.numberId).is("deleted_at", null).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!number || number.provider !== "qr") throw new Error("Escolhe uma ligação QR/Baileys válida.");
+    return fetchGroups({ organizationId: number.organization_id, whatsappNumberId: number.id });
   });
 
 /** Gera código de associação WhatsApp em vez de QR. A autorização é validada no servidor. */
