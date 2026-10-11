@@ -253,7 +253,7 @@ Deno.serve(async (req: Request) => {
         cancel_at_period_end: false,
         cancelled_at: null,
         provider: "manual",
-        metadata: { ...(before.metadata ?? {}), source: "superadmin_manual_activation", activated_by: actor.id, period_days: periodDays },
+        metadata: { ...(isObject(before.metadata) ? before.metadata : {}), source: "superadmin_manual_activation", activated_by: actor.id, period_days: periodDays },
         updated_at: startsAt.toISOString(),
       }).eq("id", subscriptionId).select("id,organization_id,plan_id,status,current_period_start,current_period_end,amount_aoa").single();
       if (error) throw error;
