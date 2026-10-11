@@ -160,7 +160,7 @@ export async function processIncomingMessage(
       .from("automation_rules")
       .select("id, name, config")
       .eq("organization_id", number.organization_id)
-      .eq("trigger_type", "keyword")
+      .eq("trigger_type", "keyword_match")
       .eq("is_active", true)
       .order("created_at", { ascending: true })
       .limit(50);
