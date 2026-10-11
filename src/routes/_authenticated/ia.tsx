@@ -48,6 +48,7 @@ type Agent = {
   name: string;
   model: string | null;
   is_active: boolean;
+  config: Record<string, unknown> | null;
   goal: string | null;
   company_name: string | null;
   company_description: string | null;
@@ -82,7 +83,7 @@ type Example = {
 };
 
 const AGENT_FIELDS = [
-  "id, organization_id, name, model, is_active, goal, company_name, company_description",
+  "id, organization_id, name, model, is_active, config, goal, company_name, company_description",
   "products_services, business_hours, location, payment_methods, faq, tone",
   "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions",
 ].join(", ");
@@ -330,7 +331,10 @@ function AiPage() {
             </TabsContent>
 
             <TabsContent value="config">
-              <ConfigForm agent={agent} orgId={orgId} />
+              <div className="space-y-5">
+                <ConfigForm agent={agent} orgId={orgId} />
+                <AgentCapabilitiesPanel agent={agent} orgId={orgId} canManage={canManage} />
+              </div>
             </TabsContent>
 
             <TabsContent value="knowledge">
@@ -598,6 +602,91 @@ const CONFIG_FIELDS: {
   { key: "greeting_message", label: "Mensagem inicial", hint: "Primeira mensagem enviada ao cliente.", long: true },
   { key: "extra_instructions", label: "Instruções adicionais", hint: "Qualquer outra orientação.", long: true },
 ];
+
+function AgentCapabilitiesPanel({
+  agent,
+  orgId,
+  canManage,
+}: {
+  agent: Agent;
+  orgId: string;
+  canManage: boolean;
+}) {
+  const qc = useQueryClient();
+  const [options, setOptions] = useState({
+    imageUnderstanding: true,
+    audioUnderstanding: true,
+    reactionsEnabled: false,
+  });
+
+  useEffect(() => {
+    const config = agent.config && typeof agent.config === "object" ? agent.config : {};
+    setOptions({
+      imageUnderstanding: config["imageUnderstanding"] !== false,
+      audioUnderstanding: config["audioUnderstanding"] !== false,
+      reactionsEnabled: config["reactionsEnabled"] === true,
+    });
+  }, [agent.id, agent.config]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!canManage) throw new Error("Apenas OWNER ou ADMIN pode alterar as capacidades do agente.");
+      const previous = agent.config && typeof agent.config === "object" ? agent.config : {};
+      const { error } = await supabase.from("ai_agents")
+        .update({ config: { ...previous, ...options } })
+        .eq("id", agent.id)
+        .eq("organization_id", orgId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Capacidades da IA guardadas para este agente.");
+      void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggle = (key: keyof typeof options, checked: boolean) => {
+    setOptions((current) => ({ ...current, [key]: checked }));
+  };
+
+  return (
+    <section className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div>
+        <h3 className="font-display font-semibold">Capacidades deste agente</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Escolha o que este agente pode interpretar. As opções são guardadas por agente e não alteram o encaminhamento dos modelos.
+        </p>
+      </div>
+      <div className="divide-y divide-border">
+        <div className="flex items-center justify-between gap-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Compreensão de imagens</p>
+            <p className="text-xs text-muted-foreground">Permite analisar fotografias enviadas pelos clientes.</p>
+          </div>
+          <Switch checked={options.imageUnderstanding} disabled={!canManage || save.isPending} onCheckedChange={(v) => toggle("imageUnderstanding", v)} />
+        </div>
+        <div className="flex items-center justify-between gap-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Compreensão de áudio</p>
+            <p className="text-xs text-muted-foreground">Permite interpretar notas de voz e responder ao conteúdo compreendido.</p>
+          </div>
+          <Switch checked={options.audioUnderstanding} disabled={!canManage || save.isPending} onCheckedChange={(v) => toggle("audioUnderstanding", v)} />
+        </div>
+        <div className="flex items-center justify-between gap-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Reações com emoji</p>
+            <p className="text-xs text-muted-foreground">Sugere uma reação discreta apenas a mensagens que expressem interesse, agradecimento ou entusiasmo.</p>
+          </div>
+          <Switch checked={options.reactionsEnabled} disabled={!canManage || save.isPending} onCheckedChange={(v) => toggle("reactionsEnabled", v)} />
+        </div>
+      </div>
+      <Button onClick={() => save.mutate()} disabled={!canManage || save.isPending}>
+        {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Guardar capacidades
+      </Button>
+    </section>
+  );
+}
 
 function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
   const qc = useQueryClient();
