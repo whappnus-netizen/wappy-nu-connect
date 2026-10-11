@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+const phoneSchema = z.string().trim().regex(/^\+?[0-9\s()-]{8,20}$/, "Introduz o número com indicativo internacional, por exemplo +244923456789.");
+
 const orgOnly = z.object({ organizationId: z.string().uuid() });
 const orgNumber = orgOnly.extend({ numberId: z.string().uuid() });
 
@@ -14,6 +16,7 @@ export const startQrSession = createServerFn({ method: "POST" })
     orgOnly
       .extend({
         displayName: z.string().trim().min(2).max(80).optional(),
+        phoneE164: phoneSchema.optional(),
       })
       .parse(input),
   )
@@ -49,6 +52,7 @@ export const startQrSession = createServerFn({ method: "POST" })
         .from("whatsapp_numbers")
         .update({
           display_name: data.displayName ?? "WhatsApp (QR Code)",
+          ...(data.phoneE164 ? { phone_e164: data.phoneE164.replace(/\\s/g, "") } : {}),
           status: "connecting",
           last_error: null,
         })
@@ -56,13 +60,13 @@ export const startQrSession = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId);
       if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
     } else {
-      await requireWhatsAppConnectionCapacity(data.organizationId);
+      await requireWhatsAppConnectionCapacity(data.organizationId, data.phoneE164?.replace(/\\s/g, ""));
       const { data: createdNumber, error: createErr } = await admin
         .from("whatsapp_numbers")
         .insert({
           organization_id: data.organizationId,
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          phone_e164: null,
+          phone_e164: data.phoneE164?.replace(/\\s/g, "") ?? null,
           provider: "qr",
           status: "connecting",
         })
@@ -149,6 +153,29 @@ export const startQrSession = createServerFn({ method: "POST" })
         error: message,
       };
     }
+  });
+
+/** Gera código de associação WhatsApp em vez de QR. A autorização é validada no servidor. */
+export const requestQrPairingCode = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => orgOnly.extend({ numberId: z.string().uuid(), phoneE164: phoneSchema }).parse(input))
+  .handler(async ({ data }) => {
+    const { requireOrgRole, requireActiveSubscription, serviceClient } = await import("./whatsapp.server");
+    const { requestQrPairingCode: requestCode } = await import("./whatsapp/qr.server");
+    await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
+    await requireActiveSubscription(data.organizationId);
+    const admin = serviceClient();
+    const { data: number, error } = await admin.from("whatsapp_numbers")
+      .select("id,provider").eq("id", data.numberId).eq("organization_id", data.organizationId)
+      .is("deleted_at", null).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!number || number.provider !== "qr") throw new Error("A ligação WhatsApp não pertence a esta organização.");
+    const phone = data.phoneE164.replace(/[\\s()-]/g, "");
+    const code = await requestCode({ organizationId: data.organizationId, whatsappNumberId: data.numberId }, phone);
+    const { error: updateError } = await admin.from("whatsapp_numbers")
+      .update({ phone_e164: phone, status: "connecting", last_error: null, updated_at: new Date().toISOString() })
+      .eq("id", data.numberId).eq("organization_id", data.organizationId);
+    if (updateError) throw new Error(updateError.message);
+    return { code, numberId: data.numberId };
   });
 
 /** Consulta o estado real da sessão no serviço de sessões e sincroniza a BD. */
