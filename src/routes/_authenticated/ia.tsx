@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
 import { testOrgAiAgent } from "@/lib/ai.functions";
 
@@ -110,7 +111,8 @@ const EXAMPLE_TYPES = [
 function AiPage() {
   const { membership } = useAuth();
   const orgId = membership?.organization_id;
-  const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
+  const subscription = useSubscriptionAccess(orgId);
+  const canManage = (membership?.role === "OWNER" || membership?.role === "ADMIN") && subscription.active;
   const qc = useQueryClient();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
