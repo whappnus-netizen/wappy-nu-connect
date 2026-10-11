@@ -326,6 +326,28 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: { flows: flows.data ?? [], connections: connections.data ?? [], assets: assets.data ?? [], jobs: jobs.data ?? [], numbers: numbers.data ?? [], steps: steps.data ?? [] } });
     }
 
+    if (action === "group.ai.get") {
+      const { data, error } = await db.from("superadmin_group_ai_settings")
+        .select("id,system_prompt,public_group_rules,private_dm_rules,is_active,updated_by,updated_at").eq("id", 1).maybeSingle();
+      if (error) throw error;
+      return json({ ok: true, data: data ?? { id: 1, system_prompt: "", public_group_rules: "", private_dm_rules: "", is_active: false, updated_at: null } });
+    }
+
+    if (action === "group.ai.save") {
+      const systemPrompt = str(input.system_prompt, 12000);
+      const publicRules = str(input.public_group_rules, 8000);
+      const privateRules = str(input.private_dm_rules, 8000);
+      const isActive = input.is_active === true;
+      if (isActive && systemPrompt.trim().length < 20) return fail("Para activar a IA do funil, escreve primeiro uma instrução de treino com pelo menos 20 caracteres.");
+      const { data, error } = await db.from("superadmin_group_ai_settings").upsert({
+        id: 1, system_prompt: systemPrompt, public_group_rules: publicRules,
+        private_dm_rules: privateRules, is_active: isActive, updated_by: actor.id, updated_at: new Date().toISOString(),
+      }, { onConflict: "id" }).select("id,system_prompt,public_group_rules,private_dm_rules,is_active,updated_by,updated_at").single();
+      if (error) throw error;
+      await audit("group_ai.settings_saved", "group_ai_settings", "1", null, { is_active: isActive, prompt_length: systemPrompt.length });
+      return json({ ok: true, data });
+    }
+
     if (action === "group.asset.upload-url") {
       const fileName = str(input.file_name, 180);
       const mimeType = str(input.mime_type, 120).toLowerCase();
