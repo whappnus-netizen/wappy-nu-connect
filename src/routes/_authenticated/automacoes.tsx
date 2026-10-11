@@ -89,9 +89,9 @@ function AutomationsPage() {
       if (triggerType === "outside_business_hours" && startTime === endTime) throw new Error("A hora inicial e final não podem ser iguais.");
       const usesActions = triggerType !== "auto_assignment" && triggerType !== "auto_crm_lead";
       const usableSteps = usesActions ? steps.filter((step) => step.kind === "text" ? step.content.trim().length > 0 : Boolean(step.file)) : [];
-      if (usesActions && usableSteps.length === 0) throw new Error("Adicione pelo menos uma etapa de texto, imagem ou áudio.");
+      if (usesActions && usableSteps.length === 0) throw new Error("Adicione pelo menos uma etapa de texto, imagem, áudio, vídeo ou documento.");
       if (usesActions && steps.some((step) => step.kind !== "text" && !step.file)) {
-        throw new Error("Escolha um ficheiro para cada etapa de imagem ou áudio.");
+        throw new Error("Escolha um ficheiro para cada etapa multimédia.");
       }
 
       const uploadedPaths: string[] = [];
@@ -104,7 +104,7 @@ function AutomationsPage() {
           }
           const file = step.file;
           if (!file) throw new Error("Escolha um ficheiro para cada etapa de mídia.");
-          const allowedMime = step.kind === "image" ? file.type.startsWith("image/") : step.kind === "audio" ? file.type.startsWith("audio/") : step.kind === "video" ? file.type.startsWith("video/") : step.kind === "document" ? file.type.length > 0 : false;
+          const allowedMime = step.kind === "image" ? file.type.startsWith("image/") : step.kind === "audio" ? file.type.startsWith("audio/") : step.kind === "video" ? file.type.startsWith("video/") : step.kind === "document" ? true : false;
           if (!allowedMime) throw new Error(`Escolha um ficheiro ${step.kind} válido.`);
           if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("Cada ficheiro deve ter até 20 MB.");
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || (step.kind === "image" ? "imagem" : step.kind === "audio" ? "audio" : step.kind === "video" ? "video" : "documento");
