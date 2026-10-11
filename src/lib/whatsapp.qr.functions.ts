@@ -307,7 +307,7 @@ export const archiveQrConnection = createServerFn({ method: "POST" })
     const admin = serviceClient();
     const { data: number, error: numberError } = await admin
       .from("whatsapp_numbers")
-      .select("id, provider, deleted_at")
+      .select("id, provider, status, deleted_at")
       .eq("id", data.numberId)
       .eq("organization_id", data.organizationId)
       .maybeSingle();
@@ -324,6 +324,9 @@ export const archiveQrConnection = createServerFn({ method: "POST" })
         bridgeError = (e as Error).message;
       }
     }
+
+    if (bridgeError) throw new Error(`Não foi possível confirmar a desconexão no motor WhatsApp. A ligação não foi arquivada: ${bridgeError}`);
+    if (!qrBridgeConfigured() && number.status === "connected") throw new Error("O motor QR não está configurado; não é seguro arquivar uma ligação que pode continuar activa.");
 
     const now = new Date().toISOString();
     const { error: sessionError } = await admin
