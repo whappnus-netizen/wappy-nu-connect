@@ -134,10 +134,10 @@ export function normalizeMetaMessage(msg: {
   timestamp?: string;
   type?: string;
   text?: { body?: string };
-  image?: { id?: string; caption?: string };
-  audio?: { id?: string };
-  video?: { id?: string; caption?: string };
-  document?: { id?: string; filename?: string };
+  image?: { id?: string; caption?: string; mime_type?: string };
+  audio?: { id?: string; mime_type?: string };
+  video?: { id?: string; caption?: string; mime_type?: string };
+  document?: { id?: string; filename?: string; mime_type?: string };
   button?: { text?: string };
   profileName?: string | null;
 }): NormalizedIncoming | null {
@@ -148,6 +148,7 @@ export function normalizeMetaMessage(msg: {
 
   let body: string | null = null;
   let mediaId: string | null = null;
+  let mediaMimeType: string | null = null;
   switch (msg.type) {
     case "text":
       body = msg.text?.body ?? null;
@@ -155,17 +156,21 @@ export function normalizeMetaMessage(msg: {
     case "image":
       body = msg.image?.caption ?? null;
       mediaId = msg.image?.id ?? null;
+      mediaMimeType = msg.image?.mime_type ?? null;
       break;
     case "audio":
       mediaId = msg.audio?.id ?? null;
+      mediaMimeType = msg.audio?.mime_type ?? null;
       break;
     case "video":
       body = msg.video?.caption ?? null;
       mediaId = msg.video?.id ?? null;
+      mediaMimeType = msg.video?.mime_type ?? null;
       break;
     case "document":
       body = msg.document?.filename ?? null;
       mediaId = msg.document?.id ?? null;
+      mediaMimeType = msg.document?.mime_type ?? null;
       break;
     case "button":
       body = msg.button?.text ?? null;
@@ -182,6 +187,7 @@ export function normalizeMetaMessage(msg: {
     messageType: msg.type === "button" ? "text" : type,
     body,
     mediaId,
+    mediaMimeType,
     sentAt: msg.timestamp
       ? new Date(Number(msg.timestamp) * 1000).toISOString()
       : new Date().toISOString(),
