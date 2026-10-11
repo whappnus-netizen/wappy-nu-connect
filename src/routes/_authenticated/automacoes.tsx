@@ -116,12 +116,14 @@ function AutomationsPage() {
             kind: step.kind,
             storagePath,
             mimeType: file.type,
-            fileName: file.name,\n            ...(step.kind === "audio" && step.durationMs ? { durationMs: step.durationMs } : {}),
+            fileName: file.name,
+            ...(step.kind === "audio" && step.durationMs ? { durationMs: step.durationMs } : {}),
             ...(step.kind === "image" && step.content.trim() ? { caption: step.content.trim() } : {}),
           });
         }
 
-        const cleanReply = storedSteps.filter((step) => step.kind === "text").map((step) => step.text ?? "").join("\\n").trim();
+        const cleanReply = storedSteps.filter((step) => step.kind === "text").map((step) => step.text ?? "").join("\
+").trim();
         const baseConfig: Record<string, unknown> = triggerType === "keyword_match"
           ? { keyword: cleanKeyword, reply: cleanReply, steps: storedSteps }
           : triggerType === "outside_business_hours"
