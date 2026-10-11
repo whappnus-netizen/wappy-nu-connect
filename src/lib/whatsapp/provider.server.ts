@@ -261,7 +261,7 @@ export const metaProvider: WhatsAppProvider = {
         body: input.body,
       });
     }
-    const to = input.to.replace(/^\\+/, "");
+    const to = input.to.replace(/^\+/, "");
     const mediaPayload: Record<string, unknown> = { link: input.media.url };
     if (input.media.kind === "image" && input.media.caption) mediaPayload["caption"] = input.media.caption;
     const res = await fetch(`${GRAPH}/${input.meta.phoneNumberId}/messages`, {
