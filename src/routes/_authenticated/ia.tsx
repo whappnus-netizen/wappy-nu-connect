@@ -63,6 +63,7 @@ type Agent = {
   handoff_instructions: string | null;
   greeting_message: string | null;
   extra_instructions: string | null;
+  config?: Record<string, unknown> | null;
 };
 
 type Knowledge = {
@@ -84,7 +85,7 @@ type Example = {
 const AGENT_FIELDS = [
   "id, organization_id, name, model, is_active, goal, company_name, company_description",
   "products_services, business_hours, location, payment_methods, faq, tone",
-  "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions",
+  "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions, config",
 ].join(", ");
 
 const CATEGORIES = [
@@ -602,20 +603,38 @@ const CONFIG_FIELDS: {
 function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<Record<string, string>>({});
+  const [features, setFeatures] = useState({
+    imageUnderstanding: true,
+    audioUnderstanding: true,
+    reactionsEnabled: false,
+  });
 
   useEffect(() => {
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
+    const saved = agent.config && typeof agent.config === "object" ? agent.config : {};
+    setFeatures({
+      imageUnderstanding: saved["imageUnderstanding"] !== false,
+      audioUnderstanding: saved["audioUnderstanding"] !== false,
+      reactionsEnabled: saved["reactionsEnabled"] === true,
+    });
   }, [agent.id]);
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, string | null> = {};
+      const payload: Record<string, unknown> = {};
       for (const f of CONFIG_FIELDS) {
+        if (f.key === "config") continue;
         const v = (form[f.key] ?? "").trim();
         payload[f.key] = v.length > 0 ? v : null;
       }
+      payload["config"] = {
+        ...(agent.config ?? {}),
+        imageUnderstanding: features.imageUnderstanding,
+        audioUnderstanding: features.audioUnderstanding,
+        reactionsEnabled: features.reactionsEnabled,
+      };
       if (!payload["name"]) throw new Error("O agente precisa de um nome.");
       const { error } = await supabase
         .from("ai_agents")
@@ -663,6 +682,35 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
           </div>
         ))}
       </div>
+      <section className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5">
+        <div>
+          <h3 className="font-display font-semibold">Capacidades da Mia</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Escolha o que este agente pode compreender e quando pode reagir. As reações ficam desactivadas por defeito para evitar exageros.</p>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Compreender imagens</p>
+              <p className="text-xs text-muted-foreground">Permite analisar fotografias e capturas de ecrã enviadas pelo cliente.</p>
+            </div>
+            <Switch checked={features.imageUnderstanding} onCheckedChange={(v) => setFeatures((current) => ({ ...current, imageUnderstanding: v }))} />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Compreender áudios</p>
+              <p className="text-xs text-muted-foreground">Permite transcrever notas de voz e responder ao seu conteúdo.</p>
+            </div>
+            <Switch checked={features.audioUnderstanding} onCheckedChange={(v) => setFeatures((current) => ({ ...current, audioUnderstanding: v }))} />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Reacções contextuais</p>
+              <p className="text-xs text-muted-foreground">Reage apenas a sinais claros de interesse, agradecimento ou entusiasmo; nunca a todas as mensagens.</p>
+            </div>
+            <Switch checked={features.reactionsEnabled} onCheckedChange={(v) => setFeatures((current) => ({ ...current, reactionsEnabled: v }))} />
+          </div>
+        </div>
+      </section>
       <Button type="submit" disabled={save.isPending}>
         {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Guardar treinamento
