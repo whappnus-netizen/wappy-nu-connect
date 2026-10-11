@@ -365,11 +365,6 @@ export async function processIncomingMessage(
                   } else {
                     currentAssignedTo = chosen.user_id;
                     currentStatus = "open";
-                    await logWhatsAppEvent(number.organization_id, "automation_assigned", {
-                      whatsappNumberId: number.id,
-                      provider: incoming.provider,
-                      detail: { ruleId: assignmentRule.id, assignedTo: chosen.user_id, role: chosen.role },
-                    });
                   }
                 }
               }
