@@ -92,6 +92,8 @@ set agent_id = (
 where e.agent_id is null
   and exists (select 1 from public.ai_agents a where a.organization_id = e.organization_id);
 
+drop function if exists public.ai_agent_context(uuid);
+
 create or replace function public.ai_agent_context(
   _organization_id uuid,
   _whatsapp_number_id uuid default null,
