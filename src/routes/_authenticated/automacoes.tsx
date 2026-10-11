@@ -168,13 +168,20 @@ function AutomationsPage() {
   });
 
   const deleteRule = useMutation({
-    mutationFn: async (ruleId: string) => {
+    mutationFn: async (rule: Rule) => {
       const { error: actionError } = await supabase.from("automation_actions")
-        .delete().eq("rule_id", ruleId).eq("organization_id", orgId!);
+        .delete().eq("rule_id", rule.id).eq("organization_id", orgId!);
       if (actionError) throw new Error(actionError.message);
       const { error: ruleError } = await supabase.from("automation_rules")
-        .delete().eq("id", ruleId).eq("organization_id", orgId!);
+        .delete().eq("id", rule.id).eq("organization_id", orgId!);
       if (ruleError) throw new Error(ruleError.message);
+      const mediaPaths = (rule.config?.steps ?? [])
+        .map((step) => step.storagePath)
+        .filter((path): path is string => Boolean(path && path.startsWith(orgId + "/")));
+      if (mediaPaths.length) {
+        const { error: storageError } = await supabase.storage.from("automation-media").remove(mediaPaths);
+        if (storageError) console.error("Falha ao limpar ficheiros da automação eliminada:", storageError.message);
+      }
     },
     onSuccess: () => { setError(null); void queryClient.invalidateQueries({ queryKey: ["automations", orgId] }); },
     onError: (e: Error) => setError(e.message),
@@ -243,7 +250,7 @@ function AutomationsPage() {
               <article key={rule.id} className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-medium">{rule.name}</h3><Badge variant={rule.is_active ? "default" : "secondary"}>{rule.is_active ? "Activa" : "Pausada"}</Badge></div><div className="mt-1 flex flex-wrap items-center gap-2"><Badge variant="outline">{rule.config?.actionType === "assign_agent" ? triggerLabels.auto_assignment : rule.config?.actionType === "create_deal" ? triggerLabels.auto_crm_lead : triggerLabels[rule.trigger_type as TriggerType] ?? "Tipo não suportado"}</Badge><p className="text-xs text-muted-foreground">{triggerDescription(rule)}</p></div></div>
-                  <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={!canManage || toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={!canManage || deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule.id); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
+                  <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={!canManage || toggleRule.isPending} onClick={() => toggleRule.mutate(rule)}><Power className="mr-1 size-4" />{rule.is_active ? "Pausar" : "Activar"}</Button><Button size="sm" variant="destructive" disabled={!canManage || deleteRule.isPending} onClick={() => { if (window.confirm("Eliminar esta automação?")) deleteRule.mutate(rule); }} aria-label={`Eliminar ${rule.name}`}><Trash2 className="size-4" /></Button></div>
                 </div>
                 {rule.trigger_type === "outside_business_hours" && <p className="text-xs text-muted-foreground"><Clock3 className="mr-1 inline size-3" />Segunda a sexta · {rule.config?.startTime ?? "09:00"}–{rule.config?.endTime ?? "18:00"}</p>}
                 {rule.trigger_type === "conversation_created" && rule.config?.actionType !== "assign_agent" && rule.config?.actionType !== "create_deal" && <p className="text-xs text-muted-foreground"><Handshake className="mr-1 inline size-3" />Executa apenas na primeira mensagem da conversa.</p>}
