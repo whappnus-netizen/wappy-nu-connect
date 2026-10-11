@@ -1,4 +1,5 @@
--- Correct the plan guard so active subscribers can edit their AI and automation settings.
+-- Correct the plan guard so active subscribers can edit their AI and automation settings,
+-- and enforce automation limits when an existing paused rule is activated.
 create or replace function public.whappnus_enforce_plan_limits()
 returns trigger language plpgsql security definer set search_path=public as $$
 declare v_org uuid; v_limits jsonb; v_sub_status text; v_org_status text; v_end timestamptz; v_limit bigint; v_count bigint;
@@ -15,10 +16,14 @@ begin
  if tg_table_name='ai_agents' and tg_op='INSERT' then
    v_limit:=coalesce((v_limits->>'agents')::bigint,0); select count(*) into v_count from public.ai_agents where organization_id=v_org;
    if v_count>=v_limit then raise exception 'PLAN_LIMIT_AGENTS' using errcode='P0001'; end if;
- elsif tg_table_name='automation_rules' and tg_op='INSERT' then
+ elsif tg_table_name='automation_rules' and
+       (tg_op='INSERT' or (tg_op='UPDATE' and coalesce(new.is_active,false) and not coalesce(old.is_active,false))) then
    v_limit:=coalesce((v_limits->>'automations')::bigint,0);
-   if coalesce(new.is_active,false) then select count(*) into v_count from public.automation_rules where organization_id=v_org and is_active=true;
-     if v_count>=v_limit then raise exception 'PLAN_LIMIT_AUTOMATIONS' using errcode='P0001'; end if; end if;
+   if coalesce(new.is_active,false) then
+     select count(*) into v_count from public.automation_rules where organization_id=v_org and is_active=true
+       and (tg_op='INSERT' or id<>new.id);
+     if v_count>=v_limit then raise exception 'PLAN_LIMIT_AUTOMATIONS' using errcode='P0001'; end if;
+   end if;
  elsif tg_table_name='whatsapp_numbers' and tg_op='INSERT' then
    v_limit:=coalesce((v_limits->>'whatsapp_numbers')::bigint,0); select count(*) into v_count from public.whatsapp_numbers where organization_id=v_org and deleted_at is null;
    if v_count>=v_limit then raise exception 'PLAN_LIMIT_WHATSAPP_NUMBERS' using errcode='P0001'; end if;
