@@ -239,8 +239,8 @@ function InboxPage() {
 
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr_300px]">
-        <section className="rounded-xl border border-border bg-card">
+      <div className="grid gap-4 lg:h-[calc(100dvh-11rem)] lg:min-h-[520px] lg:grid-cols-[320px_minmax(0,1fr)_300px] lg:items-stretch">
+        <section className="flex min-h-0 flex-col rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -261,7 +261,7 @@ function InboxPage() {
               ))}
             </div>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {isLoading ? (
               <p className="p-4 text-sm text-muted-foreground">A carregar…</p>
             ) : list.length === 0 ? (
@@ -293,7 +293,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[60vh] flex-col rounded-xl border border-border bg-card">
+        <section className="flex min-h-[60vh] flex-col rounded-xl border border-border bg-card lg:h-full lg:min-h-0">
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -303,7 +303,7 @@ function InboxPage() {
               />
             </div>
           ) : (
-            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
@@ -357,7 +357,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <aside className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <aside className="min-h-0 space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-4">
           <h2 className="font-display text-sm font-semibold">Contacto</h2>
           {active ? (
             <div className="space-y-1 text-sm">
