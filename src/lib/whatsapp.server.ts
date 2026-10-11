@@ -44,6 +44,26 @@ export function serviceClient(): SupabaseClient {
 
 export type OrgRole = "OWNER" | "ADMIN" | "SUPERVISOR" | "AGENT";
 
+/** Blocks new AI/connection setup actions when the organization has no active plan. */
+export async function requireActiveSubscription(organizationId: string): Promise<void> {
+  const admin = serviceClient();
+  const [{ data: organization, error: organizationError }, { data: subscription, error: subscriptionError }] = await Promise.all([
+    admin.from("organizations").select("status").eq("id", organizationId).maybeSingle(),
+    admin.from("organization_subscriptions").select("status,current_period_end")
+      .eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (organizationError || subscriptionError) throw new Error("Não foi possível confirmar o estado da assinatura.");
+  const expiresAt = subscription?.current_period_end ? new Date(subscription.current_period_end).getTime() : null;
+  const allowed = Boolean(
+    organization &&
+    !["suspended", "blocked", "cancelled"].includes(organization.status) &&
+    subscription &&
+    ["active", "trialing"].includes(subscription.status) &&
+    (expiresAt === null || expiresAt > Date.now())
+  );
+  if (!allowed) throw new Error("SUBSCRIPTION_REQUIRED");
+}
+
 /** Valida o bearer token da sessão e confirma o papel do utilizador na organização. */
 export async function requireOrgRole(
   organizationId: string,
