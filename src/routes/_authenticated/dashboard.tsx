@@ -173,6 +173,7 @@ function DashboardPage() {
               <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
               <p className="mt-1 text-sm font-semibold text-primary">{new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(Number(subscription?.amount_aoa ?? plan?.price_aoa ?? 0))} / mês</p>
               <p className="mt-1 text-xs text-muted-foreground">Código do plano: {plan?.code ?? "—"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Permissão nesta organização: {membership.role === "OWNER" ? "Proprietário (OWNER)" : membership.role === "ADMIN" ? "Administrador (ADMIN)" : membership.role === "SUPERVISOR" ? "Supervisor" : "Agente"}</p>
               <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de conversas com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
             </div>
             <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
