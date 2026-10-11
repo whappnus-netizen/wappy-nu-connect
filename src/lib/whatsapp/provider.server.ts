@@ -247,7 +247,7 @@ export const metaProvider: WhatsAppProvider = {
       body: JSON.stringify({
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to: to.replace(/^\\+/, ""),
+        to: to.replace(/^\+/, ""),
         type: "reaction",
         reaction: { message_id: waMessageId, emoji },
       }),
