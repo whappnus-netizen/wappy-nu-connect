@@ -251,7 +251,7 @@ export async function processIncomingMessage(
       const hasActions = (rule: AutomationRow) =>
         getReply(rule).length > 0 || getSteps(rule).some((step) =>
           step.kind === "text" ? Boolean(step.text?.trim()) :
-          (step.kind === "image" || step.kind === "audio") && Boolean(step.storagePath && step.mimeType)
+          ["image", "audio", "video", "document"].includes(step.kind ?? "") && Boolean(step.storagePath && step.mimeType)
         );
       const keywordRule = activeRules
         .filter((rule) => rule.trigger_type === "keyword_match" && hasActions(rule))
@@ -537,7 +537,7 @@ export async function processIncomingMessage(
                 body,
                 isAi: false,
               });
-            } else if ((step.kind === "image" || step.kind === "audio") && step.storagePath && step.mimeType) {
+            } else if (["image", "audio", "video", "document"].includes(step.kind ?? "") && step.storagePath && step.mimeType) {
               await sendOutgoingMessage({
                 organizationId: number.organization_id,
                 whatsappNumberId: number.id,
