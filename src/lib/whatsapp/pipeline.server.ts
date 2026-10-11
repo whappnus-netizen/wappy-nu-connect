@@ -548,7 +548,8 @@ export async function processIncomingMessage(
                   storagePath: step.storagePath,
                   mimeType: step.mimeType,
                   ...(step.caption !== undefined ? { caption: step.caption } : {}),
-                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),\n                  ...(step.durationMs !== undefined ? { durationMs: step.durationMs } : {}),
+                  ...(step.fileName !== undefined ? { fileName: step.fileName } : {}),
+                  ...(step.durationMs !== undefined ? { durationMs: step.durationMs } : {}),
                 },
                 isAi: false,
               });
@@ -736,7 +737,8 @@ export async function sendOutgoingMessage(input: {
       mimeType: input.media.mimeType,
       ...(input.media.caption !== undefined ? { caption: input.media.caption } : {}),
       ...(input.media.fileName !== undefined ? { fileName: input.media.fileName } : {}),
-      storagePath: input.media.storagePath,\n      ...(input.media.durationMs !== undefined ? { durationMs: input.media.durationMs } : {}),
+      storagePath: input.media.storagePath,
+      ...(input.media.durationMs !== undefined ? { durationMs: input.media.durationMs } : {}),
     };
   }
 
