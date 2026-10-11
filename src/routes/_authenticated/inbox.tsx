@@ -154,22 +154,6 @@ function InboxPage() {
   });
 
 
-  const closeConversation = useMutation({
-    mutationFn: async () => {
-      const { error: err } = await supabase
-        .from("conversations")
-        .update({ status: "closed" })
-        .eq("id", selected!)
-        .eq("organization_id", orgId!);
-      if (err) throw new Error(err.message);
-    },
-    onSuccess: () => {
-      setSelected(null);
-      void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] });
-    },
-    onError: (e: Error) => setError(e.message),
-  });
-
   const updateStatus = useMutation({
     mutationFn: async (nextStatus: "open" | "pending" | "in_progress" | "closed") => {
       const { error: err } = await supabase.from("conversations")
@@ -373,15 +357,6 @@ function InboxPage() {
             </Button>
             <Button size="sm" variant="outline" className="w-full justify-start" disabled>
               <ArrowRightLeft className="size-4" /> Transferir
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full justify-start"
-              disabled={!active || closeConversation.isPending}
-              onClick={() => closeConversation.mutate()}
-            >
-              <CheckCircle2 className="size-4" /> Encerrar
             </Button>
           </div>
         </aside>
