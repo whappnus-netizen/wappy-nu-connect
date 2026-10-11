@@ -151,19 +151,18 @@ export async function processIncomingMessage(
     contactId: res.contact_id,
   };
 
-  // Regras explícitas de palavra-chave são executadas antes da IA.
-  // Quando uma regra responde, não chamamos os modelos para a mesma mensagem,
-  // evitando que a automação e a IA enviem duas respostas.
+  // Automações activas são avaliadas antes da IA para evitar respostas duplicadas.
+  // A ordem é intencional: palavra-chave específica, fora de horário, boas-vindas.
   const inboundText = (incoming.body ?? "").trim().toLocaleLowerCase();
-  if (inboundText && res.conversation_id && !res.assigned_to) {
+  if (res.conversation_id && !res.assigned_to) {
     const { data: rules, error: rulesError } = await admin
       .from("automation_rules")
-      .select("id, name, config")
+      .select("id, name, trigger_type, config")
       .eq("organization_id", number.organization_id)
-      .eq("trigger_type", "keyword_match")
+      .in("trigger_type", ["keyword_match", "outside_business_hours", "conversation_created"])
       .eq("is_active", true)
       .order("created_at", { ascending: true })
-      .limit(50);
+      .limit(100);
 
     if (rulesError) {
       await logWhatsAppEvent(number.organization_id, "error", {
@@ -172,36 +171,151 @@ export async function processIncomingMessage(
         detail: { stage: "automation_lookup", error: rulesError.message.slice(0, 200) },
       });
     } else {
-      const matchingRule = (rules ?? []).find((rule) => {
-        const config = (rule as { config?: { keyword?: unknown; reply?: unknown } }).config;
-        const keyword = typeof config?.keyword === "string" ? config.keyword.trim().toLocaleLowerCase() : "";
-        const reply = typeof config?.reply === "string" ? config.reply.trim() : "";
-        return keyword.length >= 2 && reply.length > 0 && inboundText.includes(keyword);
-      }) as { id: string; name: string; config: { keyword: string; reply: string } } | undefined;
+      type AutomationRow = { id: string; name: string; trigger_type: string; config: Record<string, unknown> | null };
+      const activeRules = (rules ?? []) as AutomationRow[];
+      const getReply = (rule: AutomationRow) => {
+        const value = rule.config?.["reply"];
+        return typeof value === "string" ? value.trim() : "";
+      };
+      const keywordRule = activeRules
+        .filter((rule) => rule.trigger_type === "keyword_match" && getReply(rule).length > 0)
+        .sort((a, b) => {
+          const aValue = a.config?.["keyword"];
+          const bValue = b.config?.["keyword"];
+          const aKeyword = typeof aValue === "string" ? aValue.trim() : "";
+          const bKeyword = typeof bValue === "string" ? bValue.trim() : "";
+          return bKeyword.length - aKeyword.length;
+        })
+        .find((rule) => {
+          const value = rule.config?.["keyword"];
+          const keyword = typeof value === "string" ? value.trim().toLocaleLowerCase() : "";
+          return keyword.length >= 2 && inboundText.includes(keyword);
+        });
 
-      if (matchingRule) {
+      let selectedRule: AutomationRow | undefined = keywordRule;
+      let selectedReason = "keyword_automation";
+
+      // Conta as mensagens recebidas para identificar a primeira mensagem da conversa.
+      const { count: inboundCount, error: inboundCountError } = await admin
+        .from("messages").select("id", { count: "exact", head: true })
+        .eq("organization_id", number.organization_id)
+        .eq("conversation_id", res.conversation_id)
+        .eq("direction", "inbound");
+      if (inboundCountError) {
+        await logWhatsAppEvent(number.organization_id, "error", {
+          whatsappNumberId: number.id,
+          provider: incoming.provider,
+          detail: { stage: "automation_inbound_count", error: inboundCountError.message.slice(0, 200) },
+        });
+      }
+      const isFirstInbound = !inboundCountError && inboundCount === 1;
+
+      // Fora de horário usa o fuso horário persistido na organização.
+      if (!selectedRule) {
+        const outsideRules = activeRules.filter((rule) => rule.trigger_type === "outside_business_hours" && getReply(rule).length > 0);
+        if (outsideRules.length > 0) {
+          const { data: org } = await admin.from("organizations").select("timezone").eq("id", number.organization_id).maybeSingle();
+          const timezone = typeof org?.timezone === "string" && org.timezone ? org.timezone : "Africa/Luanda";
+          const messageDate = incoming.sentAt ? new Date(incoming.sentAt) : new Date();
+          const safeDate = Number.isNaN(messageDate.getTime()) ? new Date() : messageDate;
+
+          const getLocalClock = (date: Date, zone: string) => {
+            const parts = new Intl.DateTimeFormat("en-US", {
+              timeZone: zone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+            }).formatToParts(date);
+            const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+            const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+            return {
+              day: weekdayMap[values["weekday"] ?? ""] ?? 0,
+              minutes: Number(values["hour"] ?? "0") * 60 + Number(values["minute"] ?? "0"),
+            };
+          };
+
+          for (const rule of outsideRules) {
+            const rawStart = rule.config?.["startTime"];
+            const rawEnd = rule.config?.["endTime"];
+            const startText = typeof rawStart === "string" ? rawStart : "09:00";
+            const endText = typeof rawEnd === "string" ? rawEnd : "18:00";
+            const startParts = startText.split(":").map(Number);
+            const endParts = endText.split(":").map(Number);
+            if (startParts.length !== 2 || endParts.length !== 2 || startParts.some(Number.isNaN) || endParts.some(Number.isNaN)) continue;
+            const startHour = startParts[0], startMinute = startParts[1];
+            const endHour = endParts[0], endMinute = endParts[1];
+            if (startHour === undefined || startMinute === undefined || endHour === undefined || endMinute === undefined) continue;
+            const startMinutes = startHour * 60 + startMinute;
+            const endMinutes = endHour * 60 + endMinute;
+            if (startMinutes === endMinutes) continue;
+            const rawDays = rule.config?.["days"];
+            const configuredDays = Array.isArray(rawDays)
+              ? rawDays.filter((day): day is number => typeof day === "number" && day >= 0 && day <= 6)
+              : [1, 2, 3, 4, 5];
+            let localClock: { day: number; minutes: number };
+            try { localClock = getLocalClock(safeDate, timezone); }
+            catch { localClock = getLocalClock(safeDate, "Africa/Luanda"); }
+            const withinHours = startMinutes < endMinutes
+              ? configuredDays.includes(localClock.day) && localClock.minutes >= startMinutes && localClock.minutes < endMinutes
+              : configuredDays.includes(localClock.day) && localClock.minutes >= startMinutes
+                || configuredDays.includes((localClock.day + 6) % 7) && localClock.minutes < endMinutes;
+            if (withinHours) continue;
+
+            const reply = getReply(rule);
+            const cooldownSince = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+            const { data: priorReply, error: priorReplyError } = await admin
+              .from("messages").select("id").eq("organization_id", number.organization_id)
+              .eq("conversation_id", res.conversation_id).eq("direction", "outbound")
+              .eq("body", reply).gte("created_at", cooldownSince).limit(1).maybeSingle();
+            if (priorReplyError) {
+              await logWhatsAppEvent(number.organization_id, "error", {
+                whatsappNumberId: number.id,
+                provider: incoming.provider,
+                detail: { stage: "automation_cooldown", error: priorReplyError.message.slice(0, 200) },
+              });
+              selectedReason = "outside_hours_check_failed";
+              break;
+            }
+            if (priorReply) {
+              return { ...base, aiReplied: false, aiSkippedReason: "outside_hours_already_replied" };
+            }
+            selectedRule = rule;
+            selectedReason = "outside_hours_automation";
+            break;
+          }
+        }
+      }
+
+      // Boas-vindas só na primeira mensagem recebida da conversa.
+      if (!selectedRule && isFirstInbound) {
+        selectedRule = activeRules.find((rule) => rule.trigger_type === "conversation_created" && getReply(rule).length > 0);
+        if (selectedRule) selectedReason = "welcome_automation";
+      }
+
+      if (selectedRule) {
+        const reply = getReply(selectedRule);
         try {
           await sendOutgoingMessage({
             organizationId: number.organization_id,
             whatsappNumberId: number.id,
             conversationId: res.conversation_id,
-            body: matchingRule.config.reply,
+            body: reply,
             isAi: false,
           });
           await logWhatsAppEvent(number.organization_id, "message_sent", {
             whatsappNumberId: number.id,
             provider: incoming.provider,
-            detail: { automationRuleId: matchingRule.id, automation: true },
+            detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type },
           });
-          return { ...base, aiReplied: false, aiSkippedReason: "keyword_automation" };
+          if (selectedReason !== "welcome_automation") {
+            return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
+          }
+          // A saudação não deve impedir a IA de responder à pergunta da primeira mensagem.
         } catch (e) {
           await logWhatsAppEvent(number.organization_id, "message_failed", {
             whatsappNumberId: number.id,
             provider: incoming.provider,
-            detail: { stage: "keyword_automation", ruleId: matchingRule.id, error: (e as Error).message.slice(0, 200) },
+            detail: { stage: selectedReason, ruleId: selectedRule.id, error: (e as Error).message.slice(0, 200) },
           });
-          // Não chamar a IA depois de uma falha ambígua de envio: evita respostas duplicadas.
-          return { ...base, aiReplied: false, aiSkippedReason: "keyword_automation_failed" };
+          // Não chamar a IA depois de uma falha ambígua de envio: evita duplicação.
+          return { ...base, aiReplied: false, aiSkippedReason: "automation_send_failed" };
         }
       }
     }
