@@ -79,6 +79,10 @@ function AutomationsPage() {
     },
   });
 
+  const rules = rulesQuery.data ?? [];
+  const automationLimit = Number(subscription.limits.automations ?? 0);
+  const automationLimitReached = automationLimit > 0 && rules.length >= automationLimit;
+
   const createRule = useMutation({
     mutationFn: async () => {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
@@ -232,9 +236,6 @@ function AutomationsPage() {
     onError: (e: Error) => setError(e.message),
   });
 
-  const rules = rulesQuery.data ?? [];
-  const automationLimit = Number(subscription.limits.automations ?? 0);
-  const automationLimitReached = automationLimit > 0 && rules.length >= automationLimit;
 
   return (
     <AppShell title="Automações" description="Respostas automáticas para mensagens recebidas no WhatsApp ligado por QR ou pela API oficial.">
