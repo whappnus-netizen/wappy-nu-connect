@@ -13,6 +13,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: corsHeaders });
 const fail = (message: string, status = 400) => json({ ok: false, error: message }, status);
 const str = (value: unknown, max = 200) => typeof value === "string" ? value.trim().slice(0, max) : "";
+// Long-form training text is stored without an application-level character cap.
+const longText = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -334,9 +336,9 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "group.ai.save") {
-      const systemPrompt = str(input.system_prompt, 12000);
-      const publicRules = str(input.public_group_rules, 8000);
-      const privateRules = str(input.private_dm_rules, 8000);
+      const systemPrompt = longText(input.system_prompt);
+      const publicRules = longText(input.public_group_rules);
+      const privateRules = longText(input.private_dm_rules);
       const isActive = input.is_active === true;
       if (isActive && systemPrompt.trim().length < 20) return fail("Para activar a IA do funil, escreve primeiro uma instrução de treino com pelo menos 20 caracteres.");
       const { data, error } = await db.from("superadmin_group_ai_settings").upsert({
