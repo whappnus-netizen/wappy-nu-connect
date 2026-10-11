@@ -144,6 +144,9 @@ export async function processIncomingMessage(
     };
   }
 
+  if (!res.conversation_id) {
+    return { ok: true, duplicate: false, contactId: res.contact_id, aiReplied: false, aiSkippedReason: "no_conversation" };
+  }
   const base = {
     ok: true,
     duplicate: false,
@@ -151,10 +154,26 @@ export async function processIncomingMessage(
     contactId: res.contact_id,
   };
 
+  const { data: conversationStateData, error: conversationStateError } = await admin
+    .from("conversations").select("status, assigned_to, ai_enabled")
+    .eq("id", res.conversation_id).eq("organization_id", number.organization_id).maybeSingle();
+  if (conversationStateError || !conversationStateData) {
+    await logWhatsAppEvent(number.organization_id, "error", {
+      whatsappNumberId: number.id,
+      provider: incoming.provider,
+      detail: { stage: "conversation_state", error: conversationStateError?.message?.slice(0, 200) ?? "Conversation state not found" },
+    });
+    return { ...base, aiReplied: false, aiSkippedReason: "conversation_state_unavailable" };
+  }
+  const conversationState = conversationStateData as { status: string; assigned_to: string | null; ai_enabled: boolean };
+  const currentStatus = conversationState.status;
+  const currentAssignedTo = conversationState.assigned_to;
+  const currentAiEnabled = Boolean(conversationState.ai_enabled);
+
   // Automações activas são avaliadas antes da IA para evitar respostas duplicadas.
   // A ordem é intencional: palavra-chave específica, fora de horário, boas-vindas.
   const inboundText = (incoming.body ?? "").trim().toLocaleLowerCase();
-  if (res.conversation_id && !res.assigned_to) {
+  if (currentStatus === "open" && !currentAssignedTo) {
     const { data: rules, error: rulesError } = await admin
       .from("automation_rules")
       .select("id, name, trigger_type, config")
@@ -323,15 +342,17 @@ export async function processIncomingMessage(
 
   // 12 + 13. IA automática só quando ligada na organização E na conversa,
   // e nunca quando um atendente humano assumiu a conversa.
-  const skip = !res.auto_reply
-    ? "auto_reply_off"
-    : !res.ai_enabled
-      ? "conversation_ai_off"
-      : res.assigned_to
-        ? "human_agent"
-        : null;
+  const skip = currentAssignedTo
+    ? "human_agent"
+    : currentStatus !== "open"
+      ? "conversation_not_open"
+      : !res.auto_reply
+        ? "auto_reply_off"
+        : !currentAiEnabled
+          ? "conversation_ai_off"
+          : null;
 
-  if (skip || !res.conversation_id) {
+  if (skip) {
     if (skip) {
       await logWhatsAppEvent(number.organization_id, "ai_skipped", {
         whatsappNumberId: number.id,
@@ -339,7 +360,7 @@ export async function processIncomingMessage(
         detail: { reason: skip },
       });
     }
-    return { ...base, aiReplied: false, aiSkippedReason: skip ?? "no_conversation" };
+    return { ...base, aiReplied: false, aiSkippedReason: skip };
   }
 
   // 14. Limite de frequência: no máximo 6 respostas automáticas por minuto
