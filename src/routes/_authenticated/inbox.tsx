@@ -239,7 +239,7 @@ function InboxPage() {
 
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr_300px]">
+      <div className="grid gap-4 lg:h-[calc(100dvh-12rem)] lg:min-h-[560px] lg:grid-cols-[320px_minmax(0,1fr)_300px]">
         <section className="rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
@@ -293,7 +293,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[60vh] flex-col rounded-xl border border-border bg-card">
+        <section className="flex h-[72vh] min-h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-card lg:h-full lg:min-h-0">
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -303,7 +303,7 @@ function InboxPage() {
               />
             </div>
           ) : (
-            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
