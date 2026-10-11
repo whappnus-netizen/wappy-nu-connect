@@ -124,8 +124,7 @@ function AutomationsPage() {
           });
         }
 
-        const cleanReply = storedSteps.filter((step) => step.kind === "text").map((step) => step.text ?? "").join("\
-").trim();
+        const cleanReply = storedSteps.filter((step) => step.kind === "text").map((step) => step.text ?? "").join("\n").trim();
         const baseConfig: Record<string, unknown> = triggerType === "keyword_match"
           ? { keyword: cleanKeyword, reply: cleanReply, steps: storedSteps }
           : triggerType === "outside_business_hours"
