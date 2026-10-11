@@ -280,7 +280,7 @@ function InboxPage() {
 
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
-      <div className="grid gap-4 overflow-hidden lg:h-[calc(100dvh-9rem)] lg:min-h-[560px] lg:grid-cols-[300px_minmax(0,1fr)_280px]">
+      <div className="grid h-[calc(100dvh-8rem)] min-h-[480px] grid-rows-[minmax(170px,35%)_minmax(0,1fr)] gap-3 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)_280px] lg:grid-rows-1 lg:gap-4">
         <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
@@ -402,7 +402,7 @@ function InboxPage() {
           </div>
         </section>
 
-        <aside className="space-y-4 rounded-xl border border-border bg-card p-4">
+        <aside className="hidden space-y-4 rounded-xl border border-border bg-card p-4 lg:block">
           <h2 className="font-display text-sm font-semibold">Contacto</h2>
           {active ? (
             <div className="space-y-1 text-sm">
