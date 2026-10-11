@@ -66,6 +66,7 @@ Deno.serve(async (req: Request) => {
   if (!action) return fail("Ação não especificada.");
   if (!can(action)) return fail("Não tens permissão para esta operação.", 403);
   if (action === "team.save" && admin.role !== "owner") return fail("Só o proprietário da plataforma pode alterar administradores.", 403);
+  if (action === "subscriptions.reactivate" && !["owner", "admin"].includes(admin.role)) return fail("Só o proprietário ou administrador da plataforma pode reativar assinaturas.", 403);
 
   const audit = async (name: string, targetType: string, targetId: string | null, organizationId: string | null, details: Record<string, unknown> = {}) => {
     const { error } = await db.from("superadmin_audit_logs").insert({
@@ -218,6 +219,60 @@ Deno.serve(async (req: Request) => {
         .order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
       return json({ ok: true, data: data ?? [] });
+    }
+
+    if (action === "subscriptions.reactivate") {
+      const subscriptionId = str(input.subscription_id, 60);
+      const planId = str(input.plan_id, 60);
+      const periodDays = Number(input.period_days ?? 30);
+      if (!subscriptionId || !planId || !Number.isInteger(periodDays) || periodDays < 1 || periodDays > 365) {
+        return fail("Assinatura, plano ou período de reativação inválido.");
+      }
+      const { data: before, error: beforeError } = await db.from("organization_subscriptions")
+        .select("id,organization_id,status,metadata").eq("id", subscriptionId).maybeSingle();
+      if (beforeError) throw beforeError;
+      if (!before) return fail("Assinatura não encontrada.", 404);
+      const { data: plan, error: planError } = await db.from("subscription_plans")
+        .select("id,code,name,billing_interval,price_aoa,limits,is_active")
+        .eq("id", planId).maybeSingle();
+      if (planError) throw planError;
+      if (!plan || !plan.is_active || Number(plan.price_aoa) <= 0) {
+        return fail("Escolhe um plano pago activo. Confirma o pagamento antes de reactivar a conta.");
+      }
+      const startsAt = new Date();
+      const endsAt = new Date(startsAt.getTime() + periodDays * 24 * 60 * 60 * 1000);
+      const { data, error } = await db.from("organization_subscriptions").update({
+        plan_id: plan.id,
+        status: "active",
+        billing_interval: plan.billing_interval,
+        amount_aoa: Number(plan.price_aoa),
+        currency: "AOA",
+        starts_at: startsAt.toISOString(),
+        current_period_start: startsAt.toISOString(),
+        current_period_end: endsAt.toISOString(),
+        cancel_at_period_end: false,
+        cancelled_at: null,
+        provider: "manual",
+        metadata: { ...(before.metadata ?? {}), source: "superadmin_manual_activation", activated_by: actor.id, period_days: periodDays },
+        updated_at: startsAt.toISOString(),
+      }).eq("id", subscriptionId).select("id,organization_id,plan_id,status,current_period_start,current_period_end,amount_aoa").single();
+      if (error) throw error;
+      const conversationLimit = Number((plan.limits as Record<string, unknown> | null)?.["ai_conversations_monthly"] ?? 0);
+      const { error: creditError } = await db.from("ai_credit_accounts").upsert({
+        organization_id: before.organization_id,
+        balance: conversationLimit,
+        monthly_limit: conversationLimit,
+        updated_at: startsAt.toISOString(),
+      }, { onConflict: "organization_id" });
+      if (creditError) throw creditError;
+      const { error: organizationError } = await db.from("organizations").update({
+        status: "active", suspended_at: null, suspension_reason: null, updated_at: startsAt.toISOString(),
+      }).eq("id", before.organization_id);
+      if (organizationError) throw organizationError;
+      await audit("subscription.manually_reactivated", "subscription", subscriptionId, before.organization_id, {
+        plan_id: plan.id, plan_code: plan.code, period_days: periodDays, amount_aoa: Number(plan.price_aoa),
+      });
+      return json({ ok: true, data: { ...data, plan_name: plan.name } });
     }
 
     if (action === "payments.list") {
