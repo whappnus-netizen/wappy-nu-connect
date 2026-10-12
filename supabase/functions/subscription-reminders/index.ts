@@ -29,7 +29,7 @@ Deno.serve(async (req: Request) => {
   const engineUrl = "https://whappnus-whatsapp-engine-production.up.railway.app";
 
   const now = new Date();
-  const lower = new Date(now.getTime() + 72 * hour).toISOString();
+  const lower = new Date(now.getTime() + 48 * hour).toISOString();
   const upper = new Date(now.getTime() + 96 * hour).toISOString();
   const result = { scanned: 0, whatsapp_sent: 0, queued_or_failed: 0, expired_notices: 0, skipped_duplicates: 0, errors: [] as string[] };
 
@@ -53,11 +53,18 @@ Deno.serve(async (req: Request) => {
     const org = orgResult.data;
     const endDate = new Date(sub.current_period_end).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" });
     const planName = (sub.subscription_plans as any)?.name ?? "WhappNus";
-    const templateIndex = (now.getUTCDate() + org.name.length) % templates.length;
+    const hoursRemaining = (new Date(sub.current_period_end).getTime() - now.getTime()) / hour;
+    const reminderDays = hoursRemaining <= 72 ? 3 : 4;
+    if (reminderDays === 3) {
+      const { data: dayFour } = await db.from("subscription_reminder_logs").select("status")
+        .eq("subscription_id", sub.id).eq("reminder_days", 4).maybeSingle();
+      if (dayFour?.status === "sent") { result.skipped_duplicates += 1; continue; }
+    }
+    const templateIndex = (now.getUTCDate() + org.name.length + reminderDays) % templates.length;
     const message = templates[templateIndex](org.name, planName, endDate);
 
     const { data: inserted, error: logError } = await db.from("subscription_reminder_logs").upsert({
-      organization_id: org.id, subscription_id: sub.id, reminder_days: 4, status: "queued",
+      organization_id: org.id, subscription_id: sub.id, reminder_days: reminderDays, status: "queued",
       message, updated_at: now.toISOString(),
     }, { onConflict: "subscription_id,reminder_days", ignoreDuplicates: true }).select("id").maybeSingle();
     if (logError) { result.errors.push(`Registo de aviso ${sub.id}: ${logError.message}`); continue; }
@@ -78,7 +85,7 @@ Deno.serve(async (req: Request) => {
     if (!recipientPhone || !session?.whatsapp_number_id) {
       const reason = !recipientPhone ? "Falta o WhatsApp de contacto do proprietário." : "Não existe sessão WhatsApp ligada para esta organização.";
       await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone || null, whatsapp_number_id: session?.whatsapp_number_id ?? null, error_message: reason, updated_at: new Date().toISOString() }).eq("id", inserted.id);
-      await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: 4 } });
+      await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays } });
       result.queued_or_failed += 1;
       continue;
     }
@@ -94,12 +101,12 @@ Deno.serve(async (req: Request) => {
       const responseBody = await response.json().catch(() => ({}));
       if (!response.ok || responseBody?.ok !== true) throw new Error(`WhatsApp Engine HTTP ${response.status}: ${String(responseBody?.error ?? "envio não confirmado").slice(0, 240)}`);
       await db.from("subscription_reminder_logs").update({ status: "sent", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }).eq("id", inserted.id);
-      await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: 4, whatsapp_sent: true } });
+      await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: true } });
       result.whatsapp_sent += 1;
     } catch (error) {
       const messageError = error instanceof Error ? error.message : String(error);
       await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, error_message: messageError.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", inserted.id);
-      await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: 4, whatsapp_sent: false } });
+      await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: false } });
       result.queued_or_failed += 1;
       result.errors.push(`${org.name}: ${messageError}`);
     }
@@ -115,7 +122,7 @@ Deno.serve(async (req: Request) => {
     if (!orgResult.data) continue;
     const message = `A assinatura da organização ${orgResult.data.name} expirou. Os dados continuam guardados, mas os recursos sujeitos ao plano podem ficar limitados. Renove a assinatura para voltar a utilizar os recursos contratados.`;
     const { data: inserted } = await db.from("subscription_reminder_logs").upsert({
-      organization_id: sub.organization_id, subscription_id: sub.id, reminder_days: 3,
+      organization_id: sub.organization_id, subscription_id: sub.id, reminder_days: 0,
       status: "skipped", message, error_message: "Aviso de expiração publicado apenas no centro de notificações.",
       updated_at: now.toISOString(),
     }, { onConflict: "subscription_id,reminder_days", ignoreDuplicates: true }).select("id").maybeSingle();
