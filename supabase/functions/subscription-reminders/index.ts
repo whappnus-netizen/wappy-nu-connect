@@ -27,8 +27,7 @@ Deno.serve(async (req: Request) => {
   if (!suppliedSecret || suppliedHash !== reminderConfig.secret_hash) return json({ ok: false, error: "Não autorizado." }, 401);
 
   const engineUrl = "https://whappnus-whatsapp-engine-production.up.railway.app";
-  const bridgeSecret = Deno.env.get("WHATSAPP_BRIDGE_SECRET") ?? "";
-  if (!bridgeSecret) return json({ ok: false, error: "Falta o segredo WHATSAPP_BRIDGE_SECRET nas variáveis da função." }, 500);
+
   const now = new Date();
   const lower = new Date(now.getTime() + 72 * hour).toISOString();
   const upper = new Date(now.getTime() + 96 * hour).toISOString();
@@ -86,10 +85,10 @@ Deno.serve(async (req: Request) => {
 
     try {
       const sessionId = `${org.id}:${session.whatsapp_number_id}`;
-      const response = await fetch(`${engineUrl}/sessions/${encodeURIComponent(sessionId)}/messages`, {
+      const response = await fetch(`${engineUrl}/internal/subscription-reminder`, {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${bridgeSecret}` },
-        body: JSON.stringify({ to: recipientPhone, body: message }),
+        headers: { "content-type": "application/json", authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ sessionId, to: recipientPhone, body: message }),
         signal: AbortSignal.timeout(20000),
       });
       const responseBody = await response.json().catch(() => ({}));
