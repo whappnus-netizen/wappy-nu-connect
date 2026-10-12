@@ -21,6 +21,7 @@ Deno.serve(async(req:Request)=>{
  if(!url||!anon||!service)return reply({ok:false,error:"Configuração do servidor incompleta."},500);
  const db=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
  const sig=req.headers.get("X-Webhook-Signature");
+ if(sig===null)return reply({ok:false,error:"Assinatura obrigatória."},401);
  if(sig!==null){
   const secret=Deno.env.get("KURSINHA_WEBHOOK_SECRET");if(!secret)return reply({ok:false,error:"Webhook não configurado no servidor."},503);
   const raw=await req.text();if(!(await signatureOK(raw,sig,secret)))return reply({ok:false,error:"Assinatura inválida."},401);
@@ -56,7 +57,7 @@ Deno.serve(async(req:Request)=>{
       const ids=[...new Set((ms.data??[]).map((x:any)=>x.organization_id))];
       if(ids.length===1&&(!prev?.organization_id||prev.organization_id===ids[0])){
        if(!prev?.organization_id){const link=await db.from("kursinha_sales").update({organization_id:ids[0],updated_at:now}).eq("sale_id",saleId).is("organization_id",null);if(link.error)throw link.error;}
-       const applied=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:saleId});if(applied.error)throw applied.error;
+       const applied=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:saleId});if(applied.error)throw applied.error;if(!(applied.data?.applied||applied.data?.already_applied)){throw new Error("Ativação não confirmada: "+String(applied.data?.reason??"UNKNOWN"));}
       }
      }
     }
