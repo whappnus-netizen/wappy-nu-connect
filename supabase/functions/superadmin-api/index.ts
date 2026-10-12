@@ -304,6 +304,32 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: enriched });
     }
 
+    if (action === "reminders.list") {
+      const cutoff = new Date(Date.now() + 7 * 86400000).toISOString();
+      const { data, error } = await db.from("organization_subscriptions")
+        .select("id,organization_id,plan_id,status,starts_at,current_period_start,current_period_end,amount_aoa,organizations(id,name,slug,contact_phone),subscription_plans(name,code,limits)")
+        .lte("current_period_end", cutoff)
+        .order("current_period_end", { ascending: true }).limit(300);
+      if (error) throw error;
+      const rows = data ?? [];
+      const ids = rows.map((row: any) => row.id);
+      const [logs, sessions] = await Promise.all([
+        ids.length ? db.from("subscription_reminder_logs").select("id,subscription_id,reminder_days,status,recipient_phone,whatsapp_number_id,error_message,sent_at,created_at").in("subscription_id", ids) : { data: [], error: null },
+        rows.length ? db.from("whatsapp_sessions").select("organization_id,whatsapp_number_id,status,phone_number,display_name").in("organization_id", [...new Set(rows.map((row: any) => row.organization_id))]).eq("status", "connected") : { data: [], error: null },
+      ]);
+      if (logs.error) throw logs.error; if (sessions.error) throw sessions.error;
+      const logsBySubscription = new Map((logs.data ?? []).map((row: any) => [row.subscription_id, row]));
+      const sessionsByOrg = new Map((sessions.data ?? []).map((row: any) => [row.organization_id, row]));
+      return json({ ok: true, data: rows.map((row: any) => {
+        const end = row.current_period_end ? new Date(row.current_period_end).getTime() : null;
+        const reminder = logsBySubscription.get(row.id);
+        return { ...row, days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
+          reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,
+          reminder_sent_at: reminder?.sent_at ?? null, reminder_error: reminder?.error_message ?? null,
+          whatsapp_session: sessionsByOrg.get(row.organization_id) ?? null };
+      }) });
+    }
+
     if (action === "notifications.list") {
       const { data, error } = await db.from("organization_notifications")
         .select("id,organization_id,title,body,notification_type,created_at,organizations(name,slug)")
