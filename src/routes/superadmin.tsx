@@ -108,6 +108,33 @@ const statusVariant = (status: string): "default" | "secondary" | "destructive" 
   ["trial", "trialing", "setup", "pending", "processing"].includes(status) ? "secondary" : "outline";
 const money = (value: number | string) => new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(Number(value) || 0);
 const date = (value?: string | null) => value ? new Intl.DateTimeFormat("pt-AO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—";
+function auditDetails(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "Sem detalhes adicionais";
+  const labels: Record<string, string> = {
+    code: "Código", name: "Nome", title: "Título", reason: "Motivo", from: "Antes",
+    to: "Depois", active: "Activo", is_active: "Activo", is_enabled: "Ligado",
+    role: "Função", status: "Estado", price_aoa: "Preço", recipient_count: "Destinatários",
+    broadcast: "Envio geral", batch_size: "Organizações", queued: "Tarefas na fila",
+    period_days: "Duração", billing_interval: "Periodicidade", asset_type: "Tipo de ficheiro",
+    file_size: "Tamanho do ficheiro", group_jid: "Identificador do grupo", flow_id: "Funil",
+    organization_ids: "Organizações destinatárias", owner_assigned: "Proprietário associado",
+    whatsapp_sent: "Aviso WhatsApp enviado", reminder_days: "Dias antes do fim",
+  };
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return "Sem detalhes adicionais";
+  return entries.map(([key, raw]) => {
+    let rendered: string;
+    if (key === "organization_ids" && Array.isArray(raw)) rendered = raw.length + " organização(ões)";
+    else if (typeof raw === "boolean") rendered = raw ? "Sim" : "Não";
+    else if (raw === null || raw === undefined || raw === "") rendered = "—";
+    else if (Array.isArray(raw)) rendered = raw.length + " item(ns)";
+    else if (typeof raw === "string" && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(raw)) rendered = "ID " + raw.slice(0, 8);
+    else if (key === "price_aoa") rendered = money(String(raw));
+    else if (key === "file_size" && Number.isFinite(Number(raw))) rendered = (Number(raw) / (1024 * 1024)).toFixed(2) + " MB";
+    else rendered = String(raw);
+    return (labels[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())) + ": " + rendered;
+  }).join(" · ");
+}
 const slugify = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 function SuperAdminPage() {
@@ -436,7 +463,7 @@ function SuperAdminPage() {
               <Card className="border-white/10 bg-[#0b1912] text-slate-100 shadow-none"><CardHeader><CardTitle className="text-base">Fila de disparos</CardTitle><CardDescription className="text-slate-500">A fila de envio é processada pelo worker do motor WhatsApp no Railway. Confirma o estado e o erro de cada tarefa nesta tabela.</CardDescription></CardHeader><CardContent>{(groupCommander.data?.jobs ?? []).length === 0 ? <Empty text="Ainda não há disparos agendados." /> : <Table><TableHeader><TableRow className="border-white/10"><TableHead>Data</TableHead><TableHead>Estado</TableHead><TableHead>Tentativas / erro</TableHead></TableRow></TableHeader><TableBody>{(groupCommander.data?.jobs ?? []).map((job: any) => <TableRow key={job.id} className="border-white/[0.06]"><TableCell>{date(job.due_at)}</TableCell><TableCell><Badge variant={job.status === "sent" ? "default" : "secondary"}>{job.status}</Badge></TableCell><TableCell className="text-xs text-slate-500">{job.attempts} · {job.last_error || "—"}</TableCell></TableRow>)}</TableBody></Table>}</CardContent></Card>
             </>}
           </section>}
-          {tab === "audit" && <section><SectionIntro title="Registo de auditoria" description="Histórico de ações privilegiadas para rastreabilidade e investigação." />{audit.isLoading ? <Loading /> : audit.error ? <ErrorText error={audit.error as Error} /> : <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1912]"><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Data</TableHead><TableHead className="text-slate-500">Ação</TableHead><TableHead className="text-slate-500">Alvo</TableHead><TableHead className="text-slate-500">Organização</TableHead><TableHead className="text-slate-500">Detalhes</TableHead></TableRow></TableHeader><TableBody>{(audit.data ?? []).map((entry:any)=><TableRow key={entry.id} className="border-white/[0.06]"><TableCell className="whitespace-nowrap text-xs text-slate-400">{date(entry.created_at)}</TableCell><TableCell><div className="font-medium">{entry.action_label ?? entry.action}</div><div className="text-xs text-slate-500">{entry.actor_name ?? entry.actor_user_id ?? "Sistema"}{entry.actor_email ? " · " + entry.actor_email : ""}</div></TableCell><TableCell>{entry.target_label ?? entry.target_type}<div className="text-xs text-slate-500">{entry.target_id ?? "—"}</div></TableCell><TableCell className="text-xs text-slate-400">{entry.organization_name ?? "Plataforma"}</TableCell><TableCell className="max-w-72 truncate text-xs text-slate-400">{JSON.stringify(entry.details ?? {})}</TableCell></TableRow>)}</TableBody></Table></div>}</section>}
+          {tab === "audit" && <section><SectionIntro title="Registo de auditoria" description="Histórico de ações privilegiadas para rastreabilidade e investigação." />{audit.isLoading ? <Loading /> : audit.error ? <ErrorText error={audit.error as Error} /> : <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0b1912]"><Table><TableHeader><TableRow className="border-white/10 hover:bg-transparent"><TableHead className="text-slate-500">Data</TableHead><TableHead className="text-slate-500">Ação</TableHead><TableHead className="text-slate-500">Alvo</TableHead><TableHead className="text-slate-500">Organização</TableHead><TableHead className="text-slate-500">Detalhes</TableHead></TableRow></TableHeader><TableBody>{(audit.data ?? []).map((entry:any)=><TableRow key={entry.id} className="border-white/[0.06]"><TableCell className="whitespace-nowrap text-xs text-slate-400">{date(entry.created_at)}</TableCell><TableCell><div className="font-medium">{entry.action_label ?? entry.action}</div><div className="text-xs text-slate-500">{entry.actor_name ?? entry.actor_user_id ?? "Sistema"}{entry.actor_email ? " · " + entry.actor_email : ""}</div></TableCell><TableCell>{entry.target_label ?? entry.target_type}<div className="text-xs text-slate-500">{entry.target_id ?? "—"}</div></TableCell><TableCell className="text-xs text-slate-400">{entry.organization_name ?? "Plataforma"}</TableCell><TableCell className="max-w-72 truncate text-xs text-slate-400">{auditDetails(entry.details)}</TableCell></TableRow>)}</TableBody></Table></div>}</section>}
         </div>
       </main>
     </div>
