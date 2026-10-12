@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
-import { addExistingTeamMember } from "@/lib/team.server";
+import { addExistingTeamMember } from "@/lib/team.functions";
 
 export const Route = createFileRoute("/_authenticated/equipa")({
   head: () => ({
