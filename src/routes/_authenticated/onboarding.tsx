@@ -36,6 +36,19 @@ function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [technicalError, setTechnicalError] = useState<string | null>(null);
 
+  async function claimPendingPayments() {
+    const { data, error } = await supabase.functions.invoke("kursinha-webhook", {
+      body: { action: "claim_pending_sales" },
+    });
+    if (error) {
+      console.warn("[WhappNus] Não foi possível associar pagamentos pendentes agora.", error.message);
+      return;
+    }
+    if (Number(data?.applied ?? 0) > 0) {
+      toast.success("Pagamento confirmado e plano activado.");
+    }
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setTechnicalError(null);
@@ -141,6 +154,7 @@ function OnboardingPage() {
       return;
     }
 
+    await claimPendingPayments();
     setLoading(false);
     toast.success("Organização criada.");
     navigate({ to: "/dashboard" });
@@ -157,7 +171,10 @@ function OnboardingPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Pode seguir directamente para o painel de atendimento.
             </p>
-            <Button className="mt-4" onClick={() => navigate({ to: "/dashboard" })}>
+            <Button className="mt-4" onClick={async () => {
+              await claimPendingPayments();
+              navigate({ to: "/dashboard" });
+            }}>
               Ir para o Dashboard
             </Button>
           </>
