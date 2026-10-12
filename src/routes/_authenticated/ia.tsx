@@ -113,7 +113,7 @@ function AiPage() {
   const orgId = membership?.organization_id;
   const subscription = useSubscriptionAccess(orgId);
   const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
-  const canCreateAgent = canManage && subscription.active && subscription.features.ai !== false;
+  const canCreateAgent = canManage && subscription.active && subscription.features["ai"] !== false;
   const qc = useQueryClient();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
