@@ -154,6 +154,14 @@ function OnboardingPage() {
       return;
     }
 
+    const contactPhone = String(authenticatedUser.user_metadata?.phone ?? "").trim();
+    if (contactPhone) {
+      const { error: contactError } = await supabase.from("organizations")
+        .update({ contact_phone: contactPhone, updated_at: new Date().toISOString() })
+        .eq("id", createdOrganizationId);
+      if (contactError) console.warn("[WhappNus] Não foi possível guardar o WhatsApp de contacto da organização.", contactError.message);
+    }
+
     await claimPendingPayments();
     setLoading(false);
     toast.success("Organização criada.");
