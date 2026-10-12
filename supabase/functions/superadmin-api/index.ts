@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
     if (action === "organizations.list") {
       const search = str(input.search, 100);
       let query = db.from("organizations")
-        .select("id,name,slug,status,management_mode,suspension_reason,created_at,updated_at")
+        .select("id,name,slug,status,management_mode,suspension_reason,contact_phone,created_by,created_at,updated_at")
         .order("created_at", { ascending: false }).limit(200);
       if (search) query = query.or(`name.ilike.%${search.replace(/[,%()]/g, "")}%,slug.ilike.%${search.replace(/[,%()]/g, "")}%`);
       const { data, error } = await query;
@@ -115,7 +115,7 @@ Deno.serve(async (req: Request) => {
       const ids = (data ?? []).map((row: any) => row.id);
       if (!ids.length) return json({ ok: true, data: [] });
       const [members, numbers, agents] = await Promise.all([
-        db.from("memberships").select("organization_id").in("organization_id", ids),
+        db.from("memberships").select("organization_id,user_id,role").in("organization_id", ids),
         db.from("whatsapp_numbers").select("organization_id,status,phone_e164,display_name").in("organization_id", ids).is("deleted_at", null),
         db.from("ai_agents").select("organization_id,is_active").in("organization_id", ids),
       ]);
@@ -126,11 +126,28 @@ Deno.serve(async (req: Request) => {
       const memberCounts = counts(members.data ?? [], "organization_id");
       const numberCounts = counts(numbers.data ?? [], "organization_id");
       const activeAgents = (agents.data ?? []).reduce((acc: Record<string, number>, row: any) => { if (row.is_active) acc[row.organization_id] = (acc[row.organization_id] ?? 0) + 1; return acc; }, {});
-      return json({ ok: true, data: (data ?? []).map((row: any) => ({
-        ...row, members_count: memberCounts[row.id] ?? 0, whatsapp_count: numberCounts[row.id] ?? 0,
-        ai_agents_active: activeAgents[row.id] ?? 0,
-        whatsapp_statuses: (numbers.data ?? []).filter((n: any) => n.organization_id === row.id).map((n: any) => ({ status: n.status, phone_e164: n.phone_e164, display_name: n.display_name })),
-      })) });
+      const ownerByOrg = new Map<string, string>();
+      for (const membership of members.data ?? []) if (membership.role === "OWNER" || membership.role === "owner") ownerByOrg.set(membership.organization_id, membership.user_id);
+      const ownerIds = [...new Set([...ownerByOrg.values()])];
+      const profileResult = ownerIds.length ? await db.from("profiles").select("id,full_name,email").in("id", ownerIds) : { data: [], error: null };
+      if (profileResult.error) throw profileResult.error;
+      const profilesById = new Map((profileResult.data ?? []).map((p: any) => [p.id, p]));
+      const owners = await Promise.all(ownerIds.map(async (id) => { const { data: result } = await db.auth.admin.getUserById(id); return [id, result.user ?? null] as const; }));
+      const authById = new Map(owners);
+      return json({ ok: true, data: (data ?? []).map((row: any) => {
+        const ownerId = ownerByOrg.get(row.id);
+        const profile = ownerId ? profilesById.get(ownerId) : null;
+        const owner = ownerId ? authById.get(ownerId) : null;
+        const metadata = owner?.user_metadata ?? {};
+        const orgNumbers = (numbers.data ?? []).filter((n: any) => n.organization_id === row.id);
+        return { ...row, client_name: profile?.full_name ?? metadata.full_name ?? metadata.name ?? null,
+          client_email: profile?.email ?? owner?.email ?? null,
+          contact_phone: row.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
+          members_count: memberCounts[row.id] ?? 0, whatsapp_count: numberCounts[row.id] ?? 0,
+          ai_agents_active: activeAgents[row.id] ?? 0,
+          whatsapp_statuses: orgNumbers.map((n: any) => ({ id: n.id, status: n.status, phone_e164: n.phone_e164, display_name: n.display_name })),
+        };
+      }) });
     }
 
     if (action === "organizations.create") {
@@ -200,6 +217,26 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: data ?? [] });
     }
 
+    if (action === "plans.delete") {
+      const id = str(input.id, 60);
+      if (!id) return fail("Plano inválido.");
+      const { data: plan, error: planError } = await db.from("subscription_plans").select("id,code,name,is_active").eq("id", id).maybeSingle();
+      if (planError) throw planError;
+      if (!plan) return fail("Plano não encontrado.", 404);
+      if (plan.is_active) return fail("Desactiva o plano antes de o apagar.", 409);
+      const [subs, mappings, sales] = await Promise.all([
+        db.from("organization_subscriptions").select("id", { count: "exact", head: true }).eq("plan_id", id),
+        db.from("kursinha_product_mappings").select("product_id", { count: "exact", head: true }).eq("plan_id", id),
+        db.from("kursinha_sales").select("sale_id", { count: "exact", head: true }).eq("plan_id", id),
+      ]);
+      if (subs.error) throw subs.error; if (mappings.error) throw mappings.error; if (sales.error) throw sales.error;
+      if ((subs.count ?? 0) + (mappings.count ?? 0) + (sales.count ?? 0) > 0) return fail("Este plano tem histórico associado e não pode ser eliminado com segurança.", 409);
+      const { error } = await db.from("subscription_plans").delete().eq("id", id);
+      if (error) throw error;
+      await audit("plan.deleted", "subscription_plan", id, null, { code: plan.code, name: plan.name });
+      return json({ ok: true, data: { id, deleted: true } });
+    }
+
     if (action === "plans.save") {
       const id = str(input.id, 60);
       const code = str(input.code, 50).toLowerCase();
@@ -227,10 +264,41 @@ Deno.serve(async (req: Request) => {
 
     if (action === "subscriptions.list") {
       const { data, error } = await db.from("organization_subscriptions")
-        .select("id,organization_id,plan_id,status,billing_interval,amount_aoa,currency,starts_at,current_period_start,current_period_end,cancel_at_period_end,provider,created_at,organizations(name,slug),subscription_plans(name,code)")
+        .select("id,organization_id,plan_id,status,billing_interval,amount_aoa,currency,starts_at,current_period_start,current_period_end,cancel_at_period_end,provider,created_at,organizations(id,name,slug,contact_phone,created_by),subscription_plans(name,code,limits,features)")
         .order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
-      return json({ ok: true, data: data ?? [] });
+      const rows = data ?? [];
+      const orgIds = [...new Set(rows.map((s: any) => s.organization_id))];
+      const ownerMemberships = orgIds.length ? await db.from("memberships").select("organization_id,user_id,role").in("organization_id", orgIds) : { data: [], error: null };
+      if (ownerMemberships.error) throw ownerMemberships.error;
+      const owners = new Map<string, string>();
+      for (const m of ownerMemberships.data ?? []) if (m.role === "OWNER" || m.role === "owner") owners.set(m.organization_id, m.user_id);
+      const ownerIds = [...new Set([...owners.values()])];
+      const profileResult = ownerIds.length ? await db.from("profiles").select("id,full_name,email").in("id", ownerIds) : { data: [], error: null };
+      if (profileResult.error) throw profileResult.error;
+      const profiles = new Map((profileResult.data ?? []).map((p: any) => [p.id, p]));
+      const authRows = await Promise.all(ownerIds.map(async (id) => { const { data: result } = await db.auth.admin.getUserById(id); return [id, result.user ?? null] as const; }));
+      const authUsers = new Map(authRows);
+      const enriched = await Promise.all(rows.map(async (s: any) => {
+        const ownerId = owners.get(s.organization_id) ?? s.organizations?.created_by ?? null;
+        const profile = ownerId ? profiles.get(ownerId) : null;
+        const authUser = ownerId ? authUsers.get(ownerId) : null;
+        const metadata = authUser?.user_metadata ?? {};
+        const periodStart = s.current_period_start ?? s.starts_at ?? s.created_at;
+        const { count: aiUsed, error: usageError } = await db.from("ai_logs").select("id", { count: "exact", head: true })
+          .eq("organization_id", s.organization_id).gte("created_at", periodStart);
+        if (usageError) throw usageError;
+        const endMs = s.current_period_end ? new Date(s.current_period_end).getTime() : null;
+        return { ...s, client_name: profile?.full_name ?? metadata.full_name ?? metadata.name ?? null,
+          client_email: profile?.email ?? authUser?.email ?? null,
+          client_phone: s.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? authUser?.phone ?? null,
+          days_remaining: endMs === null ? null : Math.max(0, Math.ceil((endMs - Date.now()) / 86400000)),
+          ai_conversations_used: aiUsed ?? 0,
+          ai_conversations_limit: Number(s.subscription_plans?.limits?.ai_conversations_monthly ?? 0),
+          plan_limits: s.subscription_plans?.limits ?? {}, plan_features: s.subscription_plans?.features ?? {},
+        };
+      }));
+      return json({ ok: true, data: enriched });
     }
 
     if (action === "notifications.list") {
@@ -243,21 +311,28 @@ Deno.serve(async (req: Request) => {
 
     if (action === "notifications.send") {
       if (!["owner", "admin"].includes(admin.role)) return fail("Só o proprietário ou administrador pode enviar notificações.", 403);
-      const organizationId = str(input.organization_id, 60);
       const title = str(input.title, 140);
       const body = str(input.body, 2000);
-      if (!organizationId || title.length < 3 || body.length < 3) return fail("Escolhe uma organização e preenche o título e a mensagem.");
-      const { data: organization, error: organizationError } = await db.from("organizations")
-        .select("id,name").eq("id", organizationId).maybeSingle();
-      if (organizationError) throw organizationError;
-      if (!organization) return fail("Organização não encontrada.", 404);
-      const { data, error } = await db.from("organization_notifications").insert({
-        organization_id: organizationId, title, body, notification_type: "subscription",
-        created_by: actor.id, metadata: { source: "superadmin" },
-      }).select("id,organization_id,title,body,notification_type,created_at").single();
+      const allOrganizations = input.all_organizations === true || input.organization_id === "all";
+      const requestedIds = Array.isArray(input.organization_ids) ? [...new Set(input.organization_ids.map((v: unknown) => str(v, 60)).filter(Boolean))] : [];
+      const singleId = str(input.organization_id, 60);
+      const ids = allOrganizations ? [] : requestedIds.length ? requestedIds : singleId ? [singleId] : [];
+      if (title.length < 3 || body.length < 3) return fail("Preenche um título e uma mensagem válidos.");
+      if (!allOrganizations && (!ids.length || ids.length > 10)) return fail("Selecciona uma organização, até 10 organizações, ou escolhe Todos.");
+      let orgQuery = db.from("organizations").select("id,name");
+      if (!allOrganizations) orgQuery = orgQuery.in("id", ids);
+      const { data: targetOrganizations, error: orgError } = await orgQuery.order("name", { ascending: true });
+      if (orgError) throw orgError;
+      if (!targetOrganizations?.length) return fail("Não foram encontradas organizações para receber a notificação.", 404);
+      const records = targetOrganizations.map((org: any) => ({ organization_id: org.id, title, body,
+        notification_type: "platform_update", created_by: actor.id,
+        metadata: { source: "superadmin", broadcast: allOrganizations, batch_size: targetOrganizations.length },
+      }));
+      const { data, error } = await db.from("organization_notifications").insert(records)
+        .select("id,organization_id,title,body,notification_type,created_at");
       if (error) throw error;
-      await audit("notification.sent", "organization_notification", data.id, organizationId, { title });
-      return json({ ok: true, data: { ...data, organizations: organization } });
+      await audit("notification.sent", "organization_notification_batch", null, null, { title, recipient_count: data?.length ?? 0, broadcast: allOrganizations, organization_ids: targetOrganizations.map((o: any) => o.id) });
+      return json({ ok: true, data: { sent_count: data?.length ?? 0, notifications: data ?? [] } });
     }
 
     if (action === "subscriptions.reactivate") {
@@ -573,10 +648,21 @@ Deno.serve(async (req: Request) => {
         db.from("ai_logs").select("id,organization_id,event_type,status,provider,model,latency_ms,created_at").order("created_at", { ascending: false }).limit(50),
         db.from("whatsapp_events").select("id,organization_id,provider,event_type,created_at").order("created_at", { ascending: false }).limit(30),
       ]);
-      if (sessions.error) throw sessions.error;
-      if (aiLogs.error) throw aiLogs.error;
-      if (events.error) throw events.error;
-      return json({ ok: true, data: { sessions: sessions.data ?? [], aiLogs: aiLogs.data ?? [], events: events.data ?? [] } });
+      if (sessions.error) throw sessions.error; if (aiLogs.error) throw aiLogs.error; if (events.error) throw events.error;
+      const orgIds = [...new Set((sessions.data ?? []).map((row: any) => row.organization_id).filter(Boolean))];
+      const [orgs, numbers] = await Promise.all([
+        orgIds.length ? db.from("organizations").select("id,name,slug").in("id", orgIds) : { data: [], error: null },
+        orgIds.length ? db.from("whatsapp_numbers").select("id,organization_id,phone_e164,display_name,verified_name").in("organization_id", orgIds) : { data: [], error: null },
+      ]);
+      if (orgs.error) throw orgs.error; if (numbers.error) throw numbers.error;
+      const orgById = new Map((orgs.data ?? []).map((o: any) => [o.id, o]));
+      const numberById = new Map((numbers.data ?? []).map((n: any) => [n.id, n]));
+      const orgNames = new Map((orgs.data ?? []).map((o: any) => [o.id, o.name]));
+      return json({ ok: true, data: {
+        sessions: (sessions.data ?? []).map((row: any) => ({ ...row, organization: orgById.get(row.organization_id) ?? null, number: numberById.get(row.whatsapp_number_id) ?? null })),
+        aiLogs: (aiLogs.data ?? []).map((row: any) => ({ ...row, organization_name: orgNames.get(row.organization_id) ?? null })),
+        events: (events.data ?? []).map((row: any) => ({ ...row, organization_name: orgNames.get(row.organization_id) ?? null })),
+      } });
     }
 
 
@@ -621,11 +707,39 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "audit.list") {
-      const { data, error } = await db.from("superadmin_audit_logs")
-        .select("id,actor_user_id,action,target_type,target_id,organization_id,request_id,details,created_at")
+      const { data, error } = await db.from("superadmin_audit_logs").select("id,actor_user_id,action,target_type,target_id,organization_id,request_id,details,created_at")
         .order("created_at", { ascending: false }).limit(200);
       if (error) throw error;
-      return json({ ok: true, data: data ?? [] });
+      const actorIds = [...new Set((data ?? []).map((r: any) => r.actor_user_id).filter(Boolean))];
+      const orgIds = [...new Set((data ?? []).map((r: any) => r.organization_id).filter(Boolean))];
+      const [profiles, orgs] = await Promise.all([
+        actorIds.length ? db.from("profiles").select("id,full_name,email").in("id", actorIds) : { data: [], error: null },
+        orgIds.length ? db.from("organizations").select("id,name").in("id", orgIds) : { data: [], error: null },
+      ]);
+      if (profiles.error) throw profiles.error; if (orgs.error) throw orgs.error;
+      const profileById = new Map((profiles.data ?? []).map((p: any) => [p.id, p]));
+      const orgById = new Map((orgs.data ?? []).map((o: any) => [o.id, o.name]));
+      const authRows = await Promise.all(actorIds.map(async (id) => { const { data: result } = await db.auth.admin.getUserById(id); return [id, result.user ?? null] as const; }));
+      const authById = new Map(authRows);
+      const actionLabels: Record<string, string> = {
+        "group_job.scheduled": "Agendou uma mensagem de grupo", "group_connection.toggled": "Alterou a ligação de um grupo",
+        "group_flow.created": "Criou um funil de mensagens", "group_flow.updated": "Editou um funil de mensagens",
+        "group_flow.toggled": "Activou ou pausou um funil", "group_flow_step.created": "Criou uma etapa do funil",
+        "group_flow_step.updated": "Editou uma etapa do funil", "admin.created": "Adicionou um administrador",
+        "admin.updated": "Actualizou as permissões de um administrador", "organization.created": "Criou uma organização",
+        "organization.status_changed": "Alterou o estado de uma organização", "plan.created": "Criou um plano",
+        "plan.updated": "Actualizou um plano", "plan.deleted": "Eliminou um plano",
+        "notification.sent": "Enviou uma notificação", "subscription.reactivated": "Reactivou uma assinatura",
+        "group_asset.created": "Adicionou um ficheiro ao banco multimédia", "group_asset.deleted": "Eliminou um ficheiro do banco multimédia",
+      };
+      return json({ ok: true, data: (data ?? []).map((row: any) => {
+        const profile = profileById.get(row.actor_user_id); const authUser = authById.get(row.actor_user_id);
+        return { ...row, action_label: actionLabels[row.action] ?? row.action.replace(/[._]/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          actor_name: profile?.full_name ?? authUser?.user_metadata?.full_name ?? authUser?.email ?? "Sistema",
+          actor_email: profile?.email ?? authUser?.email ?? null, organization_name: orgById.get(row.organization_id) ?? null,
+          target_label: row.target_type === "group_job" ? "Mensagem agendada" : row.target_type === "platform_admin" ? "Administrador" : row.target_type === "subscription_plan" ? "Plano" : row.target_type === "organization" ? "Organização" : row.target_type.replace(/_/g, " "),
+        };
+      }) });
     }
 
     return fail("Ação desconhecida.");
