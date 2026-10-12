@@ -277,6 +277,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/onboarding'
     | '/whatsapp'
+    | '/notificacoes'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
