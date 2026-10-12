@@ -285,8 +285,11 @@ Deno.serve(async (req: Request) => {
         const authUser = ownerId ? authUsers.get(ownerId) : null;
         const metadata = authUser?.user_metadata ?? {};
         const periodStart = s.current_period_start ?? s.starts_at ?? s.created_at;
-        const { count: aiUsed, error: usageError } = await db.from("ai_logs").select("id", { count: "exact", head: true })
-          .eq("organization_id", s.organization_id).gte("created_at", periodStart);
+        let usageQuery = db.from("ai_credit_ledger").select("id", { count: "exact", head: true })
+          .eq("organization_id", s.organization_id).eq("reason", "ai_conversation");
+        if (periodStart) usageQuery = usageQuery.gte("created_at", periodStart);
+        if (s.current_period_end) usageQuery = usageQuery.lt("created_at", s.current_period_end);
+        const { count: aiUsed, error: usageError } = await usageQuery;
         if (usageError) throw usageError;
         const endMs = s.current_period_end ? new Date(s.current_period_end).getTime() : null;
         return { ...s, client_name: profile?.full_name ?? metadata.full_name ?? metadata.name ?? null,
