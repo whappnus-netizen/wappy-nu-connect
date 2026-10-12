@@ -44,7 +44,7 @@ export const startQrSession = createServerFn({ method: "POST" })
     // reutilizamo-la; caso contrário criamos um whatsapp_number com phone_e164 = null.
     let numberId: string;
 
-    const requestedPhone = data.phoneE164?.replace(/\s/g, "");
+    const requestedPhone = data.phoneE164 ? normalizePhoneE164(data.phoneE164) : undefined;
     if (requestedPhone) {
       const { data: existingPhone, error: existingPhoneError } = await admin.from("whatsapp_numbers")
         .select("id,status").eq("organization_id", data.organizationId).eq("provider", "qr")
@@ -71,7 +71,7 @@ export const startQrSession = createServerFn({ method: "POST" })
         .from("whatsapp_numbers")
         .update({
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          ...(data.phoneE164 ? { phone_e164: data.phoneE164.replace(/\s/g, "") } : {}),
+          ...(requestedPhone ? { phone_e164: requestedPhone } : {}),
           status: "connecting",
           last_error: null,
         })
@@ -79,13 +79,13 @@ export const startQrSession = createServerFn({ method: "POST" })
         .eq("organization_id", data.organizationId);
       if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
     } else {
-      await requireWhatsAppConnectionCapacity(data.organizationId, data.phoneE164?.replace(/\s/g, ""));
+      await requireWhatsAppConnectionCapacity(data.organizationId, requestedPhone);
       const { data: createdNumber, error: createErr } = await admin
         .from("whatsapp_numbers")
         .insert({
           organization_id: data.organizationId,
           display_name: data.displayName ?? "WhatsApp (QR Code)",
-          phone_e164: data.phoneE164?.replace(/\s/g, "") ?? null,
+          phone_e164: requestedPhone ?? null,
           provider: "qr",
           status: "connecting",
         })
@@ -211,7 +211,7 @@ export const requestQrPairingCode = createServerFn({ method: "POST" })
       .is("deleted_at", null).maybeSingle();
     if (error) throw new Error(error.message);
     if (!number || number.provider !== "qr") throw new Error("A ligação WhatsApp não pertence a esta organização.");
-    const phone = data.phoneE164.replace(/[\s()-]/g, "");
+    const phone = normalizePhoneE164(data.phoneE164);
     const code = await requestCode({ organizationId: data.organizationId, whatsappNumberId: data.numberId }, phone);
     const now = new Date().toISOString();
     const { error: updateError } = await admin.from("whatsapp_numbers")
