@@ -6,7 +6,7 @@ const phoneSchema = z.string().trim().regex(/^\+?[0-9\s()-]{8,20}$/, "Introduz o
 
 /** Canonical database format: + followed by 8–15 digits, with no formatting characters. */
 function normalizePhoneE164(value: string): string {
-  const digits = value.replace(/\\D/g, "");
+  const digits = value.replace(/\D/g, "");
   if (!/^[1-9][0-9]{7,14}$/.test(digits)) {
     throw new Error("Número inválido. Usa o indicativo internacional e 8 a 15 dígitos, por exemplo +244923456789.");
   }
