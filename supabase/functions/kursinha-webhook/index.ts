@@ -48,7 +48,7 @@ Deno.serve(async(req:Request)=>{
     const r=await db.from("kursinha_sales").upsert({...common,status:valid?"approved":"invalid",approved_at:valid?now:null},{onConflict:"sale_id"});if(r.error)throw r.error;
     if(!valid){await db.from("kursinha_webhook_events").update({processing_status:"processed",error_message:"Produto, preço ou moeda fora do catálogo.",processed_at:now}).eq("event_key",eventKey);return reply({ok:true,activated:false,reason:"PRODUCT_PRICE_CURRENCY_MISMATCH"});}
     // Only attach automatically when a verified account has exactly one OWNER organization.
-    const pr=await db.from("profiles").select("id,email").eq("email",buyer).maybeSingle();if(pr.error)throw pr.error;
+    const pr=await db.from("profiles").select("id,email").ilike("email",buyer).maybeSingle();if(pr.error)throw pr.error;
     if(pr.data?.id){
      const au=await db.auth.admin.getUserById(pr.data.id);
      if(!au.error&&au.data.user?.email_confirmed_at&&email(au.data.user.email)===buyer){
@@ -78,7 +78,7 @@ Deno.serve(async(req:Request)=>{
  }
  let body:Record<string,any>;try{const j=await req.json();if(!obj(j))return reply({ok:false,error:"Pedido inválido."},400);body=j;}catch{return reply({ok:false,error:"JSON inválido."},400);}
  if(body.action!=="claim_pending_sales")return reply({ok:false,error:"Ação não autorizada."},400);
- const token=(req.headers.get("Authorization")??"").replace(/^Bearer\\s+/i,"").trim();if(!token)return reply({ok:false,error:"Sessão necessária."},401);
+ const token=(req.headers.get("Authorization")??"").replace(/^Bearer\s+/i,"").trim();if(!token)return reply({ok:false,error:"Sessão necessária."},401);
  const authClient=createClient(url,anon,{auth:{persistSession:false,autoRefreshToken:false}}),auth=await authClient.auth.getUser(token),u=auth.data.user;
  if(auth.error||!u||!u.email_confirmed_at||!u.email)return reply({ok:false,error:"Confirma o email antes de associar o pagamento."},401);
  const ms=await db.from("memberships").select("organization_id").eq("user_id",u.id).eq("role","OWNER");if(ms.error)return reply({ok:false,error:"Não foi possível confirmar a organização."},500);
