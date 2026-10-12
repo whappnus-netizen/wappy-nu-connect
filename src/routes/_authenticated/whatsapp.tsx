@@ -105,7 +105,7 @@ function WhatsAppPage() {
   const subscription = useSubscriptionAccess(orgId);
   const role = membership?.role;
   const canManage = role === "OWNER" || role === "ADMIN";
-  const canConnect = canManage && subscription.active && subscription.features.integrations !== false;
+  const canConnect = canManage && subscription.active && subscription.features["integrations"] !== false;
   const queryClient = useQueryClient();
 
   const [method, setMethod] = useState<"meta_cloud" | "qr" | "pairing" | null>(null);
