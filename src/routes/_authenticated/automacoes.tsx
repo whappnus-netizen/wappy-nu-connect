@@ -50,7 +50,7 @@ function AutomationsPage() {
   const orgId = membership?.organization_id;
   const subscription = useSubscriptionAccess(orgId);
   const canManage = membership?.role === "OWNER" || membership?.role === "ADMIN";
-  const canCreateAutomation = canManage && subscription.active && subscription.features.automations !== false;
+  const canCreateAutomation = canManage && subscription.active && subscription.features["automations"] !== false;
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState<TriggerType>("keyword_match");
