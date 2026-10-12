@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
-import { previewExistingConversationDeals, syncExistingConversationDeals } from "@/lib/crm-backfill.server";
+import { previewExistingConversationDeals, syncExistingConversationDeals } from "@/lib/crm-backfill.functions";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   head: () => ({ meta: [{ title: "CRM — Wapnus" }] }),
