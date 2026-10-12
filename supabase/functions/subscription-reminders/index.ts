@@ -13,20 +13,22 @@ Deno.serve(async (req: Request) => {
   }});
   if (req.method !== "POST") return json({ ok: false, error: "Método não permitido." }, 405);
 
-  const reminderSecret = Deno.env.get("SUBSCRIPTION_REMINDER_SECRET") ?? "";
-  if (!reminderSecret || req.headers.get("x-reminder-secret") !== reminderSecret) {
-    return json({ ok: false, error: "Não autorizado." }, 401);
-  }
-
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!url || !serviceKey) return json({ ok: false, error: "Configuração Supabase incompleta." }, 500);
+  const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  const suppliedSecret = req.headers.get("x-reminder-secret") ?? "";
+  const { data: reminderConfig, error: configError } = await db.from("subscription_reminder_config")
+    .select("secret_hash").eq("id", true).maybeSingle();
+  if (configError || !reminderConfig?.secret_hash) return json({ ok: false, error: "Configuração segura dos avisos não encontrada." }, 500);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(suppliedSecret));
+  const suppliedHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (!suppliedSecret || suppliedHash !== reminderConfig.secret_hash) return json({ ok: false, error: "Não autorizado." }, 401);
+
   const engineUrl = (Deno.env.get("WHATSAPP_ENGINE_URL") ?? "").replace(/\/$/, "");
   const bridgeSecret = Deno.env.get("WHATSAPP_BRIDGE_SECRET") ?? "";
-  if (!url || !serviceKey || !engineUrl || !bridgeSecret) {
-    return json({ ok: false, error: "Configuração incompleta: SUPABASE e WhatsApp Engine são necessários." }, 500);
-  }
-
-  const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!engineUrl || !bridgeSecret) return json({ ok: false, error: "Faltam os segredos WHATSAPP_ENGINE_URL e WHATSAPP_BRIDGE_SECRET nas variáveis da função." }, 500);
   const now = new Date();
   const lower = new Date(now.getTime() + 72 * hour).toISOString();
   const upper = new Date(now.getTime() + 96 * hour).toISOString();
