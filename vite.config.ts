@@ -5,17 +5,17 @@ import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import viteReact from "@vitejs/plugin-react";
 
-// Use the official TanStack Start + Netlify plugin pipeline.
-// The Lovable wrapper conditionally replaced the plugin list on Netlify builds,
-// which can leave TanStack's route-tree crawler without a consistent plugin lifecycle.
+// Keep the TanStack Start plugin pipeline explicit and in the order used by
+// the official Netlify integration. The custom SSR error wrapper remains at
+// src/server.ts and is selected by the "server" entry.
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     tanstackStart({
       server: { entry: "server" },
     }),
-    tailwindcss(),
+    netlify(),
     tsconfigPaths(),
     viteReact(),
-    netlify(),
   ],
 });
