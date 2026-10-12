@@ -33,6 +33,7 @@ const nav = [
   { to: "/ia", label: "IA", icon: Sparkles },
   { to: "/equipa", label: "Equipa", icon: UsersRound },
   { to: "/definicoes", label: "Definições", icon: Settings },
+  { to: "/notificacoes", label: "Notificações", icon: Bell },
 ] as const;
 
 export function Logo({ className }: { className?: string }) {
