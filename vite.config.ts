@@ -1,19 +1,21 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - TanStack devtools (dev-only, first), tanstackStart, viteReact, tailwindcss, tsConfigPaths,
-//     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
-//     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import netlify from "@netlify/vite-plugin-tanstack-start";
+import tailwindcss from "@tailwindcss/vite";
+import tsconfigPaths from "vite-tsconfig-paths";
+import viteReact from "@vitejs/plugin-react";
 
-// On Netlify builds, swap nitro for Netlify's official TanStack Start adapter, which
-// emits the client to dist/client and the SSR server as a Netlify Function.
-// Lovable builds (NETLIFY unset) keep the default nitro/Cloudflare pipeline.
-const isNetlifyBuild = process.env["NETLIFY"] === "true";
-
+// Use the official TanStack Start + Netlify plugin pipeline.
+// The Lovable wrapper conditionally replaced the plugin list on Netlify builds,
+// which can leave TanStack's route-tree crawler without a consistent plugin lifecycle.
 export default defineConfig({
-  tanstackStart: {
-    server: { entry: "server" },
-  },
-  ...(isNetlifyBuild && { nitro: false, plugins: [netlify()] }),
+  plugins: [
+    tanstackStart({
+      server: { entry: "server" },
+    }),
+    tailwindcss(),
+    tsconfigPaths(),
+    viteReact(),
+    netlify(),
+  ],
 });
