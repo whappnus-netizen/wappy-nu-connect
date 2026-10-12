@@ -86,5 +86,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.2.0"
+  },
+  "overrides": {
+    "@radix-ui/react-primitive": "2.1.10"
   }
 }
