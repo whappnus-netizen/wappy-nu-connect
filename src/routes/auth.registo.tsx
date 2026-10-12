@@ -23,6 +23,7 @@ function SignupPage() {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +34,7 @@ function SignupPage() {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, phone: phone.trim() },
         emailRedirectTo: `${window.location.origin}/onboarding`,
       },
     });
@@ -63,6 +64,11 @@ function SignupPage() {
         <div className="space-y-2">
           <Label htmlFor="name">Nome completo</Label>
           <Input id="name" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Número de WhatsApp de contacto</Label>
+          <Input id="phone" type="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+244 9xx xxx xxx" />
+          <p className="text-xs text-muted-foreground">Usaremos este contacto apenas para avisos importantes da sua assinatura e conta.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email profissional</Label>
