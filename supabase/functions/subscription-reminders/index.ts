@@ -26,9 +26,9 @@ Deno.serve(async (req: Request) => {
   const suppliedHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (!suppliedSecret || suppliedHash !== reminderConfig.secret_hash) return json({ ok: false, error: "Não autorizado." }, 401);
 
-  const engineUrl = (Deno.env.get("WHATSAPP_ENGINE_URL") ?? "").replace(/\/$/, "");
+  const engineUrl = "https://whappnus-whatsapp-engine-production.up.railway.app";
   const bridgeSecret = Deno.env.get("WHATSAPP_BRIDGE_SECRET") ?? "";
-  if (!engineUrl || !bridgeSecret) return json({ ok: false, error: "Faltam os segredos WHATSAPP_ENGINE_URL e WHATSAPP_BRIDGE_SECRET nas variáveis da função." }, 500);
+  if (!bridgeSecret) return json({ ok: false, error: "Falta o segredo WHATSAPP_BRIDGE_SECRET nas variáveis da função." }, 500);
   const now = new Date();
   const lower = new Date(now.getTime() + 72 * hour).toISOString();
   const upper = new Date(now.getTime() + 96 * hour).toISOString();
