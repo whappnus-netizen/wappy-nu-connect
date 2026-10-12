@@ -27,6 +27,7 @@ function SettingsPage() {
   const [name, setName] = useState("");
   const [timezone, setTimezone] = useState("Africa/Luanda");
   const [currency, setCurrency] = useState("AOA");
+  const [contactPhone, setContactPhone] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [photoTarget, setPhotoTarget] = useState<"profile" | "organization">("profile");
@@ -37,6 +38,19 @@ function SettingsPage() {
     setTimezone(membership?.organizations?.timezone ?? "Africa/Luanda");
     setCurrency(membership?.organizations?.currency ?? "AOA");
   }, [membership?.organizations?.name, membership?.organizations?.timezone, membership?.organizations?.currency]);
+
+  const contactQuery = useQuery({
+    queryKey: ["organization-contact-phone", orgId],
+    enabled: Boolean(orgId),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("organizations").select("contact_phone").eq("id", orgId!).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data?.contact_phone ?? null;
+    },
+  });
+  useEffect(() => {
+    setContactPhone(contactQuery.data ?? String(user?.user_metadata?.phone ?? ""));
+  }, [contactQuery.data, user?.user_metadata?.phone]);
 
   const assetsQuery = useQuery({
     queryKey: ["settings-assets", user?.id, orgId],
@@ -114,6 +128,7 @@ function SettingsPage() {
         name: name.trim(),
         timezone: timezone.trim(),
         currency: currency.trim().toUpperCase(),
+        contact_phone: contactPhone.trim() || null,
         updated_at: new Date().toISOString(),
       }).eq("id", orgId);
       if (updateError) throw new Error(updateError.message);
@@ -139,6 +154,7 @@ function SettingsPage() {
             <div className="space-y-1.5"><Label htmlFor="org-name">Nome da organização</Label><Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={!canEdit || save.isPending} required /></div>
             <div className="space-y-1.5"><Label htmlFor="org-timezone">Fuso horário (IANA)</Label><Input id="org-timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Africa/Luanda" disabled={!canEdit || save.isPending} required /><p className="text-xs text-muted-foreground">Exemplo para Angola: Africa/Luanda.</p></div>
             <div className="space-y-1.5"><Label htmlFor="org-currency">Moeda (código ISO)</Label><Input id="org-currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} placeholder="AOA" disabled={!canEdit || save.isPending} required /></div>
+            <div className="space-y-1.5"><Label htmlFor="org-contact-phone">WhatsApp de contacto para avisos da assinatura</Label><Input id="org-contact-phone" type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} maxLength={40} placeholder="+244 9xx xxx xxx" disabled={!canEdit || save.isPending} /><p className="text-xs text-muted-foreground">Receberá os avisos importantes sobre renovação neste número. Use o indicativo do país, por exemplo +244.</p></div>
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
             {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">{notice}</p>}
             {canEdit ? <Button type="submit" disabled={save.isPending}>{save.isPending ? "A guardar…" : "Guardar definições"}</Button> : <p className="text-xs text-muted-foreground">Contacte o OWNER ou ADMIN para alterar estas definições.</p>}
