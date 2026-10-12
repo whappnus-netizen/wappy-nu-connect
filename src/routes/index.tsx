@@ -133,10 +133,10 @@ function Landing() {
           </div>
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {[
-              {name:"Teste grátis",price:"0",period:"7 dias",description:"Experimente antes de investir.",featured:false,items:["1 WhatsApp + 1 agente IA","Até 150 conversas com IA no teste","Até 2 automações","Acesso ao Inbox, CRM e contactos","Sem cartão bancário"]},
-              {name:"WhappNus Start",price:"10.000",period:"/ mês",description:"Para começar a automatizar o atendimento.",featured:false,items:["1 WhatsApp + 1 agente IA","Até 1.500 conversas com IA / mês","Até 2 automações activas","1 membro adicional na equipa","Dashboard, Inbox, CRM e IA"]},
-              {name:"WhappNus Pro",price:"25.000",period:"/ mês",description:"Mais capacidade para equipas em crescimento.",featured:true,items:["2 WhatsApps + 2 agentes IA","Até 4.000 conversas com IA / mês","Até 5 automações activas","Até 3 membros adicionais","Todas as ferramentas essenciais"]},
-              {name:"WhappNus Premium",price:"45.000",period:"/ mês",description:"Para operações com maior volume.",featured:false,items:["4 WhatsApps + 4 agentes IA","Até 10.000 conversas com IA / mês","Até 15 automações activas","Até 9 membros adicionais","Todas as ferramentas essenciais"]},
+              {name:"Teste grátis",price:"0",period:"7 dias",checkoutUrl:null,description:"Experimente antes de investir.",featured:false,items:["1 WhatsApp + 1 agente IA","Até 150 conversas com IA no teste","Até 2 automações","Acesso ao Inbox, CRM e contactos","Sem cartão bancário"]},
+              {name:"WhappNus Start",price:"10.000",period:"/ mês",checkoutUrl:"https://pay.kursinha.com/c/6aca37f7bad1248c97213091",description:"Para começar a automatizar o atendimento.",featured:false,items:["1 WhatsApp + 1 agente IA","Até 1.500 conversas com IA / mês","Até 2 automações activas","1 membro adicional na equipa","Dashboard, Inbox, CRM e IA"]},
+              {name:"WhappNus Pro",price:"25.000",period:"/ mês",checkoutUrl:"https://pay.kursinha.com/c/6aca8c46e62b25eb5a5f9df3",description:"Mais capacidade para equipas em crescimento.",featured:true,items:["2 WhatsApps + 2 agentes IA","Até 4.000 conversas com IA / mês","Até 5 automações activas","Até 3 membros adicionais","Todas as ferramentas essenciais"]},
+              {name:"WhappNus Premium",price:"45.000",period:"/ mês",checkoutUrl:null,description:"Para operações com maior volume.",featured:false,items:["4 WhatsApps + 4 agentes IA","Até 10.000 conversas com IA / mês","Até 15 automações activas","Até 9 membros adicionais","Todas as ferramentas essenciais"]},
             ].map((plan) => (
               <div key={plan.name} className={`relative flex flex-col rounded-2xl border bg-background p-5 shadow-soft ${plan.featured ? "border-primary ring-2 ring-primary/20" : "border-border"}`}>
                 {plan.featured && <span className="mb-3 self-start rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">Mais escolhido</span>}
@@ -146,13 +146,23 @@ function Landing() {
                 <ul className="mt-6 flex-1 space-y-3">
                   {plan.items.map((item) => <li key={item} className="flex gap-2 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-primary" /><span>{item}</span></li>)}
                 </ul>
-                <Button asChild className="mt-7 w-full" variant={plan.featured ? "default" : "outline"}>
-                  <Link to="/auth/registo">{plan.price === "0" ? "Experimentar grátis" : "Começar agora"} <ArrowRight className="size-4" /></Link>
-                </Button>
+                {plan.price === "0" ? (
+                  <Button asChild className="mt-7 w-full" variant="outline">
+                    <Link to="/auth/registo">Experimentar grátis <ArrowRight className="size-4" /></Link>
+                  </Button>
+                ) : plan.checkoutUrl ? (
+                  <Button asChild className="mt-7 w-full" variant={plan.featured ? "default" : "outline"}>
+                    <a href={plan.checkoutUrl} target="_blank" rel="noreferrer">Pagar e activar <ArrowRight className="size-4" /></a>
+                  </Button>
+                ) : (
+                  <Button type="button" className="mt-7 w-full" variant="outline" disabled>
+                    Disponível em breve
+                  </Button>
+                )}
               </div>
             ))}
           </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">As conversas e os recursos são contabilizados por organização. Os dados e o histórico permanecem guardados quando uma assinatura expira.</p>
+          <p className="mt-6 text-center text-xs text-muted-foreground">Após pagar, cria a conta com o mesmo email usado no checkout (ou entra na conta já verificada). A activação acontece depois da confirmação do pagamento pela Kursinha. Os dados e o histórico permanecem guardados quando uma assinatura expira.</p>
         </div>
       </section>
 
