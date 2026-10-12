@@ -313,17 +313,28 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       const rows = data ?? [];
       const ids = rows.map((row: any) => row.id);
-      const [logs, sessions] = await Promise.all([
+      const orgIds = [...new Set(rows.map((row: any) => row.organization_id))];
+      const [logs, sessions, memberships] = await Promise.all([
         ids.length ? db.from("subscription_reminder_logs").select("id,subscription_id,reminder_days,status,recipient_phone,whatsapp_number_id,error_message,sent_at,created_at").in("subscription_id", ids) : { data: [], error: null },
-        rows.length ? db.from("whatsapp_sessions").select("organization_id,whatsapp_number_id,status,phone_number,display_name").in("organization_id", [...new Set(rows.map((row: any) => row.organization_id))]).eq("status", "connected") : { data: [], error: null },
+        orgIds.length ? db.from("whatsapp_sessions").select("organization_id,whatsapp_number_id,status,phone_number,display_name").in("organization_id", orgIds).eq("status", "connected") : { data: [], error: null },
+        orgIds.length ? db.from("memberships").select("organization_id,user_id,role").in("organization_id", orgIds) : { data: [], error: null },
       ]);
-      if (logs.error) throw logs.error; if (sessions.error) throw sessions.error;
+      if (logs.error) throw logs.error; if (sessions.error) throw sessions.error; if (memberships.error) throw memberships.error;
+      const ownerByOrg = new Map<string, string>();
+      for (const member of memberships.data ?? []) if (member.role === "OWNER" || member.role === "owner") ownerByOrg.set(member.organization_id, member.user_id);
+      const ownerIds = [...new Set([...ownerByOrg.values()])];
+      const authRows = await Promise.all(ownerIds.map(async (id) => { const { data: result } = await db.auth.admin.getUserById(id); return [id, result.user ?? null] as const; }));
+      const authById = new Map(authRows);
       const logsBySubscription = new Map((logs.data ?? []).map((row: any) => [row.subscription_id, row]));
       const sessionsByOrg = new Map((sessions.data ?? []).map((row: any) => [row.organization_id, row]));
       return json({ ok: true, data: rows.map((row: any) => {
         const end = row.current_period_end ? new Date(row.current_period_end).getTime() : null;
         const reminder = logsBySubscription.get(row.id);
-        return { ...row, days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
+        const owner = authById.get(ownerByOrg.get(row.organization_id) ?? "");
+        const metadata = owner?.user_metadata ?? {};
+        return { ...row, contact_phone: row.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
+          client_name: metadata.full_name ?? metadata.name ?? null, client_email: owner?.email ?? null,
+          days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
           reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,
           reminder_sent_at: reminder?.sent_at ?? null, reminder_error: reminder?.error_message ?? null,
           whatsapp_session: sessionsByOrg.get(row.organization_id) ?? null };
