@@ -26,6 +26,7 @@ import { Route as AuthenticatedIaRouteImport } from './routes/_authenticated/ia'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
+import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
@@ -117,6 +118,11 @@ const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   path: '/whatsapp',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedNotificacoesRoute = AuthenticatedNotificacoesRouteImport.update({
+  id: '/notificacoes',
+  path: '/notificacoes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AuthenticatedInboxRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
@@ -217,6 +224,7 @@ export interface FileRoutesById {
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
@@ -243,6 +251,7 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/onboarding'
     | '/whatsapp'
+    | '/notificacoes'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/_authenticated/inbox'
     | '/_authenticated/onboarding'
     | '/_authenticated/whatsapp'
+    | '/_authenticated/notificacoes'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
@@ -493,6 +503,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
+  AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -506,6 +517,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
+  AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
