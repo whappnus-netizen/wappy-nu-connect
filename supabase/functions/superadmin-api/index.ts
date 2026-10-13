@@ -619,6 +619,10 @@ Deno.serve(async (req: Request) => {
         .select("id,name").eq("id", id).maybeSingle();
       if (flowReadError) throw flowReadError;
       if (!flow) return fail("Funil não encontrado.", 404);
+      const { count: processingCount, error: processingError } = await db.from("superadmin_group_jobs")
+        .select("id", { count: "exact", head: true }).eq("flow_id", id).eq("status", "processing");
+      if (processingError) throw processingError;
+      if ((processingCount ?? 0) > 0) return fail("Este funil tem disparos em processamento. Aguarda que terminem antes de o eliminar.");
 
       // Stop this flow from being used by any group and cancel jobs that could still send its content.
       const { error: disableError } = await db.from("superadmin_group_connections")
