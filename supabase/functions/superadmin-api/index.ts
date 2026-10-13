@@ -612,6 +612,109 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data, queued, note: enabled ? (queued ? `Ligação activada e ${queued} etapas colocadas na fila.` : "Ligação activada. Associa um funil activo com etapas para iniciar o calendário.") : "Ligação desactivada; tarefas pendentes canceladas." });
     }
 
+    if (action === "group.flow.delete") {
+      const id = str(input.id, 60);
+      if (!id) return fail("ID do funil inválido.");
+      const { data: flow, error: flowReadError } = await db.from("superadmin_group_flows")
+        .select("id,name").eq("id", id).maybeSingle();
+      if (flowReadError) throw flowReadError;
+      if (!flow) return fail("Funil não encontrado.", 404);
+      const { count: processingCount, error: processingError } = await db.from("superadmin_group_jobs")
+        .select("id", { count: "exact", head: true }).eq("flow_id", id).eq("status", "processing");
+      if (processingError) throw processingError;
+      if ((processingCount ?? 0) > 0) return fail("Este funil tem disparos em processamento. Aguarda que terminem antes de o eliminar.");
+
+      // Stop this flow from being used by any group and cancel jobs that could still send its content.
+      const { error: disableError } = await db.from("superadmin_group_connections")
+        .update({ active_flow_id: null, is_enabled: false, updated_at: new Date().toISOString() })
+        .eq("active_flow_id", id);
+      if (disableError) throw disableError;
+      const { error: cancelError } = await db.from("superadmin_group_jobs")
+        .update({ status: "cancelled", last_error: "Cancelado porque o funil foi eliminado.", updated_at: new Date().toISOString() })
+        .eq("flow_id", id).eq("status", "queued");
+      if (cancelError) throw cancelError;
+
+      const { error: deleteError } = await db.from("superadmin_group_flows").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+      await audit("group_flow.deleted", "group_flow", id, null, { name: flow.name });
+      return json({ ok: true, data: { id, name: flow.name } });
+    }
+
+    if (action === "group.connection.assign-flow") {
+      const id = str(input.id, 60);
+      const flowId = str(input.active_flow_id, 60) || null;
+      if (!id) return fail("ID do grupo inválido.");
+      const { data: connection, error: connectionError } = await db.from("superadmin_group_connections")
+        .select("id,group_name,active_flow_id,is_enabled,whatsapp_number_id")
+        .eq("id", id).maybeSingle();
+      if (connectionError) throw connectionError;
+      if (!connection) return fail("Grupo não encontrado.", 404);
+
+      let flow: any = null;
+      if (flowId) {
+        const { data, error } = await db.from("superadmin_group_flows")
+          .select("id,name,is_active,trigger_mode").eq("id", flowId).maybeSingle();
+        if (error) throw error;
+        if (!data) return fail("Funil não encontrado.", 404);
+        flow = data;
+      }
+
+      // Cancel queued jobs from the previous assignment before changing the target flow.
+      const { error: cancelError } = await db.from("superadmin_group_jobs")
+        .update({ status: "cancelled", last_error: "Cancelado porque o funil associado ao grupo foi alterado.", updated_at: new Date().toISOString() })
+        .eq("connection_id", id).eq("status", "queued");
+      if (cancelError) throw cancelError;
+
+      const keepEnabled = Boolean(connection.is_enabled && flow?.is_active);
+      const { data: updated, error: updateError } = await db.from("superadmin_group_connections")
+        .update({ active_flow_id: flowId, is_enabled: keepEnabled, updated_at: new Date().toISOString() })
+        .eq("id", id).select("id,group_name,active_flow_id,is_enabled").single();
+      if (updateError) throw updateError;
+
+      let queued = 0;
+      if (keepEnabled && flow) {
+        const { data: steps, error: stepsError } = await db.from("superadmin_group_flow_steps")
+          .select("id,flow_id,position,trigger_mode,delay_minutes,scheduled_at,action_type,text_content,asset_path,asset_mime_type,asset_file_name,caption")
+          .eq("flow_id", flow.id).order("position", { ascending: true });
+        if (stepsError) throw stepsError;
+        let cumulativeDelay = 0;
+        const now = Date.now();
+        for (const step of steps ?? []) {
+          let dueAt: Date;
+          if (step.trigger_mode === "relative") {
+            cumulativeDelay += Math.max(0, Number(step.delay_minutes ?? 0));
+            dueAt = new Date(now + cumulativeDelay * 60_000);
+          } else {
+            if (!step.scheduled_at || !Number.isFinite(Date.parse(step.scheduled_at))) continue;
+            dueAt = new Date(step.scheduled_at);
+            if (dueAt.getTime() <= now) continue;
+          }
+          const idempotencyKey = id + ":" + step.id + ":" + dueAt.toISOString();
+          const { error: queueError } = await db.from("superadmin_group_jobs").upsert({
+            connection_id: id, flow_id: flow.id, step_id: step.id, due_at: dueAt.toISOString(),
+            status: "queued", idempotency_key: idempotencyKey, payload: {},
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+          if (queueError) throw queueError;
+          queued += 1;
+        }
+      }
+
+      await audit("group_connection.flow_assigned", "group_connection", id, null, {
+        group_name: connection.group_name, from_flow_id: connection.active_flow_id,
+        to_flow_id: flowId, enabled: keepEnabled, queued,
+      });
+      return json({
+        ok: true,
+        data: updated,
+        queued,
+        note: !flowId ? "Associação removida; o grupo ficou desactivado e as tarefas pendentes foram canceladas."
+          : !flow?.is_active ? "Funil associado. Como está em rascunho, o grupo ficou desactivado até o funil ser activado."
+          : connection.is_enabled ? "Funil alterado e tarefas do novo funil colocadas na fila."
+          : "Funil associado. O grupo continua desactivado; activa-o quando estiver pronto.",
+      });
+    }
+
     if (action === "group.flow.toggle") {
       const id = str(input.id, 60); const active = input.is_active === true;
       if (!id) return fail("ID do funil inválido.");
