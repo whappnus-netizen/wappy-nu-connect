@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Building2, CheckCircle2, CircleDollarSign, CreditCard, LayoutDashboard,
   LoaderCircle, LockKeyhole, LogOut, Plus, RefreshCw, Search, ShieldCheck,
-  Smartphone, Sparkles, Users, Wallet, AlertTriangle, ArrowUpRight, Clock3, Trash2, Trash2,
+  Smartphone, Sparkles, Users, Wallet, AlertTriangle, ArrowUpRight, Clock3, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
