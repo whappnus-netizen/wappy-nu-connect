@@ -88,6 +88,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-surface">
+      {open && <button type="button" aria-label="Fechar menu de navegação" onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-black/50 backdrop-blur-[1px] lg:hidden" />}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-card transition-transform lg:static lg:translate-x-0",
@@ -169,7 +170,7 @@ export function AppShell({
             ))}
           </section>
         )}
-        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-8">{children}</main>
       </div>
     </div>
   );

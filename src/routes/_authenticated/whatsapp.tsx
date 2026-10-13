@@ -304,11 +304,11 @@ function WhatsAppPage() {
       title="WhatsApp"
       description="Números e ligações WhatsApp da sua organização"
       actions={
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={!orgId || !canConnect} onClick={() => setMethod("meta_cloud")}>
+        <div className="flex max-w-[62vw] flex-wrap justify-end gap-1.5 sm:max-w-none sm:gap-2">
+          <Button size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" variant="outline" disabled={!orgId || !canConnect} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
-          <Button size="sm" disabled={!orgId || !canConnect || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
+          <Button size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" disabled={!orgId || !canConnect || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
             <QrCode className="size-4" /> Conectar WhatsApp
           </Button>
         </div>
@@ -316,7 +316,7 @@ function WhatsAppPage() {
     >
       {/* Escolha do método */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card p-5 shadow-soft">
+        <div className="min-w-0 rounded-xl border border-border bg-card p-3 shadow-soft sm:p-5">
           <div className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 size-5 text-primary" />
             <div>
@@ -390,7 +390,7 @@ function WhatsAppPage() {
               const status = isQr ? (session?.status ?? n.status) : n.status;
               return (
                 <div key={n.id} className="rounded-xl border border-border bg-card p-5 shadow-soft">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                     <p className="font-medium">{session?.display_name ?? n.display_name ?? n.phone_e164}</p>
                     <Badge variant={status === "connected" ? "default" : "secondary"}>
                       {statusLabel[status] ?? status}
