@@ -692,7 +692,8 @@ Deno.serve(async (req: Request) => {
           const idempotencyKey = id + ":" + step.id + ":" + dueAt.toISOString();
           const { error: queueError } = await db.from("superadmin_group_jobs").upsert({
             connection_id: id, flow_id: flow.id, step_id: step.id, due_at: dueAt.toISOString(),
-            status: "queued", idempotency_key: idempotencyKey, payload: {},
+            status: "queued", idempotency_key: idempotencyKey,
+            payload: { action_type: step.action_type, text_content: step.text_content, asset_path: step.asset_path, asset_mime_type: step.asset_mime_type, asset_file_name: step.asset_file_name, caption: step.caption },
             updated_at: new Date().toISOString(),
           }, { onConflict: "idempotency_key", ignoreDuplicates: true });
           if (queueError) throw queueError;
