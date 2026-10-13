@@ -262,9 +262,9 @@ function SuperAdminPage() {
   });
   const deleteGroupFlow = useMutation({
     mutationFn: (id: string) => adminApi<any>("group.flow.delete", { id }),
-    onSuccess: () => {
+    onSuccess: (deleted: { id: string; name: string }) => {
       toast.success("Funil eliminado. Os grupos associados ficaram desactivados e sem funil.");
-      if (groupFlowId === deleteGroupFlow.variables) setGroupFlowId("");
+      if (groupFlowId === deleted.id) setGroupFlowId("");
       void client.invalidateQueries({ queryKey: ["superadmin", "group-commander"] });
     },
     onError: (error: Error) => toast.error(error.message),
