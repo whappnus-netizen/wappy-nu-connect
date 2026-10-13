@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Building2, CheckCircle2, CircleDollarSign, CreditCard, LayoutDashboard,
   LoaderCircle, LockKeyhole, LogOut, Plus, RefreshCw, Search, ShieldCheck,
-  Smartphone, Sparkles, Users, Wallet, AlertTriangle, ArrowUpRight, Clock3, Trash2,
+  Smartphone, Sparkles, Users, Wallet, AlertTriangle, ArrowUpRight, Clock3, Trash2, Menu, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +139,7 @@ const slugify = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036
 
 function SuperAdminPage() {
   const [tab, setTab] = useState("overview");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
@@ -350,18 +351,13 @@ function SuperAdminPage() {
       </aside>
 
       <main className="min-w-0 lg:pl-64">
-        <header className="sticky top-0 z-10 flex min-h-20 items-center justify-between gap-4 border-b border-white/10 bg-[#07110e]/90 px-5 backdrop-blur-xl sm:px-8">
-          <div><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "renewals" ? "Renovações e avisos" : tab === "notifications" ? "Notificações" : tab === "groups" ? "Group Commander" : tab === "group-ai" ? "Treinar IA do funil" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div>
-          <div className="flex items-center gap-2"><Badge variant="outline" className="hidden border-emerald-300/20 text-emerald-200 sm:inline-flex">AOA · Africa/Luanda</Badge><Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10" onClick={refreshAll} aria-label="Atualizar"><RefreshCw className="size-4" /></Button></div>
+        <header className="sticky top-0 z-30 flex min-h-20 items-center justify-between gap-3 border-b border-white/10 bg-[#07110e]/90 px-3 backdrop-blur-xl sm:px-8">
+          <div className="flex min-w-0 items-center gap-3"><Button type="button" variant="outline" size="icon" aria-label={mobileNavOpen ? "Fechar menu" : "Abrir menu"} className="shrink-0 border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 lg:hidden" onClick={() => setMobileNavOpen(v => !v)}>{mobileNavOpen ? <X className="size-5" /> : <Menu className="size-5" />}</Button><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "renewals" ? "Renovações e avisos" : tab === "notifications" ? "Notificações" : tab === "groups" ? "Group Commander" : tab === "group-ai" ? "Treinar IA do funil" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div></div>
+          <div className="flex shrink-0 items-center gap-2"><Badge variant="outline" className="hidden border-emerald-300/20 text-emerald-200 sm:inline-flex">AOA · Africa/Luanda</Badge><Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10" onClick={refreshAll} aria-label="Atualizar"><RefreshCw className="size-4" /></Button></div>
         </header>
-        <nav className="flex gap-1 overflow-x-auto border-b border-white/10 px-3 py-2 lg:hidden">
-          {([
-            ["overview", "Resumo"], ["organizations", "Clientes"], ["plans", "Planos"],
-            ["subscriptions", "Assinaturas"], ["renewals", "Renovações"], ["notifications", "Notificações"], ["groups", "Grupos"], ["payments", "Pagamentos"], ["health", "Saúde"], ["team", "Equipa"], ["audit", "Auditoria"],
-          ] as [string, string][]).map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium ${tab === id ? "bg-emerald-300/10 text-emerald-200" : "text-slate-400 hover:bg-white/5"}`}>{label}</button>)}
-        </nav>
+        {mobileNavOpen && <><button type="button" aria-label="Fechar menu de navegação" className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setMobileNavOpen(false)} /><aside role="dialog" aria-modal="true" aria-label="Navegação do Super Admin" className="fixed inset-y-0 left-0 z-40 flex w-[min(84vw,20rem)] flex-col border-r border-white/10 bg-[#091510] shadow-2xl lg:hidden"><div className="flex h-20 items-center justify-between gap-3 border-b border-white/10 px-5"><div><div className="font-display text-lg font-bold tracking-tight">WhappNus</div><div className="text-[10px] uppercase tracking-[0.24em] text-emerald-300">Control Center</div></div><Button type="button" variant="ghost" size="icon" aria-label="Fechar menu" className="text-slate-300" onClick={() => setMobileNavOpen(false)}><X className="size-5" /></Button></div><div className="px-4 pt-5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Plataforma</div><nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-3 pb-4">{[[ "overview", LayoutDashboard, "Resumo" ],[ "organizations", Building2, "Clientes" ],[ "plans", CircleDollarSign, "Planos" ],[ "subscriptions", CreditCard, "Assinaturas" ],[ "renewals", Clock3, "Renovações" ],[ "notifications", Sparkles, "Notificações" ],[ "groups", Users, "Grupos" ],[ "group-ai", Sparkles, "Treinar IA" ],[ "payments", Wallet, "Pagamentos" ],[ "health", Activity, "Saúde" ],[ "team", Users, "Equipa" ],[ "audit", LockKeyhole, "Auditoria" ]].map(([id, Icon, label]) => { const I = Icon as typeof LayoutDashboard; return <button key={id as string} type="button" onClick={() => { setTab(id as string); setMobileNavOpen(false); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${tab === id ? "bg-emerald-400/10 font-semibold text-emerald-200 ring-1 ring-emerald-300/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><I className="size-4 shrink-0" /><span>{label as string}</span>{tab === id && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-300" />}</button>; })}</nav><div className="border-t border-white/10 p-4"><Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white" onClick={() => void supabase.auth.signOut().then(() => { window.location.href = "/auth/login"; })}><LogOut className="mr-2 size-4" />Terminar sessão</Button></div></aside></>}
 
-        <div className="p-4 sm:p-8">
+        <div className="p-3 sm:p-5 lg:p-8">
           {pageError && <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm"><AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-300" /><div><div className="font-semibold text-amber-100">Não foi possível carregar o painel</div><p className="mt-1 text-slate-400">{pageError.message}. Confirma se a migração está aplicada e se a tua conta foi autorizada em <code>superadmin_users</code>.</p></div></div>}
 
           {tab === "overview" && <div className="space-y-6">
