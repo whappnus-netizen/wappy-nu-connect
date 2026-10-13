@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus, ArrowDown } from "lucide-react";
+import { MessagesSquare, Search, Filter, Send, UserPlus, ArrowRightLeft, CheckCircle2, Clock3, RotateCcw, Plus, ArrowDown, ArrowLeft } from "lucide-react";
 import { AppShell, EmptyState } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -283,20 +283,20 @@ function InboxPage() {
 
   return (
     <AppShell title="Inbox" description="Multiatendimento em tempo real — receba, responda, assuma e organize conversas">
-      <div className="grid h-[calc(100dvh-8rem)] min-h-[480px] grid-rows-[minmax(170px,35%)_minmax(0,1fr)] gap-3 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)_280px] lg:grid-rows-1 lg:gap-4">
-        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <div className="grid h-[calc(100dvh-7.5rem)] min-h-[420px] min-w-0 grid-cols-1 grid-rows-1 gap-3 overflow-hidden lg:h-[calc(100dvh-8rem)] lg:min-h-[480px] lg:grid-cols-[280px_minmax(0,1fr)_260px] lg:grid-rows-1 lg:gap-4 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
+        <section className={`${active ? "hidden lg:flex" : "flex"} relative min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card`}>
           <div className="space-y-3 border-b border-border p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="Pesquisar conversas" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
-            <p className="text-xs leading-5 text-muted-foreground">Aberta: disponível para atendimento. Pendente: pausada para seguimento. Em atendimento: atribuída ao utilizador e IA desligada. Encerrada: concluída; uma nova mensagem pode iniciar outra conversa.</p>
-            <div className="flex flex-wrap gap-1">
+            <p className="hidden text-xs leading-5 text-muted-foreground sm:block">Aberta: disponível para atendimento. Pendente: pausada para seguimento. Em atendimento: atribuída ao utilizador e IA desligada. Encerrada: concluída; uma nova mensagem pode iniciar outra conversa.</p>
+            <div className="grid grid-cols-2 gap-1 sm:flex sm:flex-wrap">
               {statuses.map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatus(s)}
-                  className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                  className={`min-w-0 rounded-md px-2 py-2 text-xs font-medium transition-colors ${
                     status === s ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary"
                   }`}
                 >
@@ -337,7 +337,8 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+        <section className={`${active ? "flex" : "hidden lg:flex"} relative min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card`}>
+          {active && <div className="flex shrink-0 items-center gap-3 border-b border-border px-3 py-2 lg:hidden"><Button type="button" variant="ghost" size="icon" aria-label="Voltar à lista de conversas" onClick={() => setSelected(null)}><ArrowLeft className="size-5" /></Button><div className="min-w-0"><p className="truncate text-sm font-semibold">{active.contacts?.full_name ?? active.contacts?.phone_e164 ?? "Conversa"}</p><p className="truncate text-xs text-muted-foreground">{active.contacts?.phone_e164 ?? active.status}</p></div><Badge variant="secondary" className="ml-auto shrink-0 text-[10px]">{active.status}</Badge></div>}
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -347,7 +348,7 @@ function InboxPage() {
               />
             </div>
           ) : (
-            <div ref={messagesViewportRef} onScroll={onMessagesScroll} className="relative min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
+            <div ref={messagesViewportRef} onScroll={onMessagesScroll} className="relative min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 sm:p-4">
               {(messages ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem mensagens nesta conversa.</p>
               ) : (
@@ -378,7 +379,7 @@ function InboxPage() {
           <div className="shrink-0 border-t border-border bg-card p-3">
             <Textarea
               placeholder={active ? "Escreva a resposta…" : "Selecione uma conversa para responder"}
-              rows={3}
+              rows={2}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               disabled={!active || send.isPending}
