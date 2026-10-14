@@ -1,6 +1,7 @@
 -- Keep one live WhatsApp number per organisation while allowing archived numbers to be registered again.
 ALTER TABLE public.whatsapp_numbers
   DROP CONSTRAINT IF EXISTS whatsapp_numbers_organization_id_phone_e164_key;
+DROP INDEX IF EXISTS public.whatsapp_numbers_organization_id_phone_e164_key;
 
 CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_numbers_org_phone_active_key
   ON public.whatsapp_numbers (organization_id, phone_e164)
