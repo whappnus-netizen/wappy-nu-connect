@@ -127,3 +127,52 @@ export const draftAiReplyForConversation = createServerFn({ method: "POST" })
       usedKnowledge: result.usedKnowledge,
     };
   });
+
+
+/** Organiza texto livre do empresário num prompt claro, sem inventar factos. */
+export const organizeAgentInstructions = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({
+      organizationId: z.string().uuid(),
+      agentId: z.string().uuid(),
+      text: z.string().trim().min(10).max(30000),
+    }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { requireOrgRole, serviceClient } = await import("./whatsapp.server");
+    await requireOrgRole(data.organizationId, ["OWNER", "ADMIN"]);
+    const admin = serviceClient();
+    const { data: agent, error } = await admin.from("ai_agents")
+      .select("id").eq("id", data.agentId)
+      .eq("organization_id", data.organizationId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!agent) throw new Error("O agente seleccionado não pertence a esta organização.");
+
+    const key = process.env["LOVABLE_API_KEY"];
+    if (!key) throw new Error("O serviço de organização de instruções não está configurado no servidor.");
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "Lovable-API-Key": key },
+      body: JSON.stringify({
+        model: "google/gemini-3.7-flash",
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: "És especialista em engenharia de prompts para assistentes comerciais de WhatsApp em Angola. Reorganiza o texto do utilizador num conjunto claro, profissional e prático de instruções em português. Preserva todos os factos, preços, regras e limites fornecidos. Não inventes dados nem acrescentes políticas que não foram ditas. Usa títulos curtos e listas quando ajudarem. Se algo estiver ambíguo, escreve uma instrução para confirmar com um humano em vez de adivinhar. Devolve apenas o texto final, sem introdução nem comentários."
+          },
+          { role: "user", content: data.text },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(response.status === 429
+        ? "Muitas solicitações. Aguarda um momento e tenta novamente."
+        : "Não foi possível organizar as instruções agora. " + detail.slice(0, 180));
+    }
+    const result = await response.json() as { choices?: { message?: { content?: string } }[] };
+    const organized = result.choices?.[0]?.message?.content?.trim();
+    if (!organized) throw new Error("O organizador não devolveu um texto válido.");
+    return { text: organized };
+  });
