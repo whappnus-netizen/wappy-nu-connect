@@ -124,7 +124,7 @@ export function AppShell({
             <p className="truncate text-xs font-medium">{membership?.organizations?.name ?? "Sem organização"}</p>
             <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
             <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-              {membership?.role ?? "—"}
+              {membership?.role === "OWNER" ? "Proprietário" : membership?.role === "ADMIN" ? "Administrador" : membership?.role === "SUPERVISOR" ? "Supervisor" : membership?.role === "AGENT" ? "Agente" : "—"}
             </p>
           </div>
           <Button variant="ghost" size="sm" className="mt-2 w-full justify-start" onClick={() => signOut()}>
