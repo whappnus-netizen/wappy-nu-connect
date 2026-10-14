@@ -245,6 +245,7 @@ function WhatsAppPage() {
     onSuccess: (res) => {
       setError(res.error ?? null);
       void queryClient.invalidateQueries({ queryKey: ["whatsapp_sessions", orgId] });
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp_numbers", orgId] });
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -304,7 +305,7 @@ function WhatsAppPage() {
       title="WhatsApp"
       description="Números e ligações WhatsApp da sua organização"
       actions={
-        <div className="flex max-w-[62vw] flex-wrap justify-end gap-1.5 sm:max-w-none sm:gap-2">
+        <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto sm:flex-nowrap">
           <Button size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" variant="outline" disabled={!orgId || !canConnect} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
@@ -317,7 +318,7 @@ function WhatsAppPage() {
       {/* Escolha do método */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 rounded-xl border border-border bg-card p-3 shadow-soft sm:p-5">
-          <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
             <ShieldCheck className="mt-0.5 size-5 text-primary" />
             <div>
               <h2 className="font-display text-sm font-semibold">Meta WhatsApp Cloud API</h2>
@@ -327,7 +328,7 @@ function WhatsAppPage() {
               </p>
               <div className="mt-3 space-y-1 text-sm">
                 <p className="font-medium">URL do webhook a configurar no Meta Developers:</p>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <code className="truncate rounded bg-secondary px-2 py-1 text-xs">{webhookUrl}</code>
                   <Button
                     size="sm"
@@ -346,7 +347,7 @@ function WhatsAppPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5 shadow-soft">
+        <div className="min-w-0 rounded-xl border border-border bg-card p-3 shadow-soft sm:p-5">
           <div className="flex items-start gap-3">
             <QrCode className="mt-0.5 size-5 text-primary" />
             <div>
@@ -475,12 +476,12 @@ function WhatsAppPage() {
                           variant="destructive"
                           disabled={!canManage || archiveQr.isPending}
                           onClick={() => {
-                            if (window.confirm("Arquivar esta ligação? A sessão será desligada e deixará de aparecer nesta lista. As conversas, contactos e mensagens serão preservados.")) {
+                            if (window.confirm("Apagar esta ligação? A sessão e as credenciais serão removidas do sistema. O histórico de conversas, contactos e mensagens será preservado.")) {
                               archiveQr.mutate(n.id);
                             }
                           }}
                         >
-                          <Trash2 className="size-4" /> Arquivar
+                          {archiveQr.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />} Apagar ligação
                         </Button>
                         <Button
                           size="sm"
@@ -492,14 +493,28 @@ function WhatsAppPage() {
                         </Button>
                       </>
                     ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={check.isPending}
-                        onClick={() => check.mutate(n.id)}
-                      >
-                        <RefreshCw className="size-4" /> Testar ligação
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={check.isPending}
+                          onClick={() => check.mutate(n.id)}
+                        >
+                          <RefreshCw className="size-4" /> Testar ligação
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={!canManage || archiveQr.isPending}
+                          onClick={() => {
+                            if (window.confirm("Apagar esta ligação? As credenciais serão removidas do sistema. O histórico de conversas, contactos e mensagens será preservado.")) {
+                              archiveQr.mutate(n.id);
+                            }
+                          }}
+                        >
+                          {archiveQr.isPending ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />} Apagar ligação
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>

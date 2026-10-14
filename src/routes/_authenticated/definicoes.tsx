@@ -147,8 +147,7 @@ function SettingsPage() {
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-sm font-semibold">Organização</h2>
           <div className="mt-2">
-            <Row label="Identificador" value={membership?.organizations?.slug ?? "—"} />
-            <Row label="A sua função" value={membership?.role ?? "—"} />
+            <Row label="A sua função" value={membership?.role === "OWNER" ? "Proprietário principal" : membership?.role === "ADMIN" ? "Administrador" : membership?.role === "SUPERVISOR" ? "Supervisor" : "Agente"} />
           </div>
           <form className="mt-4 space-y-4 border-t border-border pt-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
             <div className="space-y-1.5"><Label htmlFor="org-name">Nome da organização</Label><Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={!canEdit || save.isPending} required /></div>

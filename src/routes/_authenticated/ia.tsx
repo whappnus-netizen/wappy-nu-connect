@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, MessageSquare, Plus, Sparkles, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Loader2, MessageSquare, Plus, Sparkles, Trash2, Mic, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useSubscriptionAccess } from "@/lib/subscription";
 import { supabase } from "@/lib/supabase/client";
-import { testOrgAiAgent } from "@/lib/ai.functions";
+import { testOrgAiAgent, organizeAgentInstructions } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/ia")({
   head: () => ({
@@ -50,6 +51,7 @@ type Agent = {
   model: string | null;
   is_active: boolean;
   goal: string | null;
+  personality: string | null;
   company_name: string | null;
   company_description: string | null;
   products_services: string | null;
@@ -83,7 +85,7 @@ type Example = {
 };
 
 const AGENT_FIELDS = [
-  "id, organization_id, name, model, is_active, goal, company_name, company_description",
+  "id, organization_id, name, model, is_active, goal, personality, company_name, company_description",
   "products_services, business_hours, location, payment_methods, faq, tone",
   "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions",
 ].join(", ");
@@ -142,7 +144,7 @@ function AiPage() {
       return;
     }
     if (!selectedAgentId || !agents.some((item) => item.id === selectedAgentId)) {
-      setSelectedAgentId(agents[0]?.id ?? null);
+      setSelectedAgentId(agents.find((item) => item.is_active)?.id ?? agents[0]?.id ?? null);
     }
   }, [agentQuery.data, selectedAgentId]);
 
@@ -526,11 +528,9 @@ function Overview({
 
   const checklist = [
     { label: "Nome da empresa", done: Boolean(agent.company_name) },
-    { label: "Objetivo do agente", done: Boolean(agent.goal) },
-    { label: "Produtos e serviços", done: Boolean(agent.products_services) },
-    { label: "Horário de atendimento", done: Boolean(agent.business_hours) },
-    { label: "Formas de pagamento", done: Boolean(agent.payment_methods) },
-    { label: "Regras de atendimento", done: Boolean(agent.service_rules) },
+    { label: "Objectivo do agente", done: Boolean(agent.goal) },
+    { label: "Personalidade da IA", done: Boolean(agent.personality) },
+    { label: "Instrução da IA", done: Boolean(agent.extra_instructions) },
     { label: "Conhecimento adicionado", done: knowledgeCount > 0 },
     { label: "Exemplos de treinamento", done: exampleCount > 0 },
   ];
@@ -594,32 +594,43 @@ const CONFIG_FIELDS: {
   hint: string;
   long?: boolean;
 }[] = [
-  { key: "name", label: "Nome do agente", hint: "Como o assistente se apresenta ao cliente." },
-  { key: "goal", label: "Objetivo do agente", hint: "Ex.: atender clientes e recolher pedidos.", long: true },
+  { key: "name", label: "Nome do agente", hint: "Nome pelo qual o assistente será conhecido." },
+  { key: "tone", label: "Tom de voz", hint: "Escolha um estilo sugerido ou escreva o seu." },
+  { key: "goal", label: "Objectivo do agente", hint: "O resultado principal que o assistente deve alcançar.", long: true },
+  { key: "personality", label: "Personalidade da IA", hint: "Descreva como a IA deve ser, falar e relacionar-se com os clientes.", long: true },
+  { key: "extra_instructions", label: "Instrução da IA", hint: "Explique tarefas, processos, prioridades e regras específicas. Pode escrever ou ditar.", long: true },
   { key: "company_name", label: "Nome da empresa", hint: "Nome comercial da sua empresa." },
-  { key: "company_description", label: "Descrição da empresa", hint: "O que a empresa faz.", long: true },
-  { key: "products_services", label: "Produtos e serviços", hint: "Liste o que vende, com detalhes úteis.", long: true },
-  { key: "business_hours", label: "Horário de atendimento", hint: "Ex.: segunda a sábado, 8h–18h.", long: true },
-  { key: "location", label: "Localização", hint: "Endereço ou zonas onde atua.", long: true },
-  { key: "payment_methods", label: "Formas de pagamento", hint: "Ex.: transferência, multicaixa, dinheiro.", long: true },
-  { key: "faq", label: "Perguntas frequentes e respostas", hint: "Uma pergunta e resposta por linha.", long: true },
-  { key: "tone", label: "Tom de comunicação", hint: "Ex.: simpático, formal, direto." },
-  { key: "service_rules", label: "Regras de atendimento", hint: "O que deve sempre cumprir.", long: true },
-  { key: "can_do", label: "O que a IA pode fazer", hint: "Ex.: informar preços e horários.", long: true },
-  { key: "cannot_do", label: "O que a IA NÃO pode fazer", hint: "Ex.: dar descontos.", long: true },
-  { key: "handoff_instructions", label: "Quando encaminhar para um atendente", hint: "Situações que exigem um humano.", long: true },
-  { key: "greeting_message", label: "Mensagem inicial", hint: "Primeira mensagem enviada ao cliente.", long: true },
-  { key: "extra_instructions", label: "Instruções adicionais", hint: "Qualquer outra orientação.", long: true },
+  { key: "company_description", label: "Descrição da empresa", hint: "O que a empresa faz e a quem serve.", long: true },
+  { key: "can_do", label: "O que a IA pode fazer (opcional)", hint: "Acções autorizadas, como esclarecer dúvidas e recolher pedidos.", long: true },
+  { key: "cannot_do", label: "O que a IA não pode fazer (opcional)", hint: "Limites, promessas ou acções que deve evitar.", long: true },
 ];
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
 
 function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
   const qc = useQueryClient();
+  const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [recordingField, setRecordingField] = useState<string | null>(null);
+  const [organizingField, setOrganizingField] = useState<string | null>(null);
+  const speechRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
+    setRecordingField(null);
+    speechRef.current?.stop();
+    speechRef.current = null;
   }, [agent.id]);
 
   const save = useMutation({
@@ -638,11 +649,81 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      toast.success("Treinamento da IA guardado.");
+      toast.success("Configuração da IA guardada.");
       void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const toggleDictation = (key: string) => {
+    if (recordingField === key) {
+      speechRef.current?.stop();
+      return;
+    }
+    speechRef.current?.stop();
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("O ditado por voz não é suportado neste navegador. Tenta no Chrome actualizado.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-PT";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
+      if (transcript) setForm((current) => ({
+        ...current,
+        [key]: [current[key]?.trim(), transcript].filter(Boolean).join("\n"),
+      }));
+    };
+    recognition.onerror = (event) => {
+      setRecordingField(null);
+      toast.error(event.error === "not-allowed" ? "Autoriza o acesso ao microfone no navegador." : "Não foi possível transcrever o áudio. Tenta novamente.");
+    };
+    recognition.onend = () => {
+      setRecordingField(null);
+      speechRef.current = null;
+    };
+    speechRef.current = recognition;
+    setRecordingField(key);
+    try { recognition.start(); } catch {
+      setRecordingField(null);
+      speechRef.current = null;
+      toast.error("Não foi possível iniciar o microfone. Verifica a permissão do navegador.");
+    }
+  };
+
+  const organize = async (key: string) => {
+    const text = (form[key] ?? "").trim();
+    if (text.length < 10) {
+      toast.error("Escreve ou dita mais detalhes antes de organizar.");
+      return;
+    }
+    setOrganizingField(key);
+    try {
+      const result = await organizeFn({ data: { organizationId: orgId, agentId: agent.id, text } });
+      setForm((current) => ({ ...current, [key]: result.text }));
+      toast.success("Texto organizado. Revê e guarda a configuração.");
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setOrganizingField(null);
+    }
+  };
+
+  const toneTemplates = [
+    "Profissional, simpático e claro",
+    "Próximo, acolhedor e paciente",
+    "Consultivo, especialista e orientado para vendas",
+    "Directo, breve e objectivo",
+    "Elegante, premium e discreto",
+    "Enérgico, persuasivo e respeitoso",
+  ];
 
   return (
     <form
@@ -654,31 +735,46 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
     >
       <div className="grid gap-5 md:grid-cols-2">
         {CONFIG_FIELDS.map((f) => (
-          <div key={f.key} className={f.long ? "space-y-2 md:col-span-2" : "space-y-2"}>
+          <div key={f.key} className={f.long ? "min-w-0 space-y-2 md:col-span-2" : "min-w-0 space-y-2"}>
             <Label htmlFor={f.key}>{f.label}</Label>
             {f.long ? (
               <Textarea
                 id={f.key}
-                rows={3}
+                rows={f.key === "personality" || f.key === "extra_instructions" ? 7 : 3}
                 value={form[f.key] ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                onChange={(e) => setForm((current) => ({ ...current, [f.key]: e.target.value }))}
                 placeholder={f.hint}
+                className="min-h-24 resize-y"
               />
             ) : (
               <Input
                 id={f.key}
                 value={form[f.key] ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, [f.key]: e.target.value }))}
+                onChange={(e) => setForm((current) => ({ ...current, [f.key]: e.target.value }))}
                 placeholder={f.hint}
+                list={f.key === "tone" ? "whappnus-tone-templates" : undefined}
               />
+            )}
+            {f.key === "tone" && <datalist id="whappnus-tone-templates">{toneTemplates.map((tone) => <option key={tone} value={tone} />)}</datalist>}
+            {(f.key === "personality" || f.key === "extra_instructions") && (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => toggleDictation(f.key)} className="max-w-full">
+                  <Mic className="mr-2 size-4" />{recordingField === f.key ? "Parar gravação" : "Ditar por voz"}
+                </Button>
+                <Button type="button" size="sm" variant="outline" disabled={organizingField !== null} onClick={() => void organize(f.key)}>
+                  {organizingField === f.key ? <Loader2 className="mr-2 size-4 animate-spin" /> : <WandSparkles className="mr-2 size-4" />}
+                  {organizingField === f.key ? "A organizar…" : "Organizar com IA"}
+                </Button>
+              </div>
             )}
             <p className="text-xs text-muted-foreground">{f.hint}</p>
           </div>
         ))}
       </div>
+      <p className="rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">Dica: pode ditar instruções longas e depois usar “Organizar com IA”. O texto será estruturado sem inventar preços, políticas ou informações que não forneceu. Revê sempre o resultado antes de guardar.</p>
       <Button type="submit" disabled={save.isPending}>
         {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Guardar treinamento
+        Guardar configuração
       </Button>
     </form>
   );

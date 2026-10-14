@@ -21,6 +21,7 @@ export type AiAgentRow = {
   is_active: boolean;
   system_prompt: string | null;
   goal: string | null;
+  personality: string | null;
   company_name: string | null;
   company_description: string | null;
   products_services: string | null;
@@ -83,6 +84,7 @@ export function buildSystemPrompt(ctx: AiContext): string {
     `És ${a.name}, assistente de atendimento da empresa ${a.company_name ?? "cliente"}.`,
     `Responde sempre em português (${a.language ?? "pt-AO"}), de forma curta e clara, adequada ao WhatsApp.`,
     section("Objectivo", a.goal),
+    section("Personalidade da IA", a.personality),
     section("Sobre a empresa", a.company_description),
     section("Produtos e serviços", a.products_services),
     section("Horário de atendimento", a.business_hours),
@@ -95,7 +97,7 @@ export function buildSystemPrompt(ctx: AiContext): string {
     section("O que NUNCA podes fazer", a.cannot_do),
     section("Quando encaminhar para um humano", a.handoff_instructions),
     section("Mensagem inicial", a.greeting_message),
-    section("Instruções adicionais", a.extra_instructions),
+    section("Instruções da IA", a.extra_instructions),
     section("Instruções técnicas do agente", a.system_prompt),
     knowledge ? section("Base de conhecimento da empresa", knowledge) : "",
     examples ? section("Exemplos e regras de treinamento", examples) : "",
