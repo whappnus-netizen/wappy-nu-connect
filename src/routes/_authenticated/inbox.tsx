@@ -68,6 +68,7 @@ function InboxPage() {
   const [status, setStatus] = useState<(typeof statuses)[number]>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -317,7 +318,7 @@ function InboxPage() {
               list.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => { setSelected(c.id); setNotice(null); setError(null); if ((c.unread_count ?? 0) > 0) { void supabase.from("conversations").update({ unread_count: 0 }).eq("id", c.id).eq("organization_id", orgId!); void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] }); } }}
+                  onClick={() => { setSelected(c.id); setMobileDetailsOpen(false); setNotice(null); setError(null); if ((c.unread_count ?? 0) > 0) { void supabase.from("conversations").update({ unread_count: 0 }).eq("id", c.id).eq("organization_id", orgId!); void queryClient.invalidateQueries({ queryKey: ["conversations", orgId] }); } }}
                   className={`w-full rounded-lg p-3 text-left transition-colors ${
                     selected === c.id ? "bg-secondary" : "hover:bg-secondary"
                   }`}
@@ -337,8 +338,8 @@ function InboxPage() {
           </div>
         </section>
 
-        <section className={`${active ? "flex" : "hidden lg:flex"} relative min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card`}>
-          {active && <div className="flex shrink-0 items-center gap-3 border-b border-border px-3 py-2 lg:hidden"><Button type="button" variant="ghost" size="icon" aria-label="Voltar à lista de conversas" onClick={() => setSelected(null)}><ArrowLeft className="size-5" /></Button><div className="min-w-0"><p className="truncate text-sm font-semibold">{active.contacts?.full_name ?? active.contacts?.phone_e164 ?? "Conversa"}</p><p className="truncate text-xs text-muted-foreground">{active.contacts?.phone_e164 ?? active.status}</p></div><Badge variant="secondary" className="ml-auto shrink-0 text-[10px]">{active.status}</Badge></div>}
+        <section className={`${active && !mobileDetailsOpen ? "flex" : "hidden lg:flex"} relative min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card`}>
+          {active && <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2 sm:px-3 lg:hidden"><Button type="button" variant="ghost" size="icon" aria-label="Voltar à lista de conversas" onClick={() => { setMobileDetailsOpen(false); setSelected(null); }}><ArrowLeft className="size-5" /></Button><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{active.contacts?.full_name ?? active.contacts?.phone_e164 ?? "Conversa"}</p><p className="truncate text-xs text-muted-foreground">{active.contacts?.phone_e164 ?? active.status}</p></div><Badge variant="secondary" className="shrink-0 text-[10px]">{active.status}</Badge><Button type="button" size="sm" variant="outline" className="shrink-0 px-2 text-xs" onClick={() => setMobileDetailsOpen(true)}><UserPlus className="mr-1 size-4" />Contacto</Button></div>}
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -406,8 +407,8 @@ function InboxPage() {
           </div>
         </section>
 
-        <aside className="hidden space-y-4 rounded-xl border border-border bg-card p-4 lg:block">
-          <h2 className="font-display text-sm font-semibold">Contacto</h2>
+        <aside className={`${active && mobileDetailsOpen ? "block" : "hidden lg:block"} min-h-0 overflow-y-auto space-y-4 rounded-xl border border-border bg-card p-4`}>
+          <div className="flex items-center justify-between gap-2"><h2 className="font-display text-sm font-semibold">Contacto e atendimento</h2><Button type="button" size="sm" variant="ghost" className="lg:hidden" onClick={() => setMobileDetailsOpen(false)}><ArrowLeft className="mr-1 size-4" />Voltar à conversa</Button></div>
           {active ? (
             <div className="space-y-1 text-sm">
               <p className="font-medium">{active.contacts?.full_name ?? "Sem nome"}</p>
