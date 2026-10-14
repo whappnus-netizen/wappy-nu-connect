@@ -182,6 +182,18 @@ function DashboardPage() {
             <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Conversas com IA neste período</span><span className="font-semibold tabular-nums">{used.toLocaleString("pt-PT")} / {limit.toLocaleString("pt-PT")}</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: progress + "%" }} /></div>
             <p className="mt-2 text-xs text-muted-foreground">O histórico, os contactos e as oportunidades existentes permanecem guardados mesmo quando o período termina.</p>
+          {Object.entries((plan?.features ?? {}) as Record<string, unknown>).some(([, enabled]) => enabled === true) && (
+            <div className="mt-5">
+              <h3 className="text-sm font-semibold">Incluído no seu plano</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {Object.entries((plan?.features ?? {}) as Record<string, unknown>).filter(([, enabled]) => enabled === true).map(([key]) => (
+                  <span key={key} className="rounded-full border border-border bg-secondary/50 px-3 py-1 text-xs">
+                    {({ ai: "Atendimento com IA", integrations: "Integrações WhatsApp", automations: "Automações", crm: "CRM", campaigns: "Campanhas", analytics: "Relatórios", team: "Gestão de equipa" } as Record<string, string>)[key] ?? key.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               { label: "Números WhatsApp", used: data?.numbers ?? 0, limit: Number(plan?.limits?.["whatsapp_numbers"] ?? 0) },
