@@ -65,10 +65,10 @@ function TeamPage() {
 
   const updateRole = useMutation({
     mutationFn: async ({ member, role }: { member: Member; role: Role }) => {
-      if (!orgId || !canManage) throw new Error("Apenas OWNER ou ADMIN pode gerir funções.");
+      if (!orgId || !canManage) throw new Error("Só o proprietário ou o administrador pode gerir funções.");
       if (member.user_id === user?.id && role !== member.role) throw new Error("Não podes alterar a tua própria função nesta sessão.");
-      if (member.role === "OWNER" && currentRole !== "OWNER") throw new Error("Só o proprietário pode gerir outra conta OWNER.");
-      if (role === "OWNER" && currentRole !== "OWNER") throw new Error("Só um OWNER pode atribuir a função de proprietário.");
+      if (member.role === "OWNER" && currentRole !== "OWNER") throw new Error("Só o proprietário principal pode gerir outra conta com permissões de proprietário.");
+      if (role === "OWNER" && currentRole !== "OWNER") throw new Error("Só o proprietário principal pode atribuir a função de proprietário.");
       const { error: updateError } = await supabase.from("memberships")
         .update({ role }).eq("organization_id", orgId).eq("user_id", member.user_id);
       if (updateError) throw new Error(updateError.message);
@@ -100,7 +100,7 @@ function TeamPage() {
 
   const addMember = useMutation({
     mutationFn: async () => {
-      if (!orgId || !canManage) throw new Error("Apenas OWNER ou ADMIN pode adicionar membros.");
+      if (!orgId || !canManage) throw new Error("Só o proprietário ou o administrador pode adicionar membros.");
       return addMemberFn({ data: { organizationId: orgId, email: newEmail.trim(), role: newRole } });
     },
     onSuccess: (result) => {
@@ -118,7 +118,7 @@ function TeamPage() {
     <AppShell title="Equipa" description="Membros com acesso a esta organização e respetivas funções">
       <div className="mb-4 flex flex-col gap-2 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-start">
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
-        <div className="min-w-0"><p className="text-sm font-medium">Permissões da organização</p><p className="mt-1 text-xs leading-5 text-muted-foreground">OWNER e ADMIN podem alterar funções. A conta OWNER e a tua própria conta ficam protegidas contra remoção acidental. Remover um membro retira apenas o acesso à organização; não apaga a conta nem o histórico.</p></div>
+        <div className="min-w-0"><p className="text-sm font-medium">Permissões da organização</p><p className="mt-1 text-xs leading-5 text-muted-foreground">O proprietário e o administrador podem alterar funções. A conta do proprietário principal e a tua própria conta ficam protegidas contra remoção acidental. Remover um membro retira apenas o acesso à organização; não apaga a conta nem o histórico.</p></div>
       </div>
 
       {canManage && <form className="mb-4 grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[minmax(0,1fr)_200px_auto]" onSubmit={(e) => { e.preventDefault(); addMember.mutate(); }}>
@@ -173,7 +173,7 @@ function TeamPage() {
           </Table>
         </div>
       )}
-      {!canManage && <p className="mt-3 text-xs text-muted-foreground">Podes consultar a equipa, mas apenas OWNER ou ADMIN pode alterar funções ou remover membros.</p>}
+      {!canManage && <p className="mt-3 text-xs text-muted-foreground">Podes consultar a equipa, mas apenas o proprietário ou o administrador pode alterar funções ou remover membros.</p>}
       <p className="mt-4 text-xs text-muted-foreground">Convites automáticos por email ainda não estão ligados. Para adicionar alguém, essa pessoa deve criar primeiro uma conta Wapnus; depois podes associá-la à organização aqui.</p>
     </AppShell>
   );
