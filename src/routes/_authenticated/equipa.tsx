@@ -54,23 +54,12 @@ function TeamPage() {
     queryKey: ["team", orgId],
     enabled: Boolean(orgId),
     queryFn: async () => {
-      const { data: memberships, error: membershipError } = await supabase
+      const { data, error: queryError } = await supabase
         .from("memberships")
-        .select("user_id, role, created_at")
+        .select("user_id, role, created_at, profiles!memberships_user_id_profiles_fkey(full_name, email)")
         .eq("organization_id", orgId!);
-      if (membershipError) throw new Error(membershipError.message);
-      const userIds = [...new Set((memberships ?? []).map((m) => m.user_id))];
-      if (userIds.length === 0) return [];
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .in("id", userIds);
-      if (profilesError) throw new Error(profilesError.message);
-      const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
-      return (memberships ?? []).map((m) => ({
-        ...m,
-        profiles: profileById.get(m.user_id) ?? null,
-      })) as unknown as Member[];
+      if (queryError) throw new Error(queryError.message);
+      return (data ?? []) as unknown as Member[];
     },
   });
 
