@@ -392,11 +392,11 @@ export const archiveQrConnection = createServerFn({ method: "POST" })
       .maybeSingle();
     if (numberError) throw new Error(numberError.message);
     if (!number) throw new Error("Ligação não encontrada nesta organização.");
-    if (number.provider !== "qr") throw new Error("Esta operação só arquiva ligações QR.");
+    const isQr = number.provider === "qr";
     if (number.deleted_at) return { ok: true, alreadyArchived: true };
 
     let bridgeError: string | null = null;
-    if (qrBridgeConfigured()) {
+    if (isQr && qrBridgeConfigured()) {
       try {
         await qrProvider.disconnect({ organizationId: data.organizationId, whatsappNumberId: data.numberId });
       } catch (e) {
@@ -404,28 +404,39 @@ export const archiveQrConnection = createServerFn({ method: "POST" })
       }
     }
 
-    if (bridgeError) throw new Error(`Não foi possível confirmar a desconexão no motor WhatsApp. A ligação não foi arquivada: ${bridgeError}`);
-    if (!qrBridgeConfigured() && number.status === "connected") throw new Error("O motor QR não está configurado; não é seguro arquivar uma ligação que pode continuar activa.");
+    if (bridgeError) throw new Error(`Não foi possível confirmar a desconexão no motor WhatsApp. A ligação não foi apagada: ${bridgeError}`);
+    if (isQr && !qrBridgeConfigured() && number.status === "connected") {
+      throw new Error("O motor QR não está configurado; não é seguro apagar uma ligação que pode continuar activa.");
+    }
 
     const now = new Date().toISOString();
+    // Remove session state and stored credentials; preserve CRM history and soft-delete
+    // the number so conversations retain their foreign keys while the phone can be reused.
     const { error: sessionError } = await admin
       .from("whatsapp_sessions")
-      .update({ status: "disconnected", qr_code: null, qr_expires_at: null, last_error: bridgeError, updated_at: now })
+      .delete()
       .eq("organization_id", data.organizationId)
       .eq("whatsapp_number_id", data.numberId);
-    if (sessionError) throw new Error(`Não foi possível encerrar a sessão: ${sessionError.message}`);
+    if (sessionError) throw new Error(`Não foi possível remover a sessão: ${sessionError.message}`);
+
+    const { error: credentialError } = await admin
+      .from("whatsapp_credentials")
+      .delete()
+      .eq("organization_id", data.organizationId)
+      .eq("whatsapp_number_id", data.numberId);
+    if (credentialError) throw new Error(`Não foi possível remover as credenciais: ${credentialError.message}`);
 
     const { error: archiveError } = await admin
       .from("whatsapp_numbers")
-      .update({ status: "disconnected", deleted_at: now, disconnected_at: now, last_error: bridgeError, updated_at: now })
+      .update({ status: "disconnected", deleted_at: now, disconnected_at: now, last_error: null, updated_at: now })
       .eq("id", data.numberId)
       .eq("organization_id", data.organizationId);
-    if (archiveError) throw new Error(`Não foi possível arquivar a ligação: ${archiveError.message}`);
+    if (archiveError) throw new Error(`Não foi possível remover a ligação: ${archiveError.message}`);
 
     await logWhatsAppEvent(data.organizationId, "disconnected", {
       whatsappNumberId: data.numberId,
-      provider: "qr",
-      detail: { archived: true, bridgeError: bridgeError ? bridgeError.slice(0, 200) : null },
+      provider: number.provider,
+      detail: { deleted: true },
     });
     return { ok: true, bridgeError };
   });
