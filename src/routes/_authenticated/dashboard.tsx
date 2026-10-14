@@ -39,7 +39,7 @@ function DashboardPage() {
     queryFn: async () => {
       if (!orgId) throw new Error("Membership sem organization_id.");
       const id = orgId;
-      const [open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage, allAutomations, allAgents] = await Promise.all([
+      const [open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage, allAutomations, allAgents, teamMembers] = await Promise.all([
         countRows("conversations", id, { status: "open" }),
         countRows("conversations", id, { status: "pending" }),
         countRows("conversations", id, { status: "in_progress" }),
@@ -54,8 +54,9 @@ function DashboardPage() {
         countRows("ai_logs", id),
         countRows("automation_rules", id),
         countRows("ai_agents", id),
+        countRows("memberships", id),
       ]);
-      return { open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage, allAutomations, allAgents };
+      return { open, pending, active, contacts, deals, automations, numbers, aiAgents, aiUsage, allAutomations, allAgents, teamMembers };
     },
   });
 
@@ -186,7 +187,7 @@ function DashboardPage() {
               { label: "Números WhatsApp", used: data?.numbers ?? 0, limit: Number(plan?.limits?.["whatsapp_numbers"] ?? 0) },
               { label: "Agentes de IA", used: data?.allAgents ?? 0, limit: Number(plan?.limits?.["agents"] ?? 0) },
               { label: "Automações", used: data?.allAutomations ?? 0, limit: Number(plan?.limits?.["automations"] ?? 0) },
-              { label: "Membros da equipa", used: 1, limit: Number(plan?.limits?.["team_members"] ?? 0) },
+              { label: "Membros da equipa", used: data?.teamMembers ?? 0, limit: Number(plan?.limits?.["team_members"] ?? 0) },
             ].map((item) => <div key={item.label} className="rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">{item.label}</p><p className="mt-1 text-base font-semibold tabular-nums">{item.used} / {item.limit > 0 ? item.limit : "—"}</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: item.limit > 0 ? Math.min(100, item.used / item.limit * 100) + "%" : "0%" }} /></div></div>)}
           </div>
           </div>
