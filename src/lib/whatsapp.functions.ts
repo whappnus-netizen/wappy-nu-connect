@@ -36,23 +36,36 @@ export const connectWhatsAppNumber = createServerFn({ method: "POST" })
 
 
     const admin = serviceClient();
-    const { data: row, error } = await admin
+    // Reuse an active row when reconnecting. Archived rows are excluded, so the
+    // partial unique index can safely allow a fresh connection after deletion.
+    const { data: existing, error: existingError } = await admin
       .from("whatsapp_numbers")
-      .upsert(
-        {
-          organization_id: data.organizationId,
-          display_name: meta.verified_name ?? data.displayName,
-          phone_e164: data.phoneE164,
-          waba_id: data.wabaId,
-          phone_number_id: data.phoneNumberId,
-          status: "connected",
-        },
-        { onConflict: "organization_id,phone_e164" },
-      )
-      .select("id, display_name, phone_e164, status")
-      .single();
-    if (error) throw new Error(`Base de dados: ${error.message}`);
+      .select("id")
+      .eq("organization_id", data.organizationId)
+      .eq("phone_e164", data.phoneE164)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (existingError) throw new Error(`Base de dados: ${existingError.message}`);
 
+    const values = {
+      display_name: meta.verified_name ?? data.displayName,
+      phone_e164: data.phoneE164,
+      waba_id: data.wabaId,
+      phone_number_id: data.phoneNumberId,
+      status: "connected",
+      last_error: null,
+      disconnected_at: null,
+      updated_at: new Date().toISOString(),
+    };
+    const write = existing
+      ? await admin.from("whatsapp_numbers").update(values).eq("id", existing.id)
+          .eq("organization_id", data.organizationId).select("id, display_name, phone_e164, status").single()
+      : await admin.from("whatsapp_numbers").insert({
+          organization_id: data.organizationId,
+          ...values,
+        }).select("id, display_name, phone_e164, status").single();
+    if (write.error) throw new Error(`Base de dados: ${write.error.message}`);
+    const row = write.data;
     const numberId = (row as { id: string }).id;
     const { error: credErr } = await admin.from("whatsapp_credentials").upsert(
       {
