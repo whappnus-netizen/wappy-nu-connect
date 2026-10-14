@@ -245,6 +245,7 @@ function WhatsAppPage() {
     onSuccess: (res) => {
       setError(res.error ?? null);
       void queryClient.invalidateQueries({ queryKey: ["whatsapp_sessions", orgId] });
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp_numbers", orgId] });
     },
     onError: (e: Error) => setError(e.message),
   });
