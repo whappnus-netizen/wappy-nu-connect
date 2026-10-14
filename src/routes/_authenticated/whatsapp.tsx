@@ -304,7 +304,7 @@ function WhatsAppPage() {
       title="WhatsApp"
       description="Números e ligações WhatsApp da sua organização"
       actions={
-        <div className="flex max-w-[62vw] flex-wrap justify-end gap-1.5 sm:max-w-none sm:gap-2">
+        <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto sm:flex-nowrap">
           <Button size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" variant="outline" disabled={!orgId || !canConnect} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
