@@ -135,7 +135,7 @@ export const organizeAgentInstructions = createServerFn({ method: "POST" })
     z.object({
       organizationId: z.string().uuid(),
       agentId: z.string().uuid(),
-      text: z.string().trim().min(10).max(30000),
+      text: z.string().trim().min(10),
     }).parse(input),
   )
   .handler(async ({ data }) => {
