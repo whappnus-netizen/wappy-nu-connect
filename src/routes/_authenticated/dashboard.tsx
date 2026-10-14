@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  const { user, membership, membershipLoading, membershipError } = useAuth();
+  const { membership, membershipLoading, membershipError } = useAuth();
   const orgId = membership?.organization_id;
 
   const { data, isLoading } = useQuery({
@@ -129,7 +129,7 @@ function DashboardPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             {membershipError
               ? "Não foi possível consultar a associação à organização. Tente novamente."
-              : "Conclua o onboarding para criar a organização e o acesso OWNER."}
+              : "Conclua a configuração inicial para criar a organização e o acesso de proprietário."}
           </p>
           <Button asChild size="sm" className="mt-4">
             <Link to="/onboarding">Ir para o onboarding</Link>
@@ -172,9 +172,7 @@ function DashboardPage() {
             <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assinatura e utilização</p>
               <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
               <p className="mt-1 text-sm font-semibold text-primary">{new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(Number(subscription?.amount_aoa ?? plan?.price_aoa ?? 0))} / mês</p>
-              <p className="mt-1 text-xs text-muted-foreground">Código do plano: {plan?.code ?? "—"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Permissão nesta organização: {membership.role === "OWNER" ? "Proprietário (OWNER)" : membership.role === "ADMIN" ? "Administrador (ADMIN)" : membership.role === "SUPERVISOR" ? "Supervisor" : "Agente"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Conta autenticada: {user?.email ?? "—"}</p>
+
               <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de conversas com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
             </div>
             <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
