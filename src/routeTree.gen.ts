@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as DeletionRouteImport } from './routes/deletion'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
@@ -24,13 +25,12 @@ import { Route as AuthenticatedDefinicoesRouteImport } from './routes/_authentic
 import { Route as AuthenticatedEquipaRouteImport } from './routes/_authenticated/equipa'
 import { Route as AuthenticatedIaRouteImport } from './routes/_authenticated/ia'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
+import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
-import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
-import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicWhatsappQrEventsRouteImport } from './routes/api/public/whatsapp.qr.events'
 
@@ -56,6 +56,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuperadminRoute = SuperadminRouteImport.update({
+  id: '/superadmin',
+  path: '/superadmin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -108,6 +113,12 @@ const AuthenticatedInboxRoute = AuthenticatedInboxRouteImport.update({
   path: '/inbox',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedNotificacoesRoute =
+  AuthenticatedNotificacoesRouteImport.update({
+    id: '/notificacoes',
+    path: '/notificacoes',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -116,11 +127,6 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedNotificacoesRoute = AuthenticatedNotificacoesRouteImport.update({
-  id: '/notificacoes',
-  path: '/notificacoes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
@@ -136,11 +142,6 @@ const AuthRecuperarRoute = AuthRecuperarRouteImport.update({
 const AuthRegistoRoute = AuthRegistoRouteImport.update({
   id: '/auth/registo',
   path: '/auth/registo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SuperadminRoute = SuperadminRouteImport.update({
-  id: '/superadmin',
-  path: '/superadmin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicWhatsappWebhookRoute =
@@ -161,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/deletion': typeof DeletionRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
+  '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -171,13 +173,12 @@ export interface FileRoutesByFullPath {
   '/equipa': typeof AuthenticatedEquipaRoute
   '/ia': typeof AuthenticatedIaRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
-  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
-  '/superadmin': typeof SuperadminRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -186,6 +187,7 @@ export interface FileRoutesByTo {
   '/deletion': typeof DeletionRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
+  '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -196,13 +198,12 @@ export interface FileRoutesByTo {
   '/equipa': typeof AuthenticatedEquipaRoute
   '/ia': typeof AuthenticatedIaRoute
   '/inbox': typeof AuthenticatedInboxRoute
+  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
-  '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
-  '/superadmin': typeof SuperadminRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -213,6 +214,7 @@ export interface FileRoutesById {
   '/deletion': typeof DeletionRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
+  '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -223,13 +225,12 @@ export interface FileRoutesById {
   '/_authenticated/equipa': typeof AuthenticatedEquipaRoute
   '/_authenticated/ia': typeof AuthenticatedIaRoute
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
+  '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
-  '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
-  '/superadmin': typeof SuperadminRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -240,6 +241,7 @@ export interface FileRouteTypes {
     | '/deletion'
     | '/privacidade'
     | '/privacy'
+    | '/superadmin'
     | '/termos'
     | '/terms'
     | '/automacoes'
@@ -250,13 +252,12 @@ export interface FileRouteTypes {
     | '/equipa'
     | '/ia'
     | '/inbox'
+    | '/notificacoes'
     | '/onboarding'
     | '/whatsapp'
-    | '/notificacoes'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
-    | '/superadmin'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesByTo: FileRoutesByTo
@@ -265,6 +266,7 @@ export interface FileRouteTypes {
     | '/deletion'
     | '/privacidade'
     | '/privacy'
+    | '/superadmin'
     | '/termos'
     | '/terms'
     | '/automacoes'
@@ -275,13 +277,12 @@ export interface FileRouteTypes {
     | '/equipa'
     | '/ia'
     | '/inbox'
+    | '/notificacoes'
     | '/onboarding'
     | '/whatsapp'
-    | '/notificacoes'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
-    | '/superadmin'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   id:
@@ -291,6 +292,7 @@ export interface FileRouteTypes {
     | '/deletion'
     | '/privacidade'
     | '/privacy'
+    | '/superadmin'
     | '/termos'
     | '/terms'
     | '/_authenticated/automacoes'
@@ -301,13 +303,12 @@ export interface FileRouteTypes {
     | '/_authenticated/equipa'
     | '/_authenticated/ia'
     | '/_authenticated/inbox'
+    | '/_authenticated/notificacoes'
     | '/_authenticated/onboarding'
     | '/_authenticated/whatsapp'
-    | '/_authenticated/notificacoes'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
-    | '/superadmin'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesById: FileRoutesById
@@ -318,12 +319,12 @@ export interface RootRouteChildren {
   DeletionRoute: typeof DeletionRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   PrivacyRoute: typeof PrivacyRoute
+  SuperadminRoute: typeof SuperadminRoute
   TermosRoute: typeof TermosRoute
   TermsRoute: typeof TermsRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
-  SuperadminRoute: typeof SuperadminRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicWhatsappQrEventsRoute: typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -363,6 +364,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/superadmin': {
+      id: '/superadmin'
+      path: '/superadmin'
+      fullPath: '/superadmin'
+      preLoaderRoute: typeof SuperadminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -435,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInboxRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/notificacoes': {
+      id: '/_authenticated/notificacoes'
+      path: '/notificacoes'
+      fullPath: '/notificacoes'
+      preLoaderRoute: typeof AuthenticatedNotificacoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/onboarding': {
       id: '/_authenticated/onboarding'
       path: '/onboarding'
@@ -447,13 +462,6 @@ declare module '@tanstack/react-router' {
       path: '/whatsapp'
       fullPath: '/whatsapp'
       preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/notificacoes': {
-      id: '/_authenticated/notificacoes'
-      path: '/notificacoes'
-      fullPath: '/notificacoes'
-      preLoaderRoute: typeof AuthenticatedNotificacoesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/auth/login': {
@@ -475,13 +483,6 @@ declare module '@tanstack/react-router' {
       path: '/auth/registo'
       fullPath: '/auth/registo'
       preLoaderRoute: typeof AuthRegistoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/superadmin': {
-      id: '/superadmin'
-      path: '/superadmin'
-      fullPath: '/superadmin'
-      preLoaderRoute: typeof SuperadminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/whatsapp/webhook': {
@@ -510,9 +511,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEquipaRoute: typeof AuthenticatedEquipaRoute
   AuthenticatedIaRoute: typeof AuthenticatedIaRoute
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
+  AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
-  AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -524,9 +525,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEquipaRoute: AuthenticatedEquipaRoute,
   AuthenticatedIaRoute: AuthenticatedIaRoute,
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
+  AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
-  AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -538,12 +539,12 @@ const rootRouteChildren: RootRouteChildren = {
   DeletionRoute: DeletionRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   PrivacyRoute: PrivacyRoute,
+  SuperadminRoute: SuperadminRoute,
   TermosRoute: TermosRoute,
   TermsRoute: TermsRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRecuperarRoute: AuthRecuperarRoute,
   AuthRegistoRoute: AuthRegistoRoute,
-  SuperadminRoute: SuperadminRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicWhatsappQrEventsRoute: ApiPublicWhatsappQrEventsRoute,
 }
