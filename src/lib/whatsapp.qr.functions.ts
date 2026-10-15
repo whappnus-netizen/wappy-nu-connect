@@ -93,6 +93,41 @@ export const startQrSession = createServerFn({ method: "POST" })
       selectedPhone = ranked[0] as { id: string; deleted_at: string | null };
     }
 
+    // As ligações antigas do mesmo número podem ter deixado sockets QR pendentes
+    // mesmo depois de arquivadas. Fecha apenas sessões associadas aos registos
+    // duplicados/arquivados; não toca na sessão que vamos reutilizar nem no histórico.
+    if (selectedPhone && phoneRows?.length) {
+      const archivedIds = phoneRows
+        .filter((row: { id: string }) => row.id !== selectedPhone!.id)
+        .map((row: { id: string }) => row.id);
+      if (archivedIds.length) {
+        if (qrBridgeConfigured()) {
+          for (const archivedId of archivedIds) {
+            try {
+              await qrProvider.disconnect({
+                organizationId: data.organizationId,
+                whatsappNumberId: archivedId,
+              });
+            } catch (cleanupError) {
+              console.warn("[WhappNus] Não foi possível terminar sessão QR arquivada", archivedId, cleanupError);
+            }
+          }
+        }
+        const { error: staleSessionsError } = await admin
+          .from("whatsapp_sessions")
+          .update({
+            status: "disconnected",
+            qr_code: null,
+            qr_expires_at: null,
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in("whatsapp_number_id", archivedIds)
+          .in("status", ["connected", "connecting", "qr_pending", "reconnecting"]);
+        if (staleSessionsError) throw new Error("Não foi possível limpar sessões QR arquivadas: " + staleSessionsError.message);
+      }
+    }
+
     if (selectedPhone) {
       numberId = selectedPhone.id;
       const { error: updateErr } = await admin
