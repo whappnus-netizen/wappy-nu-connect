@@ -39,7 +39,7 @@ function SignupPage() {
       password,
       options: {
         data: { full_name: fullName, phone: phone.trim() },
-        emailRedirectTo: `${window.location.origin}/onboarding`,
+        emailRedirectTo: `${window.location.origin}/auth/login?confirmed=1&email=${encodeURIComponent(email.trim().toLowerCase())}`,
       },
     });
     setLoading(false);
@@ -50,7 +50,9 @@ function SignupPage() {
     if (data.session) {
       navigate({ to: "/onboarding" });
     } else {
-      toast.success("Confirme o email para activar a conta.");
+      toast.success("Conta criada. Enviámos um link para confirmar o seu email.");
+      // Muda imediatamente para Entrar; não guarda nem transporta a palavra-passe.
+      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(email.trim().toLowerCase())}`);
     }
   }
 
