@@ -65,7 +65,6 @@ export const startQrSession = createServerFn({ method: "POST" })
     // Escolher a ligação com mais histórico. Os registos arquivados são elegíveis
     // para reactivação: apagar uma ligação não deve tornar o número impossível de
     // voltar a ligar, nem separar conversas/contactos do número que os criou.
-    let numberId: string;
     let selectedPhone: { id: string; deleted_at: string | null } | null = null;
     if (phoneRows?.length) {
       const ids = phoneRows.map((row: { id: string }) => row.id);
