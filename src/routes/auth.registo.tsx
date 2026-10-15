@@ -39,7 +39,7 @@ function SignupPage() {
       password,
       options: {
         data: { full_name: fullName, phone: phone.trim() },
-        emailRedirectTo: `${window.location.origin}/auth/login?confirmed=1&email=${encodeURIComponent(email.trim().toLowerCase())}`,
+        emailRedirectTo: `https://whappnus.online/auth/login?confirmed=1&email=${encodeURIComponent(email.trim().toLowerCase())}`,
       },
     });
     setLoading(false);
