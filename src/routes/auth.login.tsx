@@ -22,9 +22,19 @@ export const Route = createFileRoute("/auth/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("email") ?? "";
+  });
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [notice] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("confirmed") === "1") return "Email confirmado. Agora entre com a sua palavra-passe."; 
+    if (params.get("registered") === "1") return "Conta criada. Confirme o email que enviámos e depois entre aqui."; 
+    return "";
+  });
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -104,6 +114,11 @@ function LoginPage() {
         </>
       }
     >
+      {notice ? (
+        <div role="status" aria-live="polite" className="mb-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          {notice}
+        </div>
+      ) : null}
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email profissional</Label>
