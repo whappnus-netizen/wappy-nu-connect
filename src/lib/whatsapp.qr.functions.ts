@@ -198,12 +198,13 @@ export const startQrSession = createServerFn({ method: "POST" })
 
 /** Lista os grupos reais de uma sessão conectada. Só utilizadores Super Admin activos podem chamar esta operação. */
 export const listSuperAdminGroups = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ numberId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) => z.object({ numberId: z.string().uuid(), accessToken: z.string().min(20).optional() }).parse(input))
   .handler(async ({ data }) => {
     const { serviceClient } = await import("./whatsapp.server");
     const { listQrGroups: fetchGroups } = await import("./whatsapp/qr.server");
     const tokenHeader = getRequestHeader("authorization") ?? "";
-    const token = tokenHeader.toLowerCase().startsWith("bearer ") ? tokenHeader.slice(7) : "";
+    const headerToken = tokenHeader.toLowerCase().startsWith("bearer ") ? tokenHeader.slice(7) : "";
+    const token = data.accessToken ?? headerToken;
     if (!token) throw new Error("Sessão ausente. Inicia sessão novamente.");
     const admin = serviceClient();
     const { data: userData, error: authError } = await admin.auth.getUser(token);
