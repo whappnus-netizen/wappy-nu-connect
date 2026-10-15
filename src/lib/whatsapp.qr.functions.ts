@@ -45,55 +45,77 @@ export const startQrSession = createServerFn({ method: "POST" })
     let numberId: string;
 
     const requestedPhone = data.phoneE164 ? normalizePhoneE164(data.phoneE164) : undefined;
-    if (requestedPhone) {
-      const { data: existingPhone, error: existingPhoneError } = await admin.from("whatsapp_numbers")
-        .select("id,status").eq("organization_id", data.organizationId).eq("provider", "qr")
-        .eq("phone_e164", requestedPhone).is("deleted_at", null).maybeSingle();
-      if (existingPhoneError) throw new Error("Base de dados: " + existingPhoneError.message);
-      if (existingPhone) throw new Error("Este número já está registado nesta organização. Abre a ligação existente e usa as opções de reconexão, ou arquiva-a antes de criar uma nova.");
-    }
+    const { data: existingPhone, error: existingPhoneError } = requestedPhone
+      ? await admin.from("whatsapp_numbers")
+          .select("id,status")
+          .eq("organization_id", data.organizationId)
+          .eq("provider", "qr")
+          .eq("phone_e164", requestedPhone)
+          .is("deleted_at", null)
+          .maybeSingle()
+      : { data: null, error: null };
 
-    const { data: pendingNumber, error: pendingErr } = await admin
-      .from("whatsapp_numbers")
-      .select("id")
-      .eq("organization_id", data.organizationId)
-      .eq("provider", "qr")
-      .is("phone_e164", null)
-      .in("status", ["pending", "connecting", "qr_pending", "reconnecting"])
-      .limit(1)
-      .maybeSingle();
+    if (existingPhoneError) throw new Error("Base de dados: " + existingPhoneError.message);
 
-    if (pendingErr) throw new Error(`Base de dados: ${pendingErr.message}`);
-
-    if (pendingNumber) {
-      numberId = (pendingNumber as { id: string }).id;
+    // A mesma ligação QR pode ser autenticada por QR ou por código. Reutilizar
+    // o registo existente evita duplicados e preserva as referências do CRM.
+    if (existingPhone) {
+      numberId = (existingPhone as { id: string }).id;
       const { error: updateErr } = await admin
         .from("whatsapp_numbers")
         .update({
-          display_name: data.displayName ?? "WhatsApp (QR Code)",
-          ...(requestedPhone ? { phone_e164: requestedPhone } : {}),
+          display_name: data.displayName ?? "WhatsApp (código)",
           status: "connecting",
           last_error: null,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", numberId)
         .eq("organization_id", data.organizationId);
       if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
     } else {
-      await requireWhatsAppConnectionCapacity(data.organizationId, requestedPhone);
-      const { data: createdNumber, error: createErr } = await admin
+      const { data: pendingNumber, error: pendingErr } = await admin
         .from("whatsapp_numbers")
-        .insert({
-          organization_id: data.organizationId,
-          display_name: data.displayName ?? "WhatsApp (QR Code)",
-          phone_e164: requestedPhone ?? null,
-          provider: "qr",
-          status: "connecting",
-        })
         .select("id")
-        .single();
+        .eq("organization_id", data.organizationId)
+        .eq("provider", "qr")
+        .is("phone_e164", null)
+        .in("status", ["pending", "connecting", "qr_pending", "reconnecting", "error", "disconnected"])
+        .limit(1)
+        .maybeSingle();
 
-      if (createErr) throw new Error(`Base de dados: ${createErr.message}`);
-      numberId = (createdNumber as { id: string }).id;
+      if (pendingErr) throw new Error(`Base de dados: ${pendingErr.message}`);
+
+      if (pendingNumber) {
+        numberId = (pendingNumber as { id: string }).id;
+        const { error: updateErr } = await admin
+          .from("whatsapp_numbers")
+          .update({
+            display_name: data.displayName ?? "WhatsApp (QR Code)",
+            ...(requestedPhone ? { phone_e164: requestedPhone } : {}),
+            status: "connecting",
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", numberId)
+          .eq("organization_id", data.organizationId);
+        if (updateErr) throw new Error(`Base de dados: ${updateErr.message}`);
+      } else {
+        await requireWhatsAppConnectionCapacity(data.organizationId, requestedPhone);
+        const { data: createdNumber, error: createErr } = await admin
+          .from("whatsapp_numbers")
+          .insert({
+            organization_id: data.organizationId,
+            display_name: data.displayName ?? "WhatsApp (QR Code)",
+            phone_e164: requestedPhone ?? null,
+            provider: "qr",
+            status: "connecting",
+          })
+          .select("id")
+          .single();
+
+        if (createErr) throw new Error(`Base de dados: ${createErr.message}`);
+        numberId = (createdNumber as { id: string }).id;
+      }
     }
 
     // Sessão (uma por organização + número; lock impede duplicados).
