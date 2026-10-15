@@ -154,7 +154,7 @@ function OnboardingPage() {
       return;
     }
 
-    const contactPhone = String(authenticatedUser.user_metadata?.phone ?? "").trim();
+    const contactPhone = String(authenticatedUser.user_metadata?.["phone"] ?? "").trim();
     if (contactPhone) {
       const { error: contactError } = await supabase.from("organizations")
         .update({ contact_phone: contactPhone, updated_at: new Date().toISOString() })
