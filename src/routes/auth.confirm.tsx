@@ -5,8 +5,8 @@ import { supabase } from "@/lib/supabase/client";
 
 export const Route = createFileRoute("/auth/confirm")({
   validateSearch: (search: Record<string, unknown>) => ({
-    token_hash: typeof search.token_hash === "string" ? search.token_hash : "",
-    type: typeof search.type === "string" ? search.type : "",
+    token_hash: typeof search["token_hash"] === "string" ? (search["token_hash"] as string) : "",
+    type: typeof search["type"] === "string" ? (search["type"] as string) : "",
   }),
   component: ConfirmEmailPage,
 });
