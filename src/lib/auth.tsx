@@ -37,7 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [membership, setMembership] = useState<Membership | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(true);
-  const [membershipError, setMembershipError] = useState<string | null>(null);\n  const authEventVersion = useRef(0);\n  const currentUserId = useRef<string | null>(null);\n  currentUserId.current = session?.user?.id ?? null;
+  const [membershipError, setMembershipError] = useState<string | null>(null);
+  const authEventVersion = useRef(0);
+  const currentUserId = useRef<string | null>(null);
+  currentUserId.current = session?.user?.id ?? null;
 
   async function refreshMembership(): Promise<Membership | null> {
     const userId = session?.user?.id;
