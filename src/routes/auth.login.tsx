@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
+import { superadminSupabase } from "@/lib/supabase/superadmin-client";
 import { AuthCard } from "@/components/app/auth-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,22 +29,68 @@ function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
+    const normalizedEmail = email.trim().toLowerCase();
+    const reservedOwnerEmail = "sthomasshelby51@gmail.com";
+
+    // A conta principal do proprietário autentica-se num armazenamento isolado.
+    // Assim, entrar numa conta de cliente noutra aba não substitui esta sessão.
+    if (normalizedEmail === reservedOwnerEmail) {
+      const { data: adminAuth, error: adminSignInError } = await superadminSupabase.auth.signInWithPassword({ email: normalizedEmail, password });
+      if (adminSignInError || !adminAuth.user || !adminAuth.session) {
+        setLoading(false);
+        toast.error(adminSignInError?.message ?? "Não foi possível iniciar a sessão Super Admin.");
+        return;
+      }
+      const { data: check, error: checkError } = await superadminSupabase.functions.invoke("superadmin-api", {
+        body: { action: "dashboard" },
+        headers: { Authorization: `Bearer ${adminAuth.session.access_token}` },
+      });
+      if (checkError || check?.ok !== true) {
+        await superadminSupabase.auth.signOut();
+        setLoading(false);
+        toast.error(check?.error ?? "Este email não está autorizado no Super Admin.");
+        return;
+      }
+
+      // Limpa apenas uma sessão antiga da mesma conta no armazenamento normal.
+      const { data: regularSession } = await supabase.auth.getSession();
+      if (regularSession.session?.user.email?.toLowerCase() === reservedOwnerEmail) {
+        await supabase.auth.signOut();
+      }
+      setLoading(false);
+      navigate({ to: "/superadmin" });
+      return;
+    }
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) {
+      setLoading(false);
       toast.error(error.message);
       return;
     }
 
-    // Route platform owners to the control center only when the server confirms admin access.
-    // Ordinary customers continue to their existing dashboard.
+    // Outros membros autorizados da equipa também recebem sessão isolada no painel.
     const { data: adminCheck, error: adminError } = await supabase.functions.invoke("superadmin-api", {
       body: { action: "dashboard" },
+      headers: { Authorization: `Bearer ${authData.session?.access_token ?? ""}` },
     });
-    if (authData.user && !adminError && adminCheck?.ok === true) {
-      navigate({ to: "/superadmin" });
-      return;
+    if (authData.user && !adminError && adminCheck?.ok === true && authData.session) {
+      const { data: isolatedAuth, error: isolatedError } = await superadminSupabase.auth.signInWithPassword({ email: normalizedEmail, password });
+      if (!isolatedError && isolatedAuth.session) {
+        const { data: isolatedCheck, error: isolatedCheckError } = await superadminSupabase.functions.invoke("superadmin-api", {
+          body: { action: "dashboard" },
+          headers: { Authorization: `Bearer ${isolatedAuth.session.access_token}` },
+        });
+        if (!isolatedCheckError && isolatedCheck?.ok === true) {
+          await supabase.auth.signOut();
+          setLoading(false);
+          navigate({ to: "/superadmin" });
+          return;
+        }
+        await superadminSupabase.auth.signOut();
+      }
     }
+    setLoading(false);
     navigate({ to: "/dashboard" });
   }
 
