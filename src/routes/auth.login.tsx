@@ -75,7 +75,11 @@ function LoginPage() {
     const { data: authData, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
     if (error) {
       setLoading(false);
-      toast.error(error.message);
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        toast.error("O seu email ainda não foi confirmado. Abra o link enviado para a sua caixa de correio e depois volte aqui para entrar.");
+      } else {
+        toast.error(error.message);
+      }
       return;
     }
 
