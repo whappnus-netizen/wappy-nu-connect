@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { supabase } from "@/lib/supabase/client";
+import { superadminSupabase } from "@/lib/supabase/superadmin-client";
 import { listSuperAdminGroups } from "@/lib/whatsapp.qr.functions";
 
 export const Route = createFileRoute("/superadmin")({
@@ -23,12 +23,12 @@ export const Route = createFileRoute("/superadmin")({
   beforeLoad: async () => {
     // Auth storage may still be restoring after a hard refresh. Give Supabase one
     // chance to restore/refresh the session before deciding that the user signed out.
-    let sessionResult = await supabase.auth.getSession();
+    let sessionResult = await superadminSupabase.auth.getSession();
     if (!sessionResult.data.session || (sessionResult.data.session.expires_at ?? 0) * 1000 < Date.now() + 30_000) {
-      const refreshed = await supabase.auth.refreshSession();
+      const refreshed = await superadminSupabase.auth.refreshSession();
       if (refreshed.data.session) sessionResult = { data: { session: refreshed.data.session }, error: null };
     }
-    const { data, error } = await supabase.auth.getUser();
+    const { data, error } = await superadminSupabase.auth.getUser();
     if (error || !data.user || !sessionResult.data.session) throw redirect({ to: "/auth/login" });
 
     // Do not redirect to the regular dashboard for transient API/network errors.
@@ -44,24 +44,24 @@ export const Route = createFileRoute("/superadmin")({
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 async function adminApi<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const getFreshToken = async () => {
-    let session = (await supabase.auth.getSession()).data.session;
+    let session = (await superadminSupabase.auth.getSession()).data.session;
     if (!session || (session.expires_at ?? 0) * 1000 < Date.now() + 60_000) {
-      const refreshed = await supabase.auth.refreshSession();
+      const refreshed = await superadminSupabase.auth.refreshSession();
       if (refreshed.error || !refreshed.data.session) throw new Error("A sessão expirou. Inicia sessão novamente.");
       session = refreshed.data.session;
     }
     return session.access_token;
   };
   let token = await getFreshToken();
-  let response = await supabase.functions.invoke("superadmin-api", {
+  let response = await superadminSupabase.functions.invoke("superadmin-api", {
     body: { action, ...payload }, headers: { Authorization: `Bearer ${token}` },
   });
   const status = (response.error as { context?: Response } | null)?.context?.status;
   if (status === 401) {
-    const refreshed = await supabase.auth.refreshSession();
+    const refreshed = await superadminSupabase.auth.refreshSession();
     if (!refreshed.error && refreshed.data.session) {
       token = refreshed.data.session.access_token;
-      response = await supabase.functions.invoke("superadmin-api", {
+      response = await superadminSupabase.functions.invoke("superadmin-api", {
         body: { action, ...payload }, headers: { Authorization: `Bearer ${token}` },
       });
     }
@@ -197,7 +197,7 @@ function SuperAdminPage() {
   const selectedGroupAsset = (groupCommander.data?.assets ?? []).find((asset: any) => asset.storage_path === groupStepAssetPath) ?? null;
   const discoverGroupsFn = useServerFn(listSuperAdminGroups);
   const discoverGroups = useMutation({
-    mutationFn: () => discoverGroupsFn({ data: { numberId: groupNumberId } }),
+    mutationFn: async () => { const session = (await superadminSupabase.auth.getSession()).data.session; if (!session) throw new Error("Sessão Super Admin ausente. Inicia sessão novamente."); return discoverGroupsFn({ data: { numberId: groupNumberId, accessToken: session.access_token } }); },
     onSuccess: (groups) => { setDiscoveredGroups(groups); if (!groups.length) toast.message("A sessão está ligada, mas não devolveu grupos participantes."); else toast.success(`${groups.length} grupos encontrados na sessão WhatsApp.`); },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -229,12 +229,12 @@ function SuperAdminPage() {
       const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || inferred[extension] || "application/octet-stream";
       const assetType = mimeType.startsWith("image/") ? "image" : mimeType.startsWith("audio/") ? "audio" : mimeType.startsWith("video/") ? "video" : "document";
       const signed = await adminApi<{ path: string; token: string }>("group.asset.upload-url", { file_name: file.name, mime_type: mimeType, file_size: file.size });
-      const { error: uploadError } = await supabase.storage.from("superadmin-group-assets").uploadToSignedUrl(signed.path, signed.token, file, { contentType: mimeType, upsert: false });
+      const { error: uploadError } = await superadminSupabase.storage.from("superadmin-group-assets").uploadToSignedUrl(signed.path, signed.token, file, { contentType: mimeType, upsert: false });
       if (uploadError) throw new Error("Falha ao carregar o ficheiro: " + uploadError.message);
       try {
         return await adminApi<any>("group.asset.save", { name: file.name, asset_type: assetType, storage_path: signed.path, mime_type: mimeType, file_size: file.size });
       } catch (error) {
-        await supabase.storage.from("superadmin-group-assets").remove([signed.path]);
+        await superadminSupabase.storage.from("superadmin-group-assets").remove([signed.path]);
         throw error;
       }
     },
@@ -346,7 +346,7 @@ function SuperAdminPage() {
         </nav>
         <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-3"><div className="flex size-9 items-center justify-center rounded-full border border-emerald-300/20 bg-emerald-300/10"><LockKeyhole className="size-4 text-emerald-200" /></div><div className="min-w-0"><div className="text-xs font-semibold">Área restrita</div><div className="text-[11px] text-slate-500">Acesso validado no servidor</div></div></div>
-          <Button variant="ghost" className="mt-3 w-full justify-start text-slate-400 hover:text-white" onClick={() => void supabase.auth.signOut().then(() => { window.location.href = "/auth/login"; })}><LogOut />Terminar sessão</Button>
+          <Button variant="ghost" className="mt-3 w-full justify-start text-slate-400 hover:text-white" onClick={() => void superadminSupabase.auth.signOut().then(() => { window.location.href = "/auth/login"; })}><LogOut />Terminar sessão</Button>
         </div>
       </aside>
 
@@ -355,7 +355,7 @@ function SuperAdminPage() {
           <div className="flex min-w-0 items-center gap-3"><Button type="button" variant="outline" size="icon" aria-label={mobileNavOpen ? "Fechar menu" : "Abrir menu"} className="shrink-0 border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 lg:hidden" onClick={() => setMobileNavOpen(v => !v)}>{mobileNavOpen ? <X className="size-5" /> : <Menu className="size-5" />}</Button><div className="min-w-0"><div className="flex items-center gap-2 text-xs font-medium text-emerald-300"><span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.75)]" />PAINEL DE CONTROLO</div><h1 className="mt-1 font-display text-xl font-bold tracking-tight sm:text-2xl">{tab === "overview" ? "Visão geral" : tab === "organizations" ? "Organizações" : tab === "plans" ? "Planos e preços" : tab === "subscriptions" ? "Assinaturas" : tab === "renewals" ? "Renovações e avisos" : tab === "notifications" ? "Notificações" : tab === "groups" ? "Group Commander" : tab === "group-ai" ? "Treinar IA do funil" : tab === "payments" ? "Pagamentos" : tab === "health" ? "Saúde operacional" : tab === "team" ? "Equipa administrativa" : "Auditoria da plataforma"}</h1></div></div>
           <div className="flex shrink-0 items-center gap-2"><Badge variant="outline" className="hidden border-emerald-300/20 text-emerald-200 sm:inline-flex">AOA · Africa/Luanda</Badge><Button variant="outline" size="icon" className="border-white/10 bg-white/5 hover:bg-white/10" onClick={refreshAll} aria-label="Atualizar"><RefreshCw className="size-4" /></Button></div>
         </header>
-        {mobileNavOpen && <><button type="button" aria-label="Fechar menu de navegação" className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setMobileNavOpen(false)} /><aside role="dialog" aria-modal="true" aria-label="Navegação do Super Admin" className="fixed inset-y-0 left-0 z-40 flex w-[min(84vw,20rem)] flex-col border-r border-white/10 bg-[#091510] shadow-2xl lg:hidden"><div className="flex h-20 items-center justify-between gap-3 border-b border-white/10 px-5"><div><div className="font-display text-lg font-bold tracking-tight">WhappNus</div><div className="text-[10px] uppercase tracking-[0.24em] text-emerald-300">Control Center</div></div><Button type="button" variant="ghost" size="icon" aria-label="Fechar menu" className="text-slate-300" onClick={() => setMobileNavOpen(false)}><X className="size-5" /></Button></div><div className="px-4 pt-5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Plataforma</div><nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-3 pb-4">{[[ "overview", LayoutDashboard, "Resumo" ],[ "organizations", Building2, "Clientes" ],[ "plans", CircleDollarSign, "Planos" ],[ "subscriptions", CreditCard, "Assinaturas" ],[ "renewals", Clock3, "Renovações" ],[ "notifications", Sparkles, "Notificações" ],[ "groups", Users, "Grupos" ],[ "group-ai", Sparkles, "Treinar IA" ],[ "payments", Wallet, "Pagamentos" ],[ "health", Activity, "Saúde" ],[ "team", Users, "Equipa" ],[ "audit", LockKeyhole, "Auditoria" ]].map(([id, Icon, label]) => { const I = Icon as typeof LayoutDashboard; return <button key={id as string} type="button" onClick={() => { setTab(id as string); setMobileNavOpen(false); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${tab === id ? "bg-emerald-400/10 font-semibold text-emerald-200 ring-1 ring-emerald-300/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><I className="size-4 shrink-0" /><span>{label as string}</span>{tab === id && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-300" />}</button>; })}</nav><div className="border-t border-white/10 p-4"><Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white" onClick={() => void supabase.auth.signOut().then(() => { window.location.href = "/auth/login"; })}><LogOut className="mr-2 size-4" />Terminar sessão</Button></div></aside></>}
+        {mobileNavOpen && <><button type="button" aria-label="Fechar menu de navegação" className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setMobileNavOpen(false)} /><aside role="dialog" aria-modal="true" aria-label="Navegação do Super Admin" className="fixed inset-y-0 left-0 z-40 flex w-[min(84vw,20rem)] flex-col border-r border-white/10 bg-[#091510] shadow-2xl lg:hidden"><div className="flex h-20 items-center justify-between gap-3 border-b border-white/10 px-5"><div><div className="font-display text-lg font-bold tracking-tight">WhappNus</div><div className="text-[10px] uppercase tracking-[0.24em] text-emerald-300">Control Center</div></div><Button type="button" variant="ghost" size="icon" aria-label="Fechar menu" className="text-slate-300" onClick={() => setMobileNavOpen(false)}><X className="size-5" /></Button></div><div className="px-4 pt-5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Plataforma</div><nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-3 pb-4">{[[ "overview", LayoutDashboard, "Resumo" ],[ "organizations", Building2, "Clientes" ],[ "plans", CircleDollarSign, "Planos" ],[ "subscriptions", CreditCard, "Assinaturas" ],[ "renewals", Clock3, "Renovações" ],[ "notifications", Sparkles, "Notificações" ],[ "groups", Users, "Grupos" ],[ "group-ai", Sparkles, "Treinar IA" ],[ "payments", Wallet, "Pagamentos" ],[ "health", Activity, "Saúde" ],[ "team", Users, "Equipa" ],[ "audit", LockKeyhole, "Auditoria" ]].map(([id, Icon, label]) => { const I = Icon as typeof LayoutDashboard; return <button key={id as string} type="button" onClick={() => { setTab(id as string); setMobileNavOpen(false); }} className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${tab === id ? "bg-emerald-400/10 font-semibold text-emerald-200 ring-1 ring-emerald-300/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><I className="size-4 shrink-0" /><span>{label as string}</span>{tab === id && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-300" />}</button>; })}</nav><div className="border-t border-white/10 p-4"><Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white" onClick={() => void superadminSupabase.auth.signOut().then(() => { window.location.href = "/auth/login"; })}><LogOut className="mr-2 size-4" />Terminar sessão</Button></div></aside></>}
 
         <div className="p-3 sm:p-5 lg:p-8">
           {pageError && <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/5 p-4 text-sm"><AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-300" /><div><div className="font-semibold text-amber-100">Não foi possível carregar o painel</div><p className="mt-1 text-slate-400">{pageError.message}. Confirma se a migração está aplicada e se a tua conta foi autorizada em <code>superadmin_users</code>.</p></div></div>}

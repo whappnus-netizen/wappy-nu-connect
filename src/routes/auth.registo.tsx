@@ -29,6 +29,10 @@ function SignupPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (email.trim().toLowerCase() === "sthomasshelby51@gmail.com") {
+      toast.error("Este email está reservado ao proprietário do Super Admin e não pode criar uma conta de organização.");
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,

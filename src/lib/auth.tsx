@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase/client";
 
@@ -38,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(true);
   const [membershipError, setMembershipError] = useState<string | null>(null);
+  const authEventVersion = useRef(0);
+  const currentUserId = useRef<string | null>(null);
+  currentUserId.current = session?.user?.id ?? null;
 
   async function refreshMembership(): Promise<Membership | null> {
     const userId = session?.user?.id;
@@ -56,9 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .limit(1)
       .maybeSingle();
 
+    // Uma consulta antiga não pode substituir a organização do utilizador que
+    // acabou de entrar noutra conta/aba.
+    if (currentUserId.current !== userId) return null;
     setMembershipLoading(false);
     if (error) {
-      console.error("[Wappy Nus] Falha ao carregar membership", error);
+      console.error("[WhappNus] Falha ao carregar membership", error);
       setMembership(null);
       setMembershipError(error.message);
       return null;
@@ -71,12 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    const initialEventVersion = authEventVersion.current;
     supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
+      if (!active || authEventVersion.current !== initialEventVersion) return;
       setSession(data.session);
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      authEventVersion.current += 1;
       setSession(s);
       setLoading(false);
     });

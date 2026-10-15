@@ -49,8 +49,8 @@ function SettingsPage() {
     },
   });
   useEffect(() => {
-    setContactPhone(contactQuery.data ?? String(user?.user_metadata?.phone ?? ""));
-  }, [contactQuery.data, user?.user_metadata?.phone]);
+    setContactPhone(contactQuery.data ?? String(user?.user_metadata?.["phone"] ?? ""));
+  }, [contactQuery.data, user?.user_metadata?.["phone"]]);
 
   const assetsQuery = useQuery({
     queryKey: ["settings-assets", user?.id, orgId],
