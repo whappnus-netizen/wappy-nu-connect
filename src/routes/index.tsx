@@ -62,9 +62,6 @@ function Landing() {
         <div className="absolute inset-0 -z-10 bg-brand-gradient opacity-[0.07]" />
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 lg:grid-cols-2 lg:py-28">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-              Feito para empresas de Angola
-            </span>
             <h1 className="mt-5 text-4xl font-bold leading-[1.05] sm:text-5xl lg:text-6xl">
               O WhatsApp da sua empresa, finalmente organizado.
             </h1>
@@ -166,13 +163,45 @@ function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <Logo className="text-base" />
-          <div className="flex gap-4">
-            <Link to="/terms" className="hover:text-foreground">Termos</Link>
-            <Link to="/privacy" className="hover:text-foreground">Privacidade</Link>
-            <Link to="/deletion" className="hover:text-foreground">Eliminar dados</Link>
+      <footer className="border-t border-border bg-card">
+        <div className="mx-auto max-w-6xl px-5 py-10">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <Logo className="text-base" />
+              <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
+                Plataforma de multiatendimento WhatsApp, CRM, automações e inteligência artificial para empresas.
+              </p>
+              <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <MapPin className="size-3.5" /> Angola
+              </p>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Informação</h2>
+              <nav className="mt-3 flex flex-col items-start gap-3 text-sm text-muted-foreground">
+                <Link to="/privacy" className="hover:text-foreground">Política de Privacidade</Link>
+                <Link to="/terms" className="hover:text-foreground">Termos de Serviço</Link>
+                <Link to="/deletion" className="hover:text-foreground">Eliminar dados</Link>
+              </nav>
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Acompanhe a WhappNus</h2>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <a href="https://www.facebook.com/whappnus" target="_blank" rel="noreferrer" aria-label="WhappNus no Facebook" className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
+                  <Facebook className="size-4" /> Facebook
+                </a>
+                <a href="https://www.instagram.com/whappnus/" target="_blank" rel="noreferrer" aria-label="WhappNus no Instagram" className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
+                  <Instagram className="size-4" /> Instagram
+                </a>
+                <a href="https://www.tiktok.com/@whappnus" target="_blank" rel="noreferrer" aria-label="WhappNus no TikTok" className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-foreground">
+                  <Music2 className="size-4" /> TikTok
+                </a>
+              </div>
+            </div>
+          </div>
+          <div className="mt-8 border-t border-border pt-5">
+            <p className="text-xs text-muted-foreground">
+              © {new Date().getFullYear()} WhappNus. Todos os direitos reservados.
+            </p>
           </div>
         </div>
       </footer>
