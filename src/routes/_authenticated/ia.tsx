@@ -609,11 +609,15 @@ type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult: ((event: {
+    resultIndex: number;
+    results: ArrayLike<ArrayLike<{ transcript: string; isFinal?: boolean }>>;
+  }) => void) | null;
   onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
 };
 
 function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
@@ -621,17 +625,29 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
   const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
   const [recordingField, setRecordingField] = useState<string | null>(null);
+  const [transcriptPreview, setTranscriptPreview] = useState("");
   const [organizingField, setOrganizingField] = useState<string | null>(null);
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
+  const recordingFieldRef = useRef<string | null>(null);
 
   useEffect(() => {
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
+    recordingFieldRef.current = null;
     setRecordingField(null);
+    setTranscriptPreview("");
+    speechRef.current?.abort?.();
     speechRef.current?.stop();
     speechRef.current = null;
   }, [agent.id]);
+
+  useEffect(() => () => {
+    recordingFieldRef.current = null;
+    speechRef.current?.abort?.();
+    speechRef.current?.stop();
+    speechRef.current = null;
+  }, []);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -655,45 +671,89 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const stopDictation = () => {
+    const active = speechRef.current;
+    recordingFieldRef.current = null;
+    setRecordingField(null);
+    setTranscriptPreview("");
+    speechRef.current = null;
+    try { active?.stop(); } catch {
+      try { active?.abort?.(); } catch { /* reconhecimento já encerrado */ }
+    }
+  };
+
   const toggleDictation = (key: string) => {
-    if (recordingField === key) {
-      speechRef.current?.stop();
+    if (recordingFieldRef.current === key) {
+      stopDictation();
       return;
     }
-    speechRef.current?.stop();
+    if (speechRef.current) stopDictation();
+
     const speechWindow = window as unknown as {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
     };
     const SpeechRecognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error("O ditado por voz não é suportado neste navegador. Tenta no Chrome actualizado.");
+      toast.error("O ditado por voz não é suportado neste navegador. Tenta no Google Chrome actualizado.");
       return;
     }
+
     const recognition = new SpeechRecognition();
     recognition.lang = "pt-PT";
     recognition.continuous = true;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").trim();
-      if (transcript) setForm((current) => ({
-        ...current,
-        [key]: [current[key]?.trim(), transcript].filter(Boolean).join("\n"),
-      }));
+      let finalText = "";
+      let interimText = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const part = result?.[0]?.transcript?.trim() ?? "";
+        if (!part) continue;
+        if (result?.[0]?.isFinal) finalText += (finalText ? " " : "") + part;
+        else interimText += (interimText ? " " : "") + part;
+      }
+      if (finalText) {
+        setForm((current) => ({
+          ...current,
+          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("\n"),
+        }));
+      }
+      setTranscriptPreview(interimText);
     };
     recognition.onerror = (event) => {
-      setRecordingField(null);
-      toast.error(event.error === "not-allowed" ? "Autoriza o acesso ao microfone no navegador." : "Não foi possível transcrever o áudio. Tenta novamente.");
+      if (speechRef.current === recognition) {
+        speechRef.current = null;
+        recordingFieldRef.current = null;
+        setRecordingField(null);
+        setTranscriptPreview("");
+      }
+      const messages: Record<string, string> = {
+        "not-allowed": "O navegador bloqueou o microfone. Autoriza-o nas permissões do site.",
+        "audio-capture": "Não foi encontrado um microfone disponível.",
+        "no-speech": "Não foi detectada fala. Tenta falar mais perto do microfone.",
+        "network": "O serviço de reconhecimento de voz falhou. Verifica a ligação à internet.",
+      };
+      toast.error(messages[event.error ?? ""] ?? "Não foi possível transcrever o áudio. Tenta novamente.");
     };
     recognition.onend = () => {
-      setRecordingField(null);
-      speechRef.current = null;
+      if (speechRef.current === recognition) {
+        speechRef.current = null;
+        recordingFieldRef.current = null;
+        setRecordingField(null);
+      }
+      setTranscriptPreview("");
     };
     speechRef.current = recognition;
+    recordingFieldRef.current = key;
     setRecordingField(key);
-    try { recognition.start(); } catch {
-      setRecordingField(null);
+    setTranscriptPreview("");
+    try {
+      recognition.start();
+    } catch {
       speechRef.current = null;
+      recordingFieldRef.current = null;
+      setRecordingField(null);
       toast.error("Não foi possível iniciar o microfone. Verifica a permissão do navegador.");
     }
   };
@@ -758,14 +818,19 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
             {f.key === "tone" && <datalist id="whappnus-tone-templates">{toneTemplates.map((tone) => <option key={tone} value={tone} />)}</datalist>}
             {(f.key === "personality" || f.key === "extra_instructions") && (
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => toggleDictation(f.key)} className="max-w-full">
-                  <Mic className="mr-2 size-4" />{recordingField === f.key ? "Parar gravação" : "Ditar por voz"}
+                <Button type="button" size="sm" variant={recordingField === f.key ? "default" : "outline"} onClick={() => toggleDictation(f.key)} className="max-w-full">
+                  <Mic className="mr-2 size-4" />{recordingField === f.key ? "Parar ditado" : "Ditar por voz"}
                 </Button>
                 <Button type="button" size="sm" variant="outline" disabled={organizingField !== null} onClick={() => void organize(f.key)}>
                   {organizingField === f.key ? <Loader2 className="mr-2 size-4 animate-spin" /> : <WandSparkles className="mr-2 size-4" />}
                   {organizingField === f.key ? "A organizar…" : "Organizar com IA"}
                 </Button>
               </div>
+            )}
+            {recordingField === f.key && (
+              <p role="status" aria-live="polite" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-primary">
+                A ouvir… Fala agora. {transcriptPreview ? `A captar: “${transcriptPreview}”` : "O texto reconhecido aparecerá aqui."}
+              </p>
             )}
             <p className="text-xs text-muted-foreground">{f.hint}</p>
           </div>
