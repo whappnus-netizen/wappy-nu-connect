@@ -6,7 +6,10 @@ const phoneSchema = z.string().trim().regex(/^\+?[0-9\s()-]{8,20}$/, "Introduz o
 
 /** Canonical database format: + followed by 8–15 digits, with no formatting characters. */
 function normalizePhoneE164(value: string): string {
-  const digits = value.replace(/\D/g, "");
+  let digits = value.replace(/\D/g, "");
+  // Os números angolanos locais têm 9 dígitos. Quando o utilizador não inclui
+  // o indicativo, normalizar para +244 em vez de guardar +938... como país.
+  if (/^9[0-9]{8}$/.test(digits)) digits = `244${digits}`;
   if (!/^[1-9][0-9]{7,14}$/.test(digits)) {
     throw new Error("Número inválido. Usa o indicativo internacional e 8 a 15 dígitos, por exemplo +244923456789.");
   }
@@ -45,25 +48,59 @@ export const startQrSession = createServerFn({ method: "POST" })
     let numberId: string;
 
     const requestedPhone = data.phoneE164 ? normalizePhoneE164(data.phoneE164) : undefined;
-    const { data: existingPhone, error: existingPhoneError } = requestedPhone
+    const phoneCandidates = requestedPhone
+      ? [requestedPhone, ...(requestedPhone.startsWith("+244") ? [`+${requestedPhone.slice(4)}`] : [])]
+      : [];
+    const { data: phoneRows, error: phoneRowsError } = phoneCandidates.length
       ? await admin.from("whatsapp_numbers")
-          .select("id,status")
+          .select("id,phone_e164,deleted_at,created_at")
           .eq("organization_id", data.organizationId)
           .eq("provider", "qr")
-          .eq("phone_e164", requestedPhone)
-          .is("deleted_at", null)
-          .maybeSingle()
-      : { data: null, error: null };
+          .in("phone_e164", phoneCandidates)
+          .order("created_at", { ascending: true })
+      : { data: [], error: null };
 
-    if (existingPhoneError) throw new Error("Base de dados: " + existingPhoneError.message);
+    if (phoneRowsError) throw new Error("Base de dados: " + phoneRowsError.message);
 
-    // A mesma ligação QR pode ser autenticada por QR ou por código. Reutilizar
-    // o registo existente evita duplicados e preserva as referências do CRM.
-    if (existingPhone) {
-      numberId = (existingPhone as { id: string }).id;
+    // Escolher a ligação com mais histórico. Os registos arquivados são elegíveis
+    // para reactivação: apagar uma ligação não deve tornar o número impossível de
+    // voltar a ligar, nem separar conversas/contactos do número que os criou.
+    let numberId: string;
+    let selectedPhone: { id: string; deleted_at: string | null } | null = null;
+    if (phoneRows?.length) {
+      const ids = phoneRows.map((row: { id: string }) => row.id);
+      const [{ data: conversations, error: conversationsError }, { data: contacts, error: contactsError }] = await Promise.all([
+        admin.from("conversations").select("whatsapp_number_id").in("whatsapp_number_id", ids),
+        admin.from("contacts").select("whatsapp_number_id").in("whatsapp_number_id", ids),
+      ]);
+      if (conversationsError) throw new Error("Histórico: " + conversationsError.message);
+      if (contactsError) throw new Error("Contactos: " + contactsError.message);
+      const scores = new Map<string, number>();
+      for (const row of conversations ?? []) {
+        const id = (row as { whatsapp_number_id: string | null }).whatsapp_number_id;
+        if (id) scores.set(id, (scores.get(id) ?? 0) + 100);
+      }
+      for (const row of contacts ?? []) {
+        const id = (row as { whatsapp_number_id: string | null }).whatsapp_number_id;
+        if (id) scores.set(id, (scores.get(id) ?? 0) + 1);
+      }
+      const ranked = [...phoneRows].sort((a: any, b: any) => {
+        const activeDiff = Number(a.deleted_at === null) - Number(b.deleted_at === null);
+        if (activeDiff !== 0) return -activeDiff;
+        const scoreDiff = (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+      selectedPhone = ranked[0] as { id: string; deleted_at: string | null };
+    }
+
+    if (selectedPhone) {
+      numberId = selectedPhone.id;
       const { error: updateErr } = await admin
         .from("whatsapp_numbers")
         .update({
+          phone_e164: requestedPhone,
+          deleted_at: null,
           display_name: data.displayName ?? "WhatsApp (código)",
           status: "connecting",
           last_error: null,
@@ -78,6 +115,7 @@ export const startQrSession = createServerFn({ method: "POST" })
         .select("id")
         .eq("organization_id", data.organizationId)
         .eq("provider", "qr")
+        .is("deleted_at", null)
         .is("phone_e164", null)
         .in("status", ["pending", "connecting", "qr_pending", "reconnecting", "error", "disconnected"])
         .limit(1)
