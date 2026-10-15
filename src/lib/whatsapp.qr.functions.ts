@@ -30,6 +30,7 @@ export const startQrSession = createServerFn({ method: "POST" })
       .extend({
         displayName: z.string().trim().min(2).max(80).optional(),
         phoneE164: phoneSchema.optional(),
+        pairingOnly: z.boolean().optional(),
       })
       .parse(input),
   )
@@ -226,6 +227,19 @@ export const startQrSession = createServerFn({ method: "POST" })
       };
     }
 
+    if (data.pairingOnly) {
+      // A geração por código não deve iniciar primeiro um socket QR.
+      // O endpoint de pairing-code cria o socket com o perfil correcto.
+      return {
+        numberId,
+        sessionId: sessionId as string,
+        status: "connecting" as const,
+        qr: null,
+        bridgeConfigured: true,
+        error: null,
+      };
+    }
+
     try {
       const result = await qrProvider.connect({
         organizationId: data.organizationId,
@@ -307,8 +321,20 @@ export const requestQrPairingCode = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!number || number.provider !== "qr") throw new Error("A ligação WhatsApp não pertence a esta organização.");
     const phone = normalizePhoneE164(data.phoneE164);
-    const code = await requestCode({ organizationId: data.organizationId, whatsappNumberId: data.numberId }, phone);
     const now = new Date().toISOString();
+    let code: string;
+    try {
+      code = await requestCode({ organizationId: data.organizationId, whatsappNumberId: data.numberId }, phone);
+    } catch (error) {
+      const message = (error as Error).message || "Não foi possível gerar o código de ligação.";
+      await admin.from("whatsapp_numbers")
+        .update({ status: "error", last_error: message.slice(0, 500), updated_at: now })
+        .eq("id", data.numberId).eq("organization_id", data.organizationId);
+      await admin.from("whatsapp_sessions")
+        .update({ status: "error", qr_code: null, qr_expires_at: null, last_error: message.slice(0, 500), updated_at: now })
+        .eq("organization_id", data.organizationId).eq("whatsapp_number_id", data.numberId);
+      throw new Error(message);
+    }
     const { error: updateError } = await admin.from("whatsapp_numbers")
       .update({ phone_e164: phone, status: "connecting", last_error: null, updated_at: now })
       .eq("id", data.numberId).eq("organization_id", data.organizationId);
