@@ -227,7 +227,7 @@ function WhatsAppPage() {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
       const phoneE164 = pairingPhone.trim().replace(/[\s()-]/g, "");
       if (!/^\+?[0-9]{8,15}$/.test(phoneE164)) throw new Error("Introduz o número com indicativo internacional, por exemplo +244923456789.");
-      const started = await startQrFn({ data: { organizationId: orgId, displayName: "WhatsApp (código)", phoneE164 } });
+      const started = await startQrFn({ data: { organizationId: orgId, displayName: "WhatsApp (código)", phoneE164, pairingOnly: true } });
       if (started.error) throw new Error(started.error);
       return requestPairingFn({ data: { organizationId: orgId, numberId: started.numberId, phoneE164 } });
     },
