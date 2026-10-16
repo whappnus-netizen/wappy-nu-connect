@@ -111,7 +111,19 @@ Deno.serve(async(req:Request)=>{
   if(sale.organization_id&&sale.organization_id!==ids[0]){skipped++;continue;}
   const link=await db.from("kursinha_sales").update({organization_id:ids[0],updated_at:new Date().toISOString()}).eq("sale_id",sale.sale_id).is("applied_at",null);if(link.error)return reply({ok:false,error:"Não foi possível associar a compra."},500);
   const a=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:sale.sale_id});if(a.error)return reply({ok:false,error:"A associação foi feita, mas a ativação falhou; tenta novamente."},500);
-  if(a.data?.applied||a.data?.already_applied)applied++;else skipped++;
+  if(a.data?.applied||a.data?.already_applied){
+   applied++;
+   // A conta pode ter sido criada depois do evento aprovado; enviar confirmação após ativação real.
+   const saleInfo=await db.from("kursinha_sales").select("buyer_email,buyer_name,product_name,amount_aoa,order_id,organization_id,subscription_id,approved_at").eq("sale_id",sale.sale_id).maybeSingle();
+   if(saleInfo.error)console.warn("[kursinha-webhook] detalhes da venda para e-mail",saleInfo.error.message);
+   else if(saleInfo.data){
+    const si:any=saleInfo.data;
+    const subInfo=si.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",si.subscription_id).maybeSingle():{data:null,error:null};
+    if(subInfo.error)console.warn("[kursinha-webhook] dados da assinatura para e-mail",subInfo.error.message);
+    const ss:any=subInfo.data;
+    await sendEmail(db,{template:"payment_approved",to:si.buyer_email,name:si.buyer_name,event:"sale.approved",organizationId:si.organization_id,idempotencyKey:"payment_approved:"+sale.sale_id,vars:{plan:ss?.subscription_plans?.name||si.product_name,organization:ss?.organizations?.name,amount:si.amount_aoa,approved_at:si.approved_at||new Date().toISOString(),period_start:ss?.current_period_start,period_end:ss?.current_period_end,reference:si.order_id||sale.sale_id}});
+   }
+  }else skipped++;
  }
  return reply({ok:true,applied,skipped});
 });
