@@ -6,6 +6,65 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 });
 const hour = 60 * 60 * 1000;
 
+async function sendTransactionalEmail(db: any, input: {
+  template: string; to: string; name?: string; vars: Record<string, unknown>;
+  idempotencyKey: string; organizationId: string; eventType: string;
+}) {
+  const secret = Deno.env.get("EMAIL_DISPATCH_SECRET") ?? "";
+  if (!secret || !input.to) return false;
+  const endpoint = Deno.env.get("EMAIL_DISPATCH_URL") ?? "https://whappnus.online/api/public/email/dispatch";
+  try {
+    const existing = await db.from("email_delivery_logs").select("id,status")
+      .eq("idempotency_key", input.idempotencyKey).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data && ["sent", "sending", "delivered"].includes(existing.data.status)) return true;
+    let logId = existing.data?.id as string | undefined;
+    if (logId) {
+      const updated = await db.from("email_delivery_logs").update({
+        status: "sending", error_message: null, recipient_email: input.to,
+        template_code: input.template, event_type: input.eventType,
+        organization_id: input.organizationId, updated_at: new Date().toISOString(),
+      }).eq("id", logId);
+      if (updated.error) throw updated.error;
+    } else {
+      const inserted = await db.from("email_delivery_logs").insert({
+        idempotency_key: input.idempotencyKey, template_code: input.template,
+        recipient_email: input.to, event_type: input.eventType,
+        organization_id: input.organizationId, status: "sending",
+        metadata: { source: "subscription-reminders" },
+      }).select("id").single();
+      if (inserted.error) {
+        if (inserted.error.code === "23505") return true;
+        throw inserted.error;
+      }
+      logId = inserted.data.id;
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-email-secret": secret },
+      body: JSON.stringify({
+        template: input.template, to: input.to, name: input.name,
+        vars: input.vars, idempotency_key: input.idempotencyKey,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const payload = await response.json().catch(() => ({}));
+    const ok = response.ok && payload?.ok === true;
+    await db.from("email_delivery_logs").update(ok
+      ? { status: "sent", provider: "brevo", provider_message_id: payload.messageId ?? null, sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }
+      : { status: "failed", error_message: String(payload?.error ?? `HTTP ${response.status}`).slice(0, 300), updated_at: new Date().toISOString() }
+    ).eq("id", logId);
+    return ok;
+  } catch (error) {
+    console.error("[subscription-reminders email]", input.template, error instanceof Error ? error.message : String(error));
+    await db.from("email_delivery_logs").update({
+      status: "failed", error_message: "dispatch_failed", updated_at: new Date().toISOString(),
+    }).eq("idempotency_key", input.idempotencyKey).eq("status", "sending");
+    return false;
+  }
+}
+
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: {
     "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type,x-reminder-secret",
@@ -77,6 +136,17 @@ Deno.serve(async (req: Request) => {
       owner = data.user;
     }
     const metadata = owner?.user_metadata ?? {};
+    const ownerEmail = String(owner?.email ?? "").trim().toLowerCase();
+    if (ownerEmail) {
+      const emailOk = await sendTransactionalEmail(db, {
+        template: "subscription_expiring", to: ownerEmail,
+        name: String(metadata.full_name ?? metadata.name ?? org.name),
+        vars: { name: metadata.full_name ?? metadata.name ?? org.name, organization: org.name, plan: planName, period_end: sub.current_period_end, days: reminderDays },
+        idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}`,
+        organizationId: org.id, eventType: "subscription_expiring",
+      });
+      if (!emailOk) result.errors.push(`${org.name}: falha no e-mail de aviso de renovação.`);
+    }
     const recipientPhone = String(org.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
     const sessionResult = await db.from("whatsapp_sessions")
       .select("whatsapp_number_id,phone_number,display_name").eq("organization_id", org.id)
@@ -128,6 +198,22 @@ Deno.serve(async (req: Request) => {
     }, { onConflict: "subscription_id,reminder_days", ignoreDuplicates: true }).select("id").maybeSingle();
     if (!inserted?.id) continue;
     await db.from("organization_subscriptions").update({ status: "expired", updated_at: now.toISOString() }).eq("id", sub.id).in("status", ["active", "trialing"]);
+    const ownerResult = await db.from("memberships").select("user_id").eq("organization_id", sub.organization_id).eq("role", "OWNER").limit(1).maybeSingle();
+    if (ownerResult.data?.user_id) {
+      const { data: ownerData } = await db.auth.admin.getUserById(ownerResult.data.user_id);
+      const owner = ownerData.user;
+      if (owner?.email) {
+        const meta = owner.user_metadata ?? {};
+        const emailOk = await sendTransactionalEmail(db, {
+          template: "subscription_expired", to: owner.email,
+          name: String(meta.full_name ?? meta.name ?? orgResult.data.name),
+          vars: { name: meta.full_name ?? meta.name ?? orgResult.data.name, organization: orgResult.data.name, plan: (sub.subscription_plans as any)?.name ?? "WhappNus", period_end: sub.current_period_end },
+          idempotencyKey: `subscription_expired:${sub.id}`,
+          organizationId: sub.organization_id, eventType: "subscription_expired",
+        });
+        if (!emailOk) result.errors.push(`${orgResult.data.name}: falha no e-mail de expiração.`);
+      }
+    }
     await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WhappNus expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
     result.expired_notices += 1;
   }
