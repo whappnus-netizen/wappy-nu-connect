@@ -14,6 +14,21 @@ async function signatureOK(raw:string,header:string,secret:string){
  const h=hex(new Uint8Array(await crypto.subtle.sign("HMAC",k,new TextEncoder().encode(raw))));
  if(h.length!==m[1].length)return false;let d=0;for(let i=0;i<h.length;i++)d|=h.charCodeAt(i)^m[1].toLowerCase().charCodeAt(i);return d===0;
 }
+// Envio idempotente de e-mails (WhappNus /api/public/email/dispatch → Brevo). Nunca lança: falhas não bloqueiam pagamentos.
+async function sendEmail(db:any,p:{template:string;to:string;name?:string;vars?:Record<string,unknown>;idempotencyKey:string;event:string;organizationId?:string|null}){
+ const endpoint=Deno.env.get("EMAIL_DISPATCH_URL")??"https://whappnus.online/api/public/email/dispatch",secret=Deno.env.get("EMAIL_DISPATCH_SECRET");
+ if(!secret||!p.to)return;
+ try{
+  const ex=await db.from("email_delivery_logs").select("id,status").eq("idempotency_key",p.idempotencyKey).maybeSingle();
+  if(ex.data&&["sent","sending"].includes(ex.data.status))return;
+  const ins=ex.data?await db.from("email_delivery_logs").update({status:"sending",error_message:null}).eq("id",ex.data.id).select("id").single()
+   :await db.from("email_delivery_logs").insert({idempotency_key:p.idempotencyKey,template_code:p.template,recipient_email:p.to,event_type:p.event,organization_id:p.organizationId??null,status:"sending"}).select("id").single();
+  if(ins.error){console.warn("[email] log",ins.error.message);if(ins.error.code==="23505")return;}
+  const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json","x-email-secret":secret},body:JSON.stringify({template:p.template,to:p.to,name:p.name||undefined,vars:p.vars??{},idempotency_key:p.idempotencyKey})});
+  const j:any=await r.json().catch(()=>({}));
+  if(ins.data?.id)await db.from("email_delivery_logs").update(r.ok&&j.ok?{status:"sent",provider_message_id:j.messageId??null,sent_at:new Date().toISOString(),error_message:null}:{status:"failed",error_message:String(j.error??r.status).slice(0,300)}).eq("id",ins.data.id);
+ }catch(e){console.error("[email]",p.template,e instanceof Error?e.message:e);await db.from("email_delivery_logs").update({status:"failed",error_message:"network_uncertain"}).eq("idempotency_key",p.idempotencyKey).eq("status","sending");}
+}
 Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers});
  if(req.method!=="POST")return reply({ok:false,error:"Método não permitido."},405);
@@ -42,7 +57,8 @@ Deno.serve(async(req:Request)=>{
    const prev=old.data;
    const common={sale_id:saleId,order_id:str(d.orderId,180),buyer_email:buyer,buyer_name:str(d.buyer?.name,200),buyer_phone:str(d.buyer?.phone,80),product_id:productId,product_name:productName,plan_id:mr.data?.plan_id??null,amount_aoa:Number.isFinite(price)&&price>=0?price:0,currency:currency||"AOA",last_event_type:event,payload:p};
    if(event==="sale.pending"){
-    if(!prev||prev.status==="pending"){const r=await db.from("kursinha_sales").upsert({...common,status:"pending"},{onConflict:"sale_id"});if(r.error)throw r.error;}
+    if(!prev||prev.status==="pending"){const r=await db.from("kursinha_sales").upsert({...common,status:"pending"},{onConflict:"sale_id"});if(r.error)throw r.error;
+     await sendEmail(db,{template:"payment_pending",to:buyer,name:common.buyer_name,event,idempotencyKey:"payment_pending:"+saleId,vars:{plan:productName,amount:common.amount_aoa,reference:common.order_id||saleId}});}
    }else if(event==="sale.approved"){
     if(prev&&["cancelled","refunded","invalid"].includes(prev.status)){await db.from("kursinha_webhook_events").update({processing_status:"ignored",processed_at:now}).eq("event_key",eventKey);return reply({ok:true,ignored:true,reason:"SALE_TERMINAL_STATE"});}
     const valid=!!mr.data&&Number.isFinite(price)&&price===Number(mr.data.expected_amount_aoa)&&currency===mr.data.currency&&currency==="AOA";
@@ -58,12 +74,17 @@ Deno.serve(async(req:Request)=>{
       if(ids.length===1&&(!prev?.organization_id||prev.organization_id===ids[0])){
        if(!prev?.organization_id){const link=await db.from("kursinha_sales").update({organization_id:ids[0],updated_at:now}).eq("sale_id",saleId).is("organization_id",null);if(link.error)throw link.error;}
        const applied=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:saleId});if(applied.error)throw applied.error;if(!(applied.data?.applied||applied.data?.already_applied)){throw new Error("Ativação não confirmada: "+String(applied.data?.reason??"UNKNOWN"));}
+       const ss=await db.from("kursinha_sales").select("subscription_id").eq("sale_id",saleId).maybeSingle();
+       const sub:any=ss.data?.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",ss.data.subscription_id).maybeSingle():{data:null};
+       const s0:any=sub.data;
+       await sendEmail(db,{template:"payment_approved",to:buyer,name:common.buyer_name,event,organizationId:ids[0],idempotencyKey:"payment_approved:"+saleId,vars:{plan:s0?.subscription_plans?.name||productName,organization:s0?.organizations?.name,amount:common.amount_aoa,approved_at:now,period_start:s0?.current_period_start,period_end:s0?.current_period_end,reference:common.order_id||saleId}});
       }
      }
     }
    }else{
     const paid=prev?.status==="approved"||prev?.status==="refunded"||!!prev?.applied_at;
     const r=await db.from("kursinha_sales").upsert({...common,status:paid?"refunded":"cancelled",cancelled_at:now},{onConflict:"sale_id"});if(r.error)throw r.error;
+    await sendEmail(db,{template:paid?"payment_refunded":"payment_cancelled",to:buyer,name:common.buyer_name,event,organizationId:prev?.organization_id,idempotencyKey:(paid?"payment_refunded:":"payment_cancelled:")+saleId,vars:{plan:productName,amount:common.amount_aoa,reference:common.order_id||saleId}});
     if(paid&&prev?.subscription_id){
      const sub=await db.from("organization_subscriptions").update({status:"cancelled",cancelled_at:now,updated_at:now}).eq("id",prev.subscription_id).eq("provider","kursinha").eq("provider_subscription_id",saleId);if(sub.error)throw sub.error;
      const tx=await db.from("payment_transactions").update({status:"refunded",updated_at:now}).eq("provider","kursinha").eq("provider_payment_id",saleId);if(tx.error)throw tx.error;
