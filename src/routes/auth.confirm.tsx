@@ -27,7 +27,7 @@ function ConfirmEmailPage() {
         return;
       }
 
-      const { error } = await supabase.auth.verifyOtp({
+      const { data: verified, error } = await supabase.auth.verifyOtp({
         token_hash,
         type: type as EmailOtpType,
       });
@@ -38,6 +38,18 @@ function ConfirmEmailPage() {
         setStatus("error");
         setMessage("Não foi possível confirmar este e-mail. O link pode ter expirado ou já ter sido utilizado. Solicita um novo link e tenta novamente.");
         return;
+      }
+
+      // O e-mail de boas-vindas é enviado apenas após a confirmação real. Uma falha de envio não invalida a confirmação.
+      if (verified.session?.access_token) {
+        try {
+          await fetch("/api/public/email/welcome", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${verified.session.access_token}` },
+          });
+        } catch (welcomeError) {
+          console.warn("[auth.confirm] welcome email dispatch failed", welcomeError);
+        }
       }
 
       setStatus("success");
