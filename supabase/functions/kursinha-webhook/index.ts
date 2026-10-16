@@ -49,7 +49,16 @@ Deno.serve(async(req:Request)=>{
   if(ew.error)return reply({ok:false,error:"Não foi possível registar o evento."},500);
   const es=await db.from("kursinha_webhook_events").select("processing_status").eq("event_key",eventKey).maybeSingle();
   if(es.error)return reply({ok:false,error:"Não foi possível consultar o evento."},500);
-  if(["processed","ignored"].includes(es.data?.processing_status??""))return reply({ok:true,duplicate:true});
+  if(["processed","ignored"].includes(es.data?.processing_status??"")){
+   if(es.data?.processing_status==="processed"){
+    const keys=event==="sale.pending"?["payment_pending:"+saleId]:event==="sale.approved"?["payment_approved:"+saleId]:["payment_cancelled:"+saleId,"payment_refunded:"+saleId];
+    const failedEmail=await db.from("email_delivery_logs").select("id").in("idempotency_key",keys).eq("status","failed").limit(1);
+    if(failedEmail.error)console.warn("[kursinha-webhook] não foi possível verificar retry de e-mail",failedEmail.error.message);
+    if(failedEmail.data?.length){
+     await db.from("kursinha_webhook_events").update({processing_status:"received",processed_at:null,error_message:null}).eq("event_key",eventKey);
+    }else return reply({ok:true,duplicate:true});
+   }else return reply({ok:true,duplicate:true});
+  }
   await db.from("kursinha_webhook_events").update({processing_status:"processing",error_message:null}).eq("event_key",eventKey);
   try{
    const mr=await db.from("kursinha_product_mappings").select("plan_id,expected_amount_aoa,currency").eq("product_id",productId).eq("is_active",true).maybeSingle();if(mr.error)throw mr.error;
