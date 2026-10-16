@@ -182,6 +182,32 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // Retry independente dos e-mails: o registo de WhatsApp não deve impedir nova tentativa de e-mail.
+  for (const sub of expiring ?? []) {
+    const orgResult = await db.from("organizations").select("id,name").eq("id", sub.organization_id).maybeSingle();
+    if (!orgResult.data) continue;
+    const hoursRemaining = (new Date(sub.current_period_end).getTime() - now.getTime()) / hour;
+    const reminderDays = hoursRemaining <= 72 ? 3 : 4;
+    if (reminderDays === 3) {
+      const { data: dayFour } = await db.from("subscription_reminder_logs").select("status")
+        .eq("subscription_id", sub.id).eq("reminder_days", 4).maybeSingle();
+      if (dayFour?.status === "sent") continue;
+    }
+    const ownerResult = await db.from("memberships").select("user_id").eq("organization_id", sub.organization_id).eq("role", "OWNER").limit(1).maybeSingle();
+    if (!ownerResult.data?.user_id) continue;
+    const { data: ownerData } = await db.auth.admin.getUserById(ownerResult.data.user_id);
+    const owner = ownerData.user;
+    if (!owner?.email) continue;
+    const metadata = owner.user_metadata ?? {};
+    await sendTransactionalEmail(db, {
+      template: "subscription_expiring", to: owner.email,
+      name: String(metadata.full_name ?? metadata.name ?? orgResult.data.name),
+      vars: { name: metadata.full_name ?? metadata.name ?? orgResult.data.name, organization: orgResult.data.name, plan: (sub.subscription_plans as any)?.name ?? "WhappNus", period_end: sub.current_period_end, days: reminderDays },
+      idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}`,
+      organizationId: sub.organization_id, eventType: "subscription_expiring",
+    });
+  }
+
   // Notificar uma única vez quando a assinatura já expirou. Não envia WhatsApp depois do prazo.
   const { data: expired, error: expiredError } = await db.from("organization_subscriptions")
     .select("id,organization_id,status,current_period_end,subscription_plans(name)")
@@ -216,6 +242,25 @@ Deno.serve(async (req: Request) => {
     }
     await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WhappNus expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
     result.expired_notices += 1;
+  }
+
+  // Retry de e-mails de expiração, mesmo quando o aviso interno já foi criado noutra execução.
+  for (const sub of expired ?? []) {
+    const orgResult = await db.from("organizations").select("id,name").eq("id", sub.organization_id).maybeSingle();
+    if (!orgResult.data) continue;
+    const ownerResult = await db.from("memberships").select("user_id").eq("organization_id", sub.organization_id).eq("role", "OWNER").limit(1).maybeSingle();
+    if (!ownerResult.data?.user_id) continue;
+    const { data: ownerData } = await db.auth.admin.getUserById(ownerResult.data.user_id);
+    const owner = ownerData.user;
+    if (!owner?.email) continue;
+    const metadata = owner.user_metadata ?? {};
+    await sendTransactionalEmail(db, {
+      template: "subscription_expired", to: owner.email,
+      name: String(metadata.full_name ?? metadata.name ?? orgResult.data.name),
+      vars: { name: metadata.full_name ?? metadata.name ?? orgResult.data.name, organization: orgResult.data.name, plan: (sub.subscription_plans as any)?.name ?? "WhappNus", period_end: sub.current_period_end },
+      idempotencyKey: `subscription_expired:${sub.id}`,
+      organizationId: sub.organization_id, eventType: "subscription_expired",
+    });
   }
 
   return json({ ok: true, data: result });
