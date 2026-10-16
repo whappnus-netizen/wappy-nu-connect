@@ -12,55 +12,59 @@ const Body = z.object({
 
 function safeEqual(a: string, b: string) {
   if (a.length !== b.length) return false;
-  let r = 0;
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return r === 0;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
-// Envio central de e-mails transacionais via Brevo. Chamado só pelo backend (edge functions) com segredo partilhado.
+// Endpoint exclusivamente servidor-a-servidor: nunca expor EMAIL_DISPATCH_SECRET ou BREVO_API_KEY no browser.
 export const Route = createFileRoute("/api/public/email/dispatch")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["EMAIL_DISPATCH_SECRET"];
-        const got = request.headers.get("x-email-secret") ?? "";
-        if (!secret || !safeEqual(got, secret)) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+        const secret = process.env["EMAIL_DISPATCH_SECRET"] ?? "";
+        const supplied = request.headers.get("x-email-secret") ?? "";
+        if (!secret || !safeEqual(supplied, secret)) {
+          return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+        }
 
         const parsed = Body.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return Response.json({ ok: false, error: "invalid_body" }, { status: 400 });
         const { template, to, name, vars, idempotency_key } = parsed.data;
 
-        const LOVABLE_API_KEY = process.env["LOVABLE_API_KEY"];
-        const BREVO_API_KEY = process.env["BREVO_API_KEY"];
-        if (!LOVABLE_API_KEY || !BREVO_API_KEY) return Response.json({ ok: false, error: "email_not_configured" }, { status: 503 });
+        const apiKey = process.env["BREVO_API_KEY"];
+        if (!apiKey) return Response.json({ ok: false, error: "email_not_configured" }, { status: 503 });
 
         const { subject, html } = renderTemplate(template as never, { ...vars, name: name || vars["name"] });
         const senderEmail = process.env["EMAIL_SENDER"] || "whappnus@gmail.com";
-        const res = await fetch("https://connector-gateway.lovable.dev/brevo/smtp/email", {
+        const replyTo = process.env["EMAIL_REPLY_TO"] || senderEmail;
+
+        // Idempotency is enforced by the Supabase caller's unique email_delivery_logs key.
+        // Brevo's transactional API does not guarantee deduplication from an arbitrary Idempotency-Key header.
+        const res = await fetch("https://api.brevo.com/v3/smtp/email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "X-Connection-Api-Key": BREVO_API_KEY,
-            // Brevo deduplica pedidos repetidos com o mesmo idempotency key.
-            "Idempotency-Key": idempotency_key,
+            "api-key": apiKey,
           },
           body: JSON.stringify({
             sender: { name: "WhappNus", email: senderEmail },
-            replyTo: { email: process.env["EMAIL_REPLY_TO"] || senderEmail, name: "WhappNus" },
+            replyTo: { email: replyTo, name: "WhappNus" },
             to: [{ email: to, ...(name ? { name } : {}) }],
             subject,
             htmlContent: html,
-            tags: [template],
+            tags: [template, idempotency_key.slice(0, 50)],
           }),
+          signal: AbortSignal.timeout(15000),
         });
+
         const text = await res.text();
         if (!res.ok) {
-          console.error(`[email.dispatch] Brevo ${res.status}: ${text.slice(0, 500)}`);
-          return Response.json({ ok: false, error: `brevo_${res.status}`, detail: text.slice(0, 300) }, { status: 502 });
+          console.error(`[email.dispatch] Brevo ${res.status}: ${text.slice(0, 400)}`);
+          return Response.json({ ok: false, error: `brevo_${res.status}` }, { status: 502 });
         }
         let messageId: string | null = null;
-        try { messageId = JSON.parse(text).messageId ?? null; } catch { /* ignore */ }
+        try { messageId = JSON.parse(text).messageId ?? null; } catch { /* Brevo may return an empty body */ }
         return Response.json({ ok: true, messageId });
       },
     },
