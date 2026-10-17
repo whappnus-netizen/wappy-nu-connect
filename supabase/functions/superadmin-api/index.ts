@@ -815,6 +815,11 @@ Deno.serve(async (req: Request) => {
             const events = Array.isArray(body?.events) ? body.events : Array.isArray(body) ? body : [];
             providerEvents = events.map((event: any, i: number) => {
               const raw = String(event.event ?? event.type ?? "unknown").toLowerCase();
+              const subject = String(event.subject ?? "");
+              const subjectCode = /confirm|confirmar|bem-vindo|welcome/i.test(subject) ? "auth_confirm_signup" :
+                /password|palavra-passe|recuperar/i.test(subject) ? "auth_reset_password" :
+                /pagamento|payment/i.test(subject) ? "payment_notification" :
+                /renova|expir/i.test(subject) ? "subscription_notification" : "supabase_auth_or_transactional";
               const mappedStatus = raw === "delivered" ? "delivered" :
                 ["hardbounce","softbounce","blocked","invalid","deferred","error"].includes(raw.replace(/[^a-z]/g, "")) ? "bounced" :
                 ["spam","complaint"].includes(raw) ? "complained" :
@@ -824,7 +829,7 @@ Deno.serve(async (req: Request) => {
                 provider: "brevo",
                 provider_message_id: event.messageId ?? event.message_id ?? null,
                 recipient_email: event.email ?? event.recipient ?? null,
-                template_code: event.tag ?? event.tags?.[0] ?? "supabase_auth_or_transactional",
+                template_code: event.tag ?? event.tags?.[0] ?? subjectCode,
                 event_type: event.event ?? event.type ?? "unknown",
                 status: mappedStatus,
                 error_message: event.reason ?? event.error ?? null,
