@@ -19,7 +19,7 @@ function ConfirmEmailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
+    let redirectTimer: number | undefined;
 
     async function confirmEmail() {
       if (!token_hash || type !== "signup") {
