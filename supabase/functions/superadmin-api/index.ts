@@ -852,7 +852,7 @@ Deno.serve(async (req: Request) => {
         .filter((row: any) => !status || status === "all" || row.status === status)
         .filter((row: any) => !template || template === "all" || row.template_code === template)
         .sort((a: any, b: any) => Date.parse(b.created_at ?? "") - Date.parse(a.created_at ?? ""));
-      return json({ ok: true, data: merged.slice(0, 300), meta: { brevo_configured: Boolean(brevoKey), brevo_error: providerError, brevo_events: providerEvents.length, app_logs: logged.length } });
+      return json({ ok: true, data: { rows: merged.slice(0, 300), meta: { brevo_configured: Boolean(brevoKey), brevo_error: providerError, brevo_events: providerEvents.length, app_logs: logged.length } } });
     }
 
     if (action === "payments.list") {
