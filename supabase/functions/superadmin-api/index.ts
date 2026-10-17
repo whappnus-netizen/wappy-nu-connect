@@ -779,6 +779,27 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: result.data, queued: true, note: "A tarefa foi colocada na fila de envio do motor WhatsApp no Railway." });
     }
 
+    if (action === "email.logs.list") {
+      const search = str(input.search, 160).toLowerCase();
+      const status = str(input.status, 30);
+      const template = str(input.template, 80);
+      let query = db.from("email_delivery_logs")
+        .select("id,provider,provider_message_id,recipient_hash,recipient_email,template_code,event_type,status,error_message,metadata,organization_id,created_at,sent_at,updated_at")
+        .order("created_at", { ascending: false }).limit(300);
+      if (status && status !== "all") query = query.eq("status", status);
+      if (template && template !== "all") query = query.eq("template_code", template);
+      if (search) query = query.or(`recipient_email.ilike.%${search.replace(/[,%()]/g, "")}%,template_code.ilike.%${search.replace(/[,%()]/g, "")}%,event_type.ilike.%${search.replace(/[,%()]/g, "")}%,provider_message_id.ilike.%${search.replace(/[,%()]/g, "")}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      const orgIds = [...new Set((data ?? []).map((row: any) => row.organization_id).filter(Boolean))];
+      const orgResult = orgIds.length ? await db.from("organizations").select("id,name").in("id", orgIds) : { data: [], error: null };
+      if (orgResult.error) throw orgResult.error;
+      const orgNames = new Map((orgResult.data ?? []).map((row: any) => [row.id, row.name]));
+      return json({ ok: true, data: (data ?? []).map((row: any) => ({
+        ...row, organization_name: orgNames.get(row.organization_id) ?? null,
+      })) });
+    }
+
     if (action === "payments.list") {
       const { data, error } = await db.from("payment_transactions")
         .select("id,organization_id,subscription_id,provider,provider_payment_id,status,amount_aoa,currency,description,paid_at,failure_code,created_at,organizations(name,slug)")
