@@ -287,7 +287,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/email/dispatch'
-     | '/api/public/email/welcome'
+    | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesByTo: FileRoutesByTo
@@ -315,7 +315,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/email/dispatch'
-     | '/api/public/email/welcome'
+    | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   id:
@@ -344,7 +344,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/email/dispatch'
-     | '/api/public/email/welcome'
+    | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesById: FileRoutesById
@@ -363,7 +363,7 @@ export interface RootRouteChildren {
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
   ApiPublicEmailDispatchRoute: typeof ApiPublicEmailDispatchRoute
-    ApiPublicEmailWelcomeRoute: typeof ApiPublicEmailWelcomeRoute
+  ApiPublicEmailWelcomeRoute: typeof ApiPublicEmailWelcomeRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicWhatsappQrEventsRoute: typeof ApiPublicWhatsappQrEventsRoute
 }
