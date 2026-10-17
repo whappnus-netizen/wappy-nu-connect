@@ -150,6 +150,120 @@ Deno.serve(async (req: Request) => {
       }) });
     }
 
+    if (action === "users.list") {
+      const { data: authResult, error: authListError } = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
+      if (authListError) throw authListError;
+      const users = authResult.users ?? [];
+      const ids = users.map((user: any) => user.id);
+      const [profilesResult, membershipsResult, orgsResult, adminsResult] = await Promise.all([
+        ids.length ? db.from("profiles").select("id,full_name,email,created_at").in("id", ids) : Promise.resolve({ data: [], error: null }),
+        ids.length ? db.from("memberships").select("user_id,organization_id").in("user_id", ids) : Promise.resolve({ data: [], error: null }),
+        ids.length ? db.from("organizations").select("id,created_by,name").in("created_by", ids) : Promise.resolve({ data: [], error: null }),
+        ids.length ? db.from("superadmin_users").select("user_id,is_active,role").in("user_id", ids) : Promise.resolve({ data: [], error: null }),
+      ]);
+      for (const result of [profilesResult, membershipsResult, orgsResult, adminsResult]) if (result.error) throw result.error;
+      const profiles = new Map((profilesResult.data ?? []).map((p: any) => [p.id, p]));
+      const memberCounts = new Map<string, number>();
+      for (const row of membershipsResult.data ?? []) memberCounts.set(row.user_id, (memberCounts.get(row.user_id) ?? 0) + 1);
+      const orgCounts = new Map<string, number>();
+      for (const row of orgsResult.data ?? []) orgCounts.set(row.created_by, (orgCounts.get(row.created_by) ?? 0) + 1);
+      const adminRows = new Map((adminsResult.data ?? []).map((row: any) => [row.user_id, row]));
+      const needle = str(input.search, 100).toLowerCase();
+      const data = users.map((user: any) => {
+        const profile: any = profiles.get(user.id);
+        const adminRow: any = adminRows.get(user.id);
+        return {
+          id: user.id, email: user.email ?? profile?.email ?? null,
+          full_name: profile?.full_name ?? user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+          created_at: user.created_at, email_confirmed_at: user.email_confirmed_at ?? null,
+          memberships_count: memberCounts.get(user.id) ?? 0, organizations_created: orgCounts.get(user.id) ?? 0,
+          is_superadmin: Boolean(adminRow?.is_active), superadmin_role: adminRow?.role ?? null,
+          deletable: !adminRow && !(memberCounts.get(user.id) ?? 0) && !(orgCounts.get(user.id) ?? 0),
+        };
+      }).filter((user: any) => !needle || [user.email, user.full_name, user.id].some((v) => String(v ?? "").toLowerCase().includes(needle)));
+      return json({ ok: true, data });
+    }
+
+    if (action === "users.delete") {
+      if (admin.role !== "owner") return fail("Só o proprietário da plataforma pode eliminar contas.", 403);
+      const userId = str(input.user_id, 60);
+      const confirmEmail = str(input.confirm_email, 320).toLowerCase();
+      if (!userId || !confirmEmail) return fail("Indica a conta e confirma o e-mail exacto.");
+      if (userId === actor.id) return fail("Não podes eliminar a tua própria conta administrativa.");
+      const { data: targetResult, error: targetError } = await db.auth.admin.getUserById(userId);
+      if (targetError || !targetResult.user) return fail("Conta não encontrada.", 404);
+      const target = targetResult.user;
+      if (str(target.email, 320).toLowerCase() !== confirmEmail) return fail("O e-mail de confirmação não corresponde à conta seleccionada.", 409);
+      const [adminTarget, membershipsCount, createdOrgsCount, invitesCount, assetsCount, groupConnectionsCount, auditCount] = await Promise.all([
+        db.from("superadmin_users").select("user_id").eq("user_id", userId).maybeSingle(),
+        count("memberships", q => q.eq("user_id", userId)),
+        count("organizations", q => q.eq("created_by", userId)),
+        count("superadmin_invites", q => q.eq("created_by", userId)),
+        count("superadmin_group_assets", q => q.eq("created_by", userId)),
+        count("superadmin_group_connections", q => q.eq("created_by", userId)),
+        count("superadmin_audit_logs", q => q.eq("actor_user_id", userId)),
+      ]);
+      if (adminTarget.error) throw adminTarget.error;
+      if (adminTarget.data || membershipsCount || createdOrgsCount || invitesCount || assetsCount || groupConnectionsCount || auditCount) {
+        return fail("A conta tem organizações, dados operacionais ou registos de auditoria associados. Remove ou transfere essas dependências primeiro.", 409);
+      }
+      const { error: deleteError } = await db.auth.admin.deleteUser(userId);
+      if (deleteError) throw deleteError;
+      await audit("user.deleted", "user", userId, null, { email: confirmEmail });
+      return json({ ok: true, data: { id: userId, email: confirmEmail } });
+    }
+
+    if (action === "organizations.delete") {
+      if (admin.role !== "owner") return fail("Só o proprietário da plataforma pode eliminar organizações.", 403);
+      const organizationId = str(input.organization_id, 60);
+      const confirmName = str(input.confirm_name, 120);
+      if (!organizationId || !confirmName) return fail("Indica a organização e confirma o nome exacto.");
+      const { data: org, error: orgError } = await db.from("organizations")
+        .select("id,name,slug,status").eq("id", organizationId).maybeSingle();
+      if (orgError) throw orgError;
+      if (!org) return fail("Organização não encontrada.", 404);
+      if (org.name !== confirmName) return fail("O nome de confirmação não corresponde à organização seleccionada.", 409);
+
+      const [payments, sales, paidSubs, members, contacts, conversations, numbers] = await Promise.all([
+        count("payment_transactions", q => q.eq("organization_id", organizationId)),
+        count("kursinha_sales", q => q.eq("organization_id", organizationId)),
+        count("organization_subscriptions", q => q.eq("organization_id", organizationId).not("status", "in", "(trialing,cancelled,expired)")),
+        count("memberships", q => q.eq("organization_id", organizationId)),
+        count("contacts", q => q.eq("organization_id", organizationId)),
+        count("conversations", q => q.eq("organization_id", organizationId)),
+        count("whatsapp_numbers", q => q.eq("organization_id", organizationId)),
+      ]);
+      if (payments || sales || paidSubs) return fail("Esta organização tem pagamentos, vendas ou assinaturas não descartáveis. Cancela/resolve a situação financeira antes de eliminar.", 409);
+      if (members || contacts || conversations || numbers) return fail("Esta organização tem membros, contactos, conversas ou números WhatsApp. Exporta/transfere esses dados antes de eliminar.", 409);
+
+      const { data: subscriptions, error: subscriptionsError } = await db.from("organization_subscriptions")
+        .select("id,status,provider").eq("organization_id", organizationId);
+      if (subscriptionsError) throw subscriptionsError;
+      if ((subscriptions ?? []).some((s: any) => s.status !== "trialing" && s.status !== "cancelled" && s.status !== "expired")) {
+        return fail("Só é permitido eliminar assinaturas de teste/canceladas/expiradas.", 409);
+      }
+      const { error: detachAuditError } = await db.from("superadmin_audit_logs").update({ organization_id: null }).eq("organization_id", organizationId);
+      if (detachAuditError) throw detachAuditError;
+      const deleteOrgRows = async (table: string) => {
+        const { error } = await db.from(table).delete().eq("organization_id", organizationId);
+        if (error) throw error;
+      };
+      for (const table of [
+        "superadmin_invites", "ai_agent_whatsapp_numbers", "ai_knowledge_documents", "ai_knowledge",
+        "ai_training_examples", "ai_evaluations", "ai_logs", "ai_credit_ledger", "ai_credit_accounts",
+        "ai_settings", "automation_actions", "automation_rules", "contact_tags", "conversation_assignments",
+        "conversation_tags", "deals", "messages", "internal_notes", "conversations", "contacts",
+        "pipeline_stages", "tags", "whatsapp_events", "whatsapp_sessions", "whatsapp_credentials",
+        "whatsapp_numbers", "subscription_reminder_logs", "email_delivery_logs", "payment_transactions",
+        "kursinha_sales", "organization_notifications", "memberships", "activity_logs", "ai_agents",
+        "organization_subscriptions",
+      ]) await deleteOrgRows(table);
+      const { error: finalDeleteError } = await db.from("organizations").delete().eq("id", organizationId);
+      if (finalDeleteError) throw finalDeleteError;
+      await audit("organization.deleted", "organization", organizationId, null, { name: org.name, slug: org.slug });
+      return json({ ok: true, data: { id: organizationId, name: org.name } });
+    }
+
     if (action === "organizations.create") {
       const name = str(input.name, 120);
       const slug = str(input.slug, 80).toLowerCase();
