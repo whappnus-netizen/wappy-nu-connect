@@ -342,7 +342,7 @@ function SuperAdminPage() {
           {[
             ["overview", LayoutDashboard, "Visão geral"], ["organizations", Building2, "Organizações"],
             ["plans", CircleDollarSign, "Planos e preços"], ["subscriptions", CreditCard, "Assinaturas"], ["renewals", Clock3, "Renovações"], ["notifications", Sparkles, "Notificações"],
-            ["groups", Users, "Group Commander"], ["group-ai", Sparkles, "Treinar IA"], ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["audit", LockKeyhole, "Auditoria"],
+            ["groups", Users, "Group Commander"], ["group-ai", Sparkles, "Treinar IA"], ["payments", Wallet, "Pagamentos"], ["health", Activity, "WhatsApp & IA"], ["team", Users, "Equipa admin"], ["emails", Mail, "E-mails automáticos"], ["audit", LockKeyhole, "Auditoria"],
           ].map(([id, Icon, label]) => {
             const I = Icon as typeof LayoutDashboard;
             return <button key={id as string} onClick={() => setTab(id as string)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${tab === id ? "bg-emerald-400/10 font-semibold text-emerald-200 ring-1 ring-emerald-300/20" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}><I className="size-4" />{label as string}{tab === id && <span className="ml-auto size-1.5 rounded-full bg-emerald-300" />}</button>;
