@@ -795,9 +795,64 @@ Deno.serve(async (req: Request) => {
       const orgResult = orgIds.length ? await db.from("organizations").select("id,name").in("id", orgIds) : { data: [], error: null };
       if (orgResult.error) throw orgResult.error;
       const orgNames = new Map((orgResult.data ?? []).map((row: any) => [row.id, row.name]));
-      return json({ ok: true, data: (data ?? []).map((row: any) => ({
-        ...row, organization_name: orgNames.get(row.organization_id) ?? null,
-      })) });
+      const logged = (data ?? []).map((row: any) => ({
+        ...row, organization_name: orgNames.get(row.organization_id) ?? null, source: "whappnus",
+      }));
+
+      // Brevo is the source of truth for actual provider events, including messages sent by Supabase Auth over Brevo SMTP.
+      // Keep the API key only in Supabase Edge Function secrets; never return it to the browser.
+      const brevoKey = Deno.env.get("BREVO_API_KEY") ?? "";
+      let providerEvents: any[] = [];
+      let providerError: string | null = null;
+      if (brevoKey) {
+        try {
+          const url = new URL("https://api.brevo.com/v3/smtp/statistics/events");
+          url.searchParams.set("limit", "100");
+          url.searchParams.set("sort", "desc");
+          const response = await fetch(url, { headers: { "api-key": brevoKey, "accept": "application/json" }, signal: AbortSignal.timeout(12000) });
+          if (response.ok) {
+            const body: any = await response.json();
+            const events = Array.isArray(body?.events) ? body.events : Array.isArray(body) ? body : [];
+            providerEvents = events.map((event: any, i: number) => {
+              const raw = String(event.event ?? event.type ?? "unknown").toLowerCase();
+              const mappedStatus = raw === "delivered" ? "delivered" :
+                ["hardbounce","softbounce","blocked","invalid","deferred","error"].includes(raw.replace(/[^a-z]/g, "")) ? "bounced" :
+                ["spam","complaint"].includes(raw) ? "complained" :
+                ["request","sent","click","opened","unique_opened"].includes(raw) ? "sent" : raw;
+              return {
+                id: `brevo:${event.messageId ?? event.message_id ?? event.id ?? i}`,
+                provider: "brevo",
+                provider_message_id: event.messageId ?? event.message_id ?? null,
+                recipient_email: event.email ?? event.recipient ?? null,
+                template_code: event.tag ?? event.tags?.[0] ?? "supabase_auth_or_transactional",
+                event_type: event.event ?? event.type ?? "unknown",
+                status: mappedStatus,
+                error_message: event.reason ?? event.error ?? null,
+                organization_id: null,
+                organization_name: "Brevo",
+                created_at: event.date ?? event.ts ?? event.timestamp ?? null,
+                sent_at: event.date ?? event.ts ?? event.timestamp ?? null,
+                source: "brevo",
+                metadata: { subject: event.subject ?? null, link: event.link ?? null, tag: event.tag ?? null },
+              };
+            });
+          } else {
+            providerError = `Brevo API respondeu ${response.status}`;
+            console.warn("[superadmin-api] Brevo events unavailable", providerError);
+          }
+        } catch (e) {
+          providerError = "Não foi possível consultar os eventos da Brevo.";
+          console.warn("[superadmin-api] Brevo events request failed");
+        }
+      } else {
+        providerError = "Falta configurar BREVO_API_KEY nos segredos das Edge Functions do Supabase.";
+      }
+      const merged = [...providerEvents, ...logged]
+        .filter((row: any) => !search || [row.recipient_email, row.template_code, row.event_type, row.provider_message_id].some((value) => String(value ?? "").toLowerCase().includes(search)))
+        .filter((row: any) => !status || status === "all" || row.status === status)
+        .filter((row: any) => !template || template === "all" || row.template_code === template)
+        .sort((a: any, b: any) => Date.parse(b.created_at ?? "") - Date.parse(a.created_at ?? ""));
+      return json({ ok: true, data: merged.slice(0, 300), meta: { brevo_configured: Boolean(brevoKey), brevo_error: providerError, brevo_events: providerEvents.length, app_logs: logged.length } });
     }
 
     if (action === "payments.list") {
