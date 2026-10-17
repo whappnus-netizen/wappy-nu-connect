@@ -1,8 +1,9 @@
 # Modelos de e-mail do Supabase Auth (colar no painel)
 
 Supabase → Authentication → URL Configuration:
-- Site URL: `https://whappnus.online`
-- Redirect URLs: `https://whappnus.online/**`
+- Site URL: `https://whappnus.online` (não pode ser `http://localhost:3000`)
+- Redirect URLs: `https://whappnus.online/**` e, apenas para desenvolvimento, `http://localhost:3000/**`.
+- Depois de alterar, guardar a configuração e testar com uma conta nova.
 
 Supabase → Authentication → Email Templates.
 
@@ -17,8 +18,8 @@ Assunto: `Bem-vindo à WhappNus! Confirma o teu e-mail`
 <p>Olá{{ if .Data.full_name }}, <strong>{{ .Data.full_name }}</strong>{{ end }}, bem-vindo à WhappNus! Obrigado por te juntares à nossa plataforma.</p>
 <p>A WhappNus ajuda-te a organizar o atendimento, acompanhar conversas e aproveitar cada oportunidade de venda.</p>
 <p>Para proteger a tua conta, confirma o teu endereço de e-mail:</p>
-<p style="margin:24px 0"><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup" style="background:#22c55e;color:#0b0f0c;padding:14px 28px;border-radius:8px;font-weight:700;text-decoration:none">Confirmar o meu e-mail</a></p>
-<p style="font-size:13px;color:#6b7280">Se o botão não funcionar, copia este link para o navegador:<br>{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup</p>
+<p style="margin:24px 0"><a href="https://whappnus.online/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup" style="background:#22c55e;color:#0b0f0c;padding:14px 28px;border-radius:8px;font-weight:700;text-decoration:none">Confirmar o meu e-mail</a></p>
+<p style="font-size:13px;color:#6b7280">Se o botão não funcionar, copia este link para o navegador:<br>https://whappnus.online/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup</p>
 <p style="font-size:13px;color:#6b7280">Se não criaste esta conta, ignora este e-mail.</p>
 <p>Com os melhores cumprimentos,<br><strong>Equipa WhappNus</strong></p></div>
 <div style="background:#0a0a0a;padding:18px;border-radius:0 0 12px 12px;color:#9ca3af;font-size:12px;text-align:center">WhappNus — A tua operação, mais inteligente.</div></div></div>
