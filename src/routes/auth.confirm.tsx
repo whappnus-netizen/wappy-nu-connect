@@ -16,6 +16,7 @@ export const Route = createFileRoute("/auth/confirm")({
 function ConfirmEmailPage() {
   const { token_hash, type, code, error_description } = Route.useSearch();
   const [status, setStatus] = useState<"checking" | "success" | "error">("checking");
+  const [confirmedEmail, setConfirmedEmail] = useState("");
   const [message, setMessage] = useState("Estamos a confirmar o teu endereço de e-mail…");
 
   useEffect(() => {
@@ -73,9 +74,12 @@ function ConfirmEmailPage() {
         return;
       }
 
+      // Guardar apenas o e-mail confirmado no URL de entrada; nunca transportar a palavra-passe.
+      const confirmedEmail = userData.user.email ?? "";
       // Não manter uma sessão iniciada pelo link: a pessoa deve entrar com a sua palavra-passe.
       await supabase.auth.signOut();
       if (cancelled) return;
+      setConfirmedEmail(confirmedEmail);
       setStatus("success");
       setMessage("O teu endereço de e-mail foi confirmado com sucesso. Agora podes entrar com a tua palavra-passe.");
     }
@@ -119,7 +123,7 @@ function ConfirmEmailPage() {
               {status === "success" ? (
                 <Link
                   to="/auth/login"
-                  search={{ confirmed: "1" } as never}
+                  search={{ confirmed: "1", email: confirmedEmail } as never}
                   className="inline-flex items-center justify-center rounded-lg bg-[#167a43] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#126537]"
                 >
                   Entrar na WhappNus
