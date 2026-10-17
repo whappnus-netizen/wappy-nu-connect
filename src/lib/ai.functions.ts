@@ -154,7 +154,7 @@ export const organizeAgentInstructions = createServerFn({ method: "POST" })
       method: "POST",
       headers: { "content-type": "application/json", "Lovable-API-Key": key },
       body: JSON.stringify({
-        model: "google/gemini-3.7-flash",
+        model: "google/gemini-2.5-flash",
         temperature: 0.2,
         messages: [
           {
