@@ -54,9 +54,14 @@ function ConfirmEmailPage() {
 
       if (cancelled) return;
       if (confirmationError) {
-        setStatus("error");
-        setMessage("Não foi possível confirmar este e-mail. O link pode ter expirado ou já ter sido utilizado. Solicita um novo link e tenta novamente.");
-        return;
+        // Se detectSessionInUrl já trocou o PKCE code durante a inicialização,
+        // a segunda troca pode falhar apesar de a confirmação estar concluída.
+        const { data: fallbackSession } = await supabase.auth.getSession();
+        if (!fallbackSession.session?.user?.email_confirmed_at) {
+          setStatus("error");
+          setMessage("Não foi possível confirmar este e-mail. O link pode ter expirado ou já ter sido utilizado. Solicita um novo link e tenta novamente.");
+          return;
+        }
       }
 
       const { data: userData, error: userError } = await supabase.auth.getUser();
