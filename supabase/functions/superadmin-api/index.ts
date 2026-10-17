@@ -242,42 +242,22 @@ Deno.serve(async (req: Request) => {
       if ((subscriptions ?? []).some((s: any) => s.status !== "trialing" && s.status !== "cancelled" && s.status !== "expired")) {
         return fail("Só é permitido eliminar assinaturas de teste/canceladas/expiradas.", 409);
       }
-      await db.from("superadmin_audit_logs").update({ organization_id: null }).eq("organization_id", organizationId);
-      await db.from("superadmin_invites").delete().eq("organization_id", organizationId);
-      await db.from("ai_agent_whatsapp_numbers").delete().eq("organization_id", organizationId);
-      await db.from("ai_knowledge_documents").delete().eq("organization_id", organizationId);
-      await db.from("ai_knowledge").delete().eq("organization_id", organizationId);
-      await db.from("ai_training_examples").delete().eq("organization_id", organizationId);
-      await db.from("ai_evaluations").delete().eq("organization_id", organizationId);
-      await db.from("ai_logs").delete().eq("organization_id", organizationId);
-      await db.from("ai_credit_ledger").delete().eq("organization_id", organizationId);
-      await db.from("ai_credit_accounts").delete().eq("organization_id", organizationId);
-      await db.from("ai_settings").delete().eq("organization_id", organizationId);
-      await db.from("automation_actions").delete().eq("organization_id", organizationId);
-      await db.from("automation_rules").delete().eq("organization_id", organizationId);
-      await db.from("contact_tags").delete().eq("organization_id", organizationId);
-      await db.from("conversation_assignments").delete().eq("organization_id", organizationId);
-      await db.from("conversation_tags").delete().eq("organization_id", organizationId);
-      await db.from("deals").delete().eq("organization_id", organizationId);
-      await db.from("messages").delete().eq("organization_id", organizationId);
-      await db.from("internal_notes").delete().eq("organization_id", organizationId);
-      await db.from("conversations").delete().eq("organization_id", organizationId);
-      await db.from("contacts").delete().eq("organization_id", organizationId);
-      await db.from("pipeline_stages").delete().eq("organization_id", organizationId);
-      await db.from("tags").delete().eq("organization_id", organizationId);
-      await db.from("whatsapp_events").delete().eq("organization_id", organizationId);
-      await db.from("whatsapp_sessions").delete().eq("organization_id", organizationId);
-      await db.from("whatsapp_credentials").delete().eq("organization_id", organizationId);
-      await db.from("whatsapp_numbers").delete().eq("organization_id", organizationId);
-      await db.from("subscription_reminder_logs").delete().eq("organization_id", organizationId);
-      await db.from("email_delivery_logs").delete().eq("organization_id", organizationId);
-      await db.from("payment_transactions").delete().eq("organization_id", organizationId);
-      await db.from("kursinha_sales").delete().eq("organization_id", organizationId);
-      await db.from("organization_notifications").delete().eq("organization_id", organizationId);
-      await db.from("memberships").delete().eq("organization_id", organizationId);
-      await db.from("activity_logs").delete().eq("organization_id", organizationId);
-      await db.from("ai_agents").delete().eq("organization_id", organizationId);
-      await db.from("organization_subscriptions").delete().eq("organization_id", organizationId);
+      const { error: detachAuditError } = await db.from("superadmin_audit_logs").update({ organization_id: null }).eq("organization_id", organizationId);
+      if (detachAuditError) throw detachAuditError;
+      const deleteOrgRows = async (table: string) => {
+        const { error } = await db.from(table).delete().eq("organization_id", organizationId);
+        if (error) throw error;
+      };
+      for (const table of [
+        "superadmin_invites", "ai_agent_whatsapp_numbers", "ai_knowledge_documents", "ai_knowledge",
+        "ai_training_examples", "ai_evaluations", "ai_logs", "ai_credit_ledger", "ai_credit_accounts",
+        "ai_settings", "automation_actions", "automation_rules", "contact_tags", "conversation_assignments",
+        "conversation_tags", "deals", "messages", "internal_notes", "conversations", "contacts",
+        "pipeline_stages", "tags", "whatsapp_events", "whatsapp_sessions", "whatsapp_credentials",
+        "whatsapp_numbers", "subscription_reminder_logs", "email_delivery_logs", "payment_transactions",
+        "kursinha_sales", "organization_notifications", "memberships", "activity_logs", "ai_agents",
+        "organization_subscriptions",
+      ]) await deleteOrgRows(table);
       const { error: finalDeleteError } = await db.from("organizations").delete().eq("id", organizationId);
       if (finalDeleteError) throw finalDeleteError;
       await audit("organization.deleted", "organization", organizationId, null, { name: org.name, slug: org.slug });
