@@ -816,10 +816,20 @@ Deno.serve(async (req: Request) => {
             providerEvents = events.map((event: any, i: number) => {
               const raw = String(event.event ?? event.type ?? "unknown").toLowerCase();
               const subject = String(event.subject ?? "");
-              const subjectCode = /confirm|confirmar|bem-vindo|welcome/i.test(subject) ? "auth_confirm_signup" :
-                /password|palavra-passe|recuperar/i.test(subject) ? "auth_reset_password" :
-                /pagamento|payment/i.test(subject) ? "payment_notification" :
-                /renova|expir/i.test(subject) ? "subscription_notification" : "supabase_auth_or_transactional";
+              const rawTags = Array.isArray(event.tags) ? event.tags.map((tag: unknown) => String(tag)) : [];
+              const tagText = [event.tag, ...rawTags].filter(Boolean).join(" ").toLowerCase();
+              // Prefer explicit application tags; use the subject only as a fallback.
+              const subjectCode = /auth_confirm_signup|confirm.?signup|confirmation/i.test(tagText) || /confirm|confirmar|bem-vindo|welcome/i.test(subject) ? "auth_confirm_signup" :
+                /auth_reset_password|reset.?password/i.test(tagText) || /password|palavra-passe|recuperar/i.test(subject) ? "auth_reset_password" :
+                /payment_pending/i.test(tagText) || /pagamento pendente|payment pending/i.test(subject) ? "payment_pending" :
+                /payment_approved/i.test(tagText) || /pagamento confirmado|payment approved/i.test(subject) ? "payment_approved" :
+                /subscription_renewed/i.test(tagText) || /renova/i.test(subject) ? "subscription_renewed" :
+                /plan_changed/i.test(tagText) || /plano.*alterado/i.test(subject) ? "plan_changed" :
+                /payment_cancelled/i.test(tagText) || /pagamento cancelado/i.test(subject) ? "payment_cancelled" :
+                /payment_refunded/i.test(tagText) || /reembolso|refunded/i.test(subject) ? "payment_refunded" :
+                /subscription_expiring/i.test(tagText) || /a expirar|expiring/i.test(subject) ? "subscription_expiring" :
+                /subscription_expired/i.test(tagText) || /plano expirado|subscription expired/i.test(subject) ? "subscription_expired" :
+                /welcome/i.test(tagText) ? "welcome" : "unknown";
               const mappedStatus = raw === "delivered" ? "delivered" :
                 ["hardbounce","softbounce","blocked","invalid","deferred","error"].includes(raw.replace(/[^a-z]/g, "")) ? "bounced" :
                 ["spam","complaint"].includes(raw) ? "complained" :
@@ -829,7 +839,7 @@ Deno.serve(async (req: Request) => {
                 provider: "brevo",
                 provider_message_id: event.messageId ?? event.message_id ?? null,
                 recipient_email: event.email ?? event.recipient ?? null,
-                template_code: event.tag ?? event.tags?.[0] ?? subjectCode,
+                template_code: subjectCode !== "unknown" ? subjectCode : (event.tag ?? event.tags?.[0] ?? "unknown"),
                 event_type: event.event ?? event.type ?? "unknown",
                 status: mappedStatus,
                 error_message: event.reason ?? event.error ?? null,
@@ -838,7 +848,7 @@ Deno.serve(async (req: Request) => {
                 created_at: event.date ?? event.ts ?? event.timestamp ?? null,
                 sent_at: event.date ?? event.ts ?? event.timestamp ?? null,
                 source: "brevo",
-                metadata: { subject: event.subject ?? null, link: event.link ?? null, tag: event.tag ?? null },
+                metadata: { subject: event.subject ?? null, link: event.link ?? null, tag: event.tag ?? null, tags: rawTags },
               };
             });
           } else {
