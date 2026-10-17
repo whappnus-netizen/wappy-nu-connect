@@ -779,6 +779,41 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: result.data, queued: true, note: "A tarefa foi colocada na fila de envio do motor WhatsApp no Railway." });
     }
 
+    if (action === "email.logs.resend") {
+      const logId = str(input.log_id, 100);
+      if (!logId || logId.startsWith("brevo:")) return fail("Este evento é apenas um registo da Brevo e não contém uma mensagem WhappNus reenviável. Só é possível reenviar mensagens com registo local.", 400);
+      const { data: log, error: logError } = await db.from("email_delivery_logs")
+        .select("id,recipient_email,template_code,status,metadata,provider,organization_id")
+        .eq("id", logId).maybeSingle();
+      if (logError) throw logError;
+      if (!log) return fail("O registo local deste e-mail não foi encontrado.", 404);
+      const template = str(log.template_code, 80);
+      const allowedTemplates = ["welcome", "payment_pending", "payment_approved", "subscription_renewed", "plan_changed", "payment_cancelled", "payment_refunded", "subscription_expiring", "subscription_expired"];
+      if (!allowedTemplates.includes(template)) return fail("Este tipo de e-mail não pode ser reenviado por esta ação. As confirmações e recuperações de conta exigem um link seguro novo.", 400);
+      const recipient = str(log.recipient_email, 320);
+      if (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return fail("O destinatário não está disponível neste registo.", 400);
+      const dispatchSecret = Deno.env.get("EMAIL_DISPATCH_SECRET") ?? "";
+      if (!dispatchSecret) return fail("Falta configurar EMAIL_DISPATCH_SECRET nos segredos do Supabase para autorizar o envio seguro.", 503);
+      const metadata = isObject(log.metadata) ? log.metadata : {};
+      const vars = isObject(metadata.template_vars) ? metadata.template_vars : isObject(metadata.vars) ? metadata.vars : {};
+      const name = str(metadata.name ?? metadata.customer_name, 200);
+      const dispatch = await fetch("https://whappnus.online/api/public/email/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-email-secret": dispatchSecret },
+        body: JSON.stringify({ template, to: recipient, ...(name ? { name } : {}), vars, idempotency_key: `manual-resend-${log.id}-${Date.now()}` }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const dispatchBody = await dispatch.json().catch(() => ({}));
+      if (!dispatch.ok || dispatchBody?.ok !== true) {
+        const message = str(dispatchBody?.error, 200) || `O serviço de envio respondeu ${dispatch.status}.`;
+        await db.from("email_delivery_logs").update({ status: "failed", error_message: `Reenvio manual falhou: ${message}`, updated_at: new Date().toISOString() }).eq("id", log.id);
+        await audit("email.logs.resend_failed", "email", log.id, log.organization_id ?? null, { template, recipient, error: message });
+        return fail(`Não foi possível reenviar: ${message}`, 502);
+      }
+      await audit("email.logs.resend", "email", log.id, log.organization_id ?? null, { template, recipient, new_message_id: dispatchBody.messageId ?? null });
+      return json({ ok: true, data: { messageId: dispatchBody.messageId ?? null, recipient, template } });
+    }
+
     if (action === "email.logs.list") {
       const search = str(input.search, 160).toLowerCase();
       const status = str(input.status, 30);
