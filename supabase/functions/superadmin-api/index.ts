@@ -781,11 +781,26 @@ Deno.serve(async (req: Request) => {
 
     if (action === "email.logs.resend") {
       const logId = str(input.log_id, 100);
-      if (!logId || logId.startsWith("brevo:")) return fail("Este evento é apenas um registo da Brevo e não contém uma mensagem WhappNus reenviável. Só é possível reenviar mensagens com registo local.", 400);
-      const { data: log, error: logError } = await db.from("email_delivery_logs")
-        .select("id,recipient_email,template_code,status,metadata,provider,organization_id")
-        .eq("id", logId).maybeSingle();
-      if (logError) throw logError;
+      if (!logId) return fail("Identificador do e-mail em falta.", 400);
+      let log: any = null;
+      if (logId.startsWith("brevo:")) {
+        // A Brevo event by itself is not enough to reconstruct a safe transactional email.
+        // Match it to the original WhappNus delivery record using the provider's message ID.
+        const providerMessageId = logId.slice("brevo:".length);
+        if (!providerMessageId) return fail("O evento da Brevo não contém um identificador de mensagem reenviável.", 400);
+        const { data: localLog, error: localError } = await db.from("email_delivery_logs")
+          .select("id,recipient_email,template_code,status,metadata,provider,organization_id,provider_message_id")
+          .eq("provider_message_id", providerMessageId).maybeSingle();
+        if (localError) throw localError;
+        log = localLog;
+        if (!log) return fail("Este evento da Brevo não tem um registo original WhappNus associado. Por segurança, não é possível reconstruir o conteúdo correcto para reenviar.", 404);
+      } else {
+        const { data: localLog, error: logError } = await db.from("email_delivery_logs")
+          .select("id,recipient_email,template_code,status,metadata,provider,organization_id,provider_message_id")
+          .eq("id", logId).maybeSingle();
+        if (logError) throw logError;
+        log = localLog;
+      }
       if (!log) return fail("O registo local deste e-mail não foi encontrado.", 404);
       const template = str(log.template_code, 80);
       const allowedTemplates = ["welcome", "payment_pending", "payment_approved", "subscription_renewed", "plan_changed", "payment_cancelled", "payment_refunded", "subscription_expiring", "subscription_expired"];
