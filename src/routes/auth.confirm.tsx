@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
@@ -7,65 +7,86 @@ export const Route = createFileRoute("/auth/confirm")({
   validateSearch: (search: Record<string, unknown>) => ({
     token_hash: typeof search["token_hash"] === "string" ? (search["token_hash"] as string) : "",
     type: typeof search["type"] === "string" ? (search["type"] as string) : "",
+    code: typeof search["code"] === "string" ? (search["code"] as string) : "",
+    error_description: typeof search["error_description"] === "string" ? (search["error_description"] as string) : "",
   }),
   component: ConfirmEmailPage,
 });
 
 function ConfirmEmailPage() {
-  const { token_hash, type } = Route.useSearch();
-  const navigate = useNavigate();
+  const { token_hash, type, code, error_description } = Route.useSearch();
   const [status, setStatus] = useState<"checking" | "success" | "error">("checking");
   const [message, setMessage] = useState("Estamos a confirmar o teu endereço de e-mail…");
 
   useEffect(() => {
     let cancelled = false;
-    let redirectTimer: number | undefined;
 
     async function confirmEmail() {
-      if (!token_hash || type !== "signup") {
+      if (error_description) {
         setStatus("error");
-        setMessage("Este link de confirmação é inválido ou está incompleto. Solicita um novo e-mail de confirmação.");
+        setMessage("O link de confirmação não foi aceite ou expirou. Solicita um novo e-mail de confirmação e tenta novamente.");
         return;
       }
 
-      const { data: verified, error } = await supabase.auth.verifyOtp({
-        token_hash,
-        type: type as EmailOtpType,
-      });
+      // Supabase pode redirecionar com um PKCE code, um token_hash ou já ter
+      // processado o code automaticamente durante a inicialização do cliente.
+      let confirmationError: string | null = null;
+      if (token_hash && (type === "signup" || type === "email")) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash,
+          type: type as EmailOtpType,
+        });
+        confirmationError = error?.message ?? null;
+      } else if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        confirmationError = error?.message ?? null;
+      } else {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.user?.email_confirmed_at) {
+          // A biblioteca pode ter trocado o code por uma sessão ao carregar a URL.
+          // Abaixo terminamos essa sessão para exigir a palavra-passe como pedido.
+        } else {
+          setStatus("error");
+          setMessage("Este link de confirmação é inválido ou está incompleto. Solicita um novo e-mail de confirmação.");
+          return;
+        }
+      }
 
       if (cancelled) return;
-
-      if (error) {
+      if (confirmationError) {
         setStatus("error");
         setMessage("Não foi possível confirmar este e-mail. O link pode ter expirado ou já ter sido utilizado. Solicita um novo link e tenta novamente.");
         return;
       }
 
-      // O e-mail de boas-vindas é enviado apenas após a confirmação real. Uma falha de envio não invalida a confirmação.
-      if (verified.session?.access_token) {
-        try {
-          await fetch("/api/public/email/welcome", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${verified.session.access_token}` },
-          });
-        } catch (welcomeError) {
-          console.warn("[auth.confirm] welcome email dispatch failed", welcomeError);
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user?.email_confirmed_at) {
+        if (!cancelled) {
+          setStatus("error");
+          setMessage("Não conseguimos validar a confirmação desta conta. Solicita um novo link e tenta novamente.");
         }
+        return;
       }
 
+      // Não manter uma sessão iniciada pelo link: a pessoa deve entrar com a sua palavra-passe.
+      await supabase.auth.signOut();
+      if (cancelled) return;
       setStatus("success");
-      setMessage("O teu endereço de e-mail foi confirmado. Vamos levar-te para a página de entrada…");
-      redirectTimer = window.setTimeout(() => {
-        if (!cancelled) window.location.assign("/auth/login?confirmed=1");
-      }, 1800);
+      setMessage("O teu endereço de e-mail foi confirmado com sucesso. Agora podes entrar com a tua palavra-passe.");
     }
 
-    void confirmEmail();
+    void confirmEmail().catch((error) => {
+      console.error("[auth.confirm] confirmation failed", error);
+      if (!cancelled) {
+        setStatus("error");
+        setMessage("Ocorreu um erro ao confirmar o e-mail. Solicita um novo link e tenta novamente.");
+      }
+    });
+
     return () => {
       cancelled = true;
-      if (redirectTimer) window.clearTimeout(redirectTimer);
     };
-  }, [token_hash, type]);
+  }, [token_hash, type, code, error_description]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f0f4f1] px-4 py-10">
@@ -90,12 +111,22 @@ function ConfirmEmailPage() {
           <p className="mt-4 text-sm leading-7 text-[#526357]">{message}</p>
           {status !== "checking" && (
             <div className="mt-7">
-              <Link
-                to="/auth/login"
-                className="inline-flex items-center justify-center rounded-lg bg-[#167a43] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#126537]"
-              >
-                {status === "success" ? "Entrar na WhappNus" : "Ir para iniciar sessão"}
-              </Link>
+              {status === "success" ? (
+                <Link
+                  to="/auth/login"
+                  search={{ confirmed: "1" } as never}
+                  className="inline-flex items-center justify-center rounded-lg bg-[#167a43] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#126537]"
+                >
+                  Entrar na WhappNus
+                </Link>
+              ) : (
+                <Link
+                  to="/auth/login"
+                  className="inline-flex items-center justify-center rounded-lg bg-[#167a43] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#126537]"
+                >
+                  Ir para iniciar sessão
+                </Link>
+              )}
             </div>
           )}
         </div>
