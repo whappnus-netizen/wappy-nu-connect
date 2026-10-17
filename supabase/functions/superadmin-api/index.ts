@@ -640,6 +640,39 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: { id, name: flow.name } });
     }
 
+    if (action === "group.connection.delete") {
+      const id = str(input.id, 60);
+      if (!id) return fail("ID do grupo inválido.");
+      const { data: connection, error: readError } = await db.from("superadmin_group_connections")
+        .select("id,label,group_name,group_jid,is_enabled").eq("id", id).maybeSingle();
+      if (readError) throw readError;
+      if (!connection) return fail("Grupo não encontrado.", 404);
+
+      const { count: processingCount, error: processingError } = await db.from("superadmin_group_jobs")
+        .select("id", { count: "exact", head: true }).eq("connection_id", id).eq("status", "processing");
+      if (processingError) throw processingError;
+      if ((processingCount ?? 0) > 0) return fail("Este grupo tem disparos em processamento. Aguarda que terminem antes de o eliminar.");
+
+      const { count: jobCount, error: jobCountError } = await db.from("superadmin_group_jobs")
+        .select("id", { count: "exact", head: true }).eq("connection_id", id);
+      if (jobCountError) throw jobCountError;
+      const { error: cancelError } = await db.from("superadmin_group_jobs")
+        .update({ status: "cancelled", last_error: "Cancelado porque a associação ao grupo foi eliminada.", updated_at: new Date().toISOString() })
+        .eq("connection_id", id).eq("status", "queued");
+      if (cancelError) throw cancelError;
+
+      // The jobs table requires connection_id, so related queue/history rows must be removed
+      // before deleting the association. Record the count in the immutable admin audit log.
+      const { error: jobsDeleteError } = await db.from("superadmin_group_jobs").delete().eq("connection_id", id);
+      if (jobsDeleteError) throw jobsDeleteError;
+      const { error: deleteError } = await db.from("superadmin_group_connections").delete().eq("id", id);
+      if (deleteError) throw deleteError;
+      await audit("group_connection.deleted", "group_connection", id, null, {
+        group_name: connection.group_name, group_jid: connection.group_jid, related_jobs_removed: jobCount ?? 0,
+      });
+      return json({ ok: true, data: { id, group_name: connection.group_name, related_jobs_removed: jobCount ?? 0 } });
+    }
+
     if (action === "group.connection.assign-flow") {
       const id = str(input.id, 60);
       const flowId = str(input.active_flow_id, 60) || null;

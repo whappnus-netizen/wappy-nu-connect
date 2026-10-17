@@ -816,7 +816,7 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
               />
             )}
             {f.key === "tone" && <datalist id="whappnus-tone-templates">{toneTemplates.map((tone) => <option key={tone} value={tone} />)}</datalist>}
-            {(f.key === "personality" || f.key === "extra_instructions") && (
+            {(f.key === "goal" || f.key === "personality" || f.key === "extra_instructions") && (
               <div className="flex flex-wrap gap-2">
                 <Button type="button" size="sm" variant={recordingField === f.key ? "default" : "outline"} onClick={() => toggleDictation(f.key)} className="max-w-full">
                   <Mic className="mr-2 size-4" />{recordingField === f.key ? "Parar ditado" : "Ditar por voz"}
@@ -828,9 +828,12 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
               </div>
             )}
             {recordingField === f.key && (
-              <p role="status" aria-live="polite" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-primary">
-                A ouvir… Fala agora. {transcriptPreview ? `A captar: “${transcriptPreview}”` : "O texto reconhecido aparecerá aqui."}
-              </p>
+              <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-primary">
+                <span className="flex h-6 items-center gap-0.5" aria-hidden="true">
+                  {[0, 1, 2, 3, 4, 5, 6].map((bar) => <span key={bar} className="w-1 rounded-full bg-primary animate-pulse" style={{ height: `${8 + (bar % 4) * 4}px`, animationDelay: `${bar * 90}ms` }} />)}
+                </span>
+                <span className="min-w-0">{transcriptPreview ? `A transcrever: “${transcriptPreview}”` : "Microfone activo. Fala agora; o texto final será inserido no campo quando parares."}</span>
+              </div>
             )}
             <p className="text-xs text-muted-foreground">{f.hint}</p>
           </div>
