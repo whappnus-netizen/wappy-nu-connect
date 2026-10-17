@@ -33,6 +33,7 @@ import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
 import { Route as ApiPublicEmailDispatchRouteImport } from './routes/api/public/email.dispatch'
+import { Route as ApiPublicEmailWelcomeRouteImport } from './routes/api/public/email.welcome'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicWhatsappQrEventsRouteImport } from './routes/api/public/whatsapp.qr.events'
 
@@ -156,6 +157,11 @@ const ApiPublicEmailDispatchRoute = ApiPublicEmailDispatchRouteImport.update({
   path: '/api/public/email/dispatch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicEmailWelcomeRoute = ApiPublicEmailWelcomeRouteImport.update({
+  id: '/api/public/email/welcome',
+  path: '/api/public/email/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicWhatsappWebhookRoute =
   ApiPublicWhatsappWebhookRouteImport.update({
     id: '/api/public/whatsapp/webhook',
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
   '/api/public/email/dispatch': typeof ApiPublicEmailDispatchRoute
+  '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
   '/api/public/email/dispatch': typeof ApiPublicEmailDispatchRoute
+  '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -249,6 +257,7 @@ export interface FileRoutesById {
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
   '/api/public/email/dispatch': typeof ApiPublicEmailDispatchRoute
+  '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/email/dispatch'
+     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesByTo: FileRoutesByTo
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/email/dispatch'
+     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   id:
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/auth/recuperar'
     | '/auth/registo'
     | '/api/public/email/dispatch'
+     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
   fileRoutesById: FileRoutesById
@@ -351,6 +363,7 @@ export interface RootRouteChildren {
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
   ApiPublicEmailDispatchRoute: typeof ApiPublicEmailDispatchRoute
+    ApiPublicEmailWelcomeRoute: typeof ApiPublicEmailWelcomeRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicWhatsappQrEventsRoute: typeof ApiPublicWhatsappQrEventsRoute
 }
@@ -525,6 +538,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicEmailDispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/email/welcome': {
+      id: '/api/public/email/welcome'
+      path: '/api/public/email/welcome'
+      fullPath: '/api/public/email/welcome'
+      preLoaderRoute: typeof ApiPublicEmailWelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/whatsapp/webhook': {
       id: '/api/public/whatsapp/webhook'
       path: '/api/public/whatsapp/webhook'
@@ -587,6 +607,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRecuperarRoute: AuthRecuperarRoute,
   AuthRegistoRoute: AuthRegistoRoute,
   ApiPublicEmailDispatchRoute: ApiPublicEmailDispatchRoute,
+  ApiPublicEmailWelcomeRoute: ApiPublicEmailWelcomeRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicWhatsappQrEventsRoute: ApiPublicWhatsappQrEventsRoute,
 }
