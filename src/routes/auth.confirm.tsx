@@ -19,6 +19,7 @@ function ConfirmEmailPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
 
     async function confirmEmail() {
       if (!token_hash || type !== "signup") {
@@ -53,12 +54,16 @@ function ConfirmEmailPage() {
       }
 
       setStatus("success");
-      setMessage("O teu endereço de e-mail foi confirmado. A tua conta WhappNus está pronta para o próximo passo.");
+      setMessage("O teu endereço de e-mail foi confirmado. Vamos levar-te para a página de entrada…");
+      redirectTimer = window.setTimeout(() => {
+        if (!cancelled) window.location.assign("/auth/login?confirmed=1");
+      }, 1800);
     }
 
     void confirmEmail();
     return () => {
       cancelled = true;
+      if (redirectTimer) window.clearTimeout(redirectTimer);
     };
   }, [token_hash, type]);
 
