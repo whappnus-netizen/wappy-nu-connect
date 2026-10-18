@@ -223,6 +223,7 @@ export interface FileRoutesByTo {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-access-9f2c7a61d4': typeof OpsAccessRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -236,6 +237,7 @@ export interface FileRoutesByTo {
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/parcerias': typeof AuthenticatedParceriasRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -253,6 +255,7 @@ export interface FileRoutesById {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-access-9f2c7a61d4': typeof OpsAccessRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -314,6 +317,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-access-9f2c7a61d4'
     | '/termos'
     | '/terms'
     | '/automacoes'
@@ -327,6 +331,7 @@ export interface FileRouteTypes {
     | '/notificacoes'
     | '/onboarding'
     | '/whatsapp'
+    | '/parcerias'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -343,6 +348,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-access-9f2c7a61d4'
     | '/termos'
     | '/terms'
     | '/_authenticated/automacoes'
