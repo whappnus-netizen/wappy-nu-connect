@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,6 @@ function AffiliatePage(){
   </div>:null}
  </AppShell>;
 }
-function Field({label,children}:{label:string;children:React.ReactNode}){return <div className="space-y-2"><Label>{label}</Label>{children}</div>}
-function Metric({label,value,icon}:{label:string;value:string;icon:React.ReactNode}){return <div className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>{label}</span>{icon}</div><p className="mt-2 text-xl font-bold">{value}</p></div>}
+function Field({label,children}:{label:string;children:ReactNode}){return <div className="space-y-2"><Label>{label}</Label>{children}</div>}
+function Metric({label,value,icon}:{label:string;value:string;icon:ReactNode}){return <div className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between text-sm text-muted-foreground"><span>{label}</span>{icon}</div><p className="mt-2 text-xl font-bold">{value}</p></div>}
 function History({title,rows,commission=false}:{title:string;rows:any[];commission?:boolean}){return <div className="rounded-2xl border border-border bg-card p-5"><h3 className="font-semibold">{title}</h3><div className="mt-3 space-y-3">{rows.length?rows.map((r:any)=><div key={r.id} className="flex items-center justify-between gap-3 border-b border-border pb-3 text-sm last:border-0"><div><p className="font-medium">{commission?(r.commission_type==="initial"?"Comissão inicial":"Comissão de renovação")+" · "+r.plan_code:new Date(r.requested_at).toLocaleDateString("pt-AO")}</p><p className="text-xs text-muted-foreground">{new Date(commission?r.created_at:r.requested_at).toLocaleDateString("pt-AO")} · {labels[r.status]??r.status}{r.payment_reference?" · Ref. "+r.payment_reference:""}</p></div><strong>{money(r.amount_aoa)}</strong></div>):<p className="text-sm text-muted-foreground">Ainda não existem registos.</p>}</div></div>}
