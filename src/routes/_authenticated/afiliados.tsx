@@ -45,7 +45,7 @@ function AffiliatePage(){
  return <AppShell title="Programa de parceiros" description="Indica a WHAPPNUS, acompanha comissões e solicita pagamentos após validação.">
   {query.isLoading?<div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin"/>A carregar a área de parceiros…</div>:null}
   {query.isError?<div className="rounded-xl border border-destructive/30 p-4 text-sm">Não foi possível carregar a área de parceiros. <Button className="ml-2" variant="outline" onClick={()=>void query.refetch()}>Tentar novamente</Button></div>:null}
-  {!query.isLoading&&!query.isError&&!profile?<div className="mx-auto max-w-3xl space-y-5">
+  {!query.isLoading&&!query.isError&&(!profile||["pending","rejected"].includes(profile.status))?<div className="mx-auto max-w-3xl space-y-5">
    <div className="rounded-2xl border border-border bg-card p-5 sm:p-7"><p className="text-sm font-semibold text-primary">Programa sujeito a aprovação</p><h2 className="mt-2 text-2xl font-bold">Torna-te parceiro da WHAPPNUS</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">Preenche a candidatura. Só depois da aprovação terás o link de indicação e acesso às comissões. Os dados de pagamento ficam privados e disponíveis apenas para ti e para a equipa autorizada.</p></div>
    <form className="space-y-5 rounded-2xl border border-border bg-card p-5 sm:p-7" onSubmit={e=>{e.preventDefault();application.mutate();}}>
     <section className="space-y-4"><h3 className="font-semibold">Dados pessoais</h3><div className="grid gap-4 sm:grid-cols-2">
