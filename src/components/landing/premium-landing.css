@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+.whappnus-landing{font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif;color:#f8fafc;--wn-green:#34d399;--wn-deep:#06100c}
+.whappnus-landing h1,.whappnus-landing h2,.whappnus-landing h3{font-family:'Manrope','DM Sans',sans-serif}
+.whappnus-landing a:focus-visible,.whappnus-landing button:focus-visible{outline:2px solid #6ee7b7;outline-offset:4px}
+.landing-logo{color:white}.landing-header [aria-label="WHAPPNUS — início"]{color:white}
+.hero-stage{background:radial-gradient(ellipse at 78% 40%,rgba(5,90,58,.2),transparent 44%),linear-gradient(180deg,#050b09 0%,#07110d 100%)}
+.hero-aurora{background:radial-gradient(ellipse at 72% 44%,rgba(16,185,129,.13),transparent 37%),radial-gradient(ellipse at 5% 20%,rgba(6,78,59,.2),transparent 40%);opacity:.95}
+.hero-orbit{border:1px solid rgba(110,231,183,.11);box-shadow:inset 0 0 90px rgba(16,185,129,.035),0 0 80px rgba(16,185,129,.035);mask-image:linear-gradient(135deg,black,transparent 85%)}
+.hero-orbit-two{border-color:rgba(110,231,183,.1)}
+.hero-green-text{background:linear-gradient(105deg,#a7f3d0 0%,#34d399 45%,#a3e635 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-primary-btn{background:linear-gradient(115deg,#34d399,#a3e635);color:#052e22;box-shadow:0 10px 32px rgba(16,185,129,.18);transition:transform .25s ease,box-shadow .25s ease,filter .25s ease}
+.hero-primary-btn:hover{background:linear-gradient(115deg,#6ee7b7,#bef264);color:#052e22;transform:translateY(-2px);box-shadow:0 14px 38px rgba(16,185,129,.28)}
+.hero-visual{min-height:400px}
+.character-light{background:radial-gradient(ellipse at 50% 42%,rgba(52,211,153,.22),rgba(8,95,65,.12) 38%,transparent 70%);filter:blur(16px)}
+.character-ring{border:1px solid rgba(110,231,183,.14);box-shadow:inset 0 0 60px rgba(16,185,129,.06);mask-image:linear-gradient(120deg,transparent 5%,black 40%,transparent 90%)}
+.hero-woman{object-position:center 30%;filter:saturate(.88) contrast(1.02);mask-image:linear-gradient(to bottom,black 0%,black 72%,transparent 100%);mix-blend-mode:screen}
+.hero-image-blend{background:linear-gradient(to bottom,transparent,rgba(5,11,9,.86));}
+.hero-whatsapp{box-shadow:0 0 34px rgba(16,185,129,.22),inset 0 0 20px rgba(16,185,129,.08)}
+.float-note{animation:wn-float 7s ease-in-out infinite}
+.float-delay-one{animation-delay:-2.2s}.float-delay-two{animation-delay:-4.1s}
+.hero-bottom-line{background:linear-gradient(90deg,transparent,rgba(52,211,153,.32),rgba(255,255,255,.08),transparent)}
+.section-glow{background:rgba(16,185,129,.08)}
+.feature-panel{box-shadow:0 0 0 1px transparent}
+.global-section{background:radial-gradient(ellipse at 76% 50%,rgba(4,120,87,.16),transparent 44%),#06100d}
+.global-backdrop{background:radial-gradient(ellipse at 80% 55%,rgba(16,185,129,.1),transparent 34%),radial-gradient(ellipse at 18% 80%,rgba(180,140,50,.05),transparent 38%);opacity:.95}
+.global-green-text{background:linear-gradient(105deg,#a7f3d0,#34d399 60%,#f0d38a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.globe-scene{min-height:300px;isolation:isolate}
+.globe-halo{background:radial-gradient(circle,rgba(16,185,129,.17),rgba(16,185,129,.035) 52%,transparent 72%);filter:blur(12px)}
+.globe-sphere{background:radial-gradient(circle at 36% 32%,rgba(19,92,65,.95),rgba(6,34,27,.96) 52%,#020b08 100%)}
+.globe-grid{background:repeating-linear-gradient(0deg,transparent 0,transparent 44px,rgba(110,231,183,.08) 45px,transparent 46px),repeating-linear-gradient(90deg,transparent 0,transparent 44px,rgba(110,231,183,.08) 45px,transparent 46px);mask-image:radial-gradient(ellipse,black 45%,transparent 73%)}
+.plan-featured{box-shadow:0 20px 80px -35px rgba(16,185,129,.28)}
+.final-cta{background:#07120e}
+.final-cta>div:first-child{background:radial-gradient(ellipse at 50% 110%,rgba(16,185,129,.14),transparent 62%)}
+@keyframes wn-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@media(min-width:1024px){.hero-visual{min-height:610px}.hero-woman{object-position:center 20%}}
+@media(max-width:639px){.hero-visual{min-height:330px}.hero-woman{height:355px;object-position:center 24%;max-width:100%}.hero-image-blend{height:19%}.globe-scene{max-width:440px;margin-top:-.5rem}.globe-sphere{inset:9%}.globe-scene>div:nth-last-child(2){right:0}.hero-copy h1{letter-spacing:-.055em}.hero-stage .mx-auto.grid{gap:1.5rem}}
+@media(prefers-reduced-motion:reduce){.whappnus-landing *, .whappnus-landing *::before,.whappnus-landing *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
