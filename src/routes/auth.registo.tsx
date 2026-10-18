@@ -41,13 +41,14 @@ function SignupPage() {
       return;
     }
     setLoading(true);
+    const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = normalizeSignupPhone(phone);
     const params = new URLSearchParams(window.location.search);
     const referralCode = (params.get("ref") ?? "").trim().toLowerCase();
     const metadata: Record<string, string> = { full_name: fullName.trim(), phone: normalizedPhone };
     if (/^[a-f0-9]{6,32}$/.test(referralCode)) metadata.affiliate_referral_code = referralCode;
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
         data: metadata,
@@ -69,7 +70,7 @@ function SignupPage() {
     } else {
       toast.success("Conta criada. Enviámos um link para confirmar o seu email.");
       // Muda imediatamente para Entrar; não guarda nem transporta a palavra-passe.
-      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(normalizedEmail)}`);
     }
   }
 
