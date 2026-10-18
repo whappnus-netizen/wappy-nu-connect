@@ -114,7 +114,7 @@ function AffiliatePage() {
     setFullName(profile.full_name ?? "");
     setAge(String(profile.age ?? ""));
     setMotherName(profile.mother_name ?? "");
-    setWhatsappPhone(profile.whatsapp_phone ?? String(user?.user_metadata?.phone ?? ""));
+    setWhatsappPhone(profile.whatsapp_phone ?? String(user?.user_metadata?.["phone"] ?? ""));
     setPartnerType(profile.partner_type ?? "content");
     setInstagram(profile.instagram_handle ?? "");
     setTiktok(profile.tiktok_handle ?? "");
