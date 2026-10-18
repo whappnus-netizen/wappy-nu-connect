@@ -10,6 +10,7 @@ type GenerateInput = {
   profileName?: string | null;
   text: string;
   agentId?: string | null;
+  testMode?: boolean;
   mediaPath?: string | null;
   mediaMimeType?: string | null;
   messageType?: "text" | "image" | "audio" | "video" | "document" | "system";
