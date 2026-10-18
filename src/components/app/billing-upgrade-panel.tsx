@@ -20,7 +20,7 @@ export function BillingUpgradePanel({ organizationId }: { organizationId: string
     refetchInterval: 20_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("billing-api", { body: { action: "plans.available" } });
+      const { data, error } = await supabase.functions.invoke("billing-api", { body: { action: "plans.available", organization_id: organizationId } });
       if (error) throw new Error(error.message || "Não foi possível consultar os planos.");
       if (!data?.ok) throw new Error(data?.error ?? "Não foi possível consultar os planos disponíveis.");
       return data.data as UpgradeData;
