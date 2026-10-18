@@ -83,6 +83,28 @@ Deno.serve(async(req:Request)=>{
       if(ids.length===1&&(!prev?.organization_id||prev.organization_id===ids[0])){
        if(!prev?.organization_id){const link=await db.from("kursinha_sales").update({organization_id:ids[0],updated_at:now}).eq("sale_id",saleId).is("organization_id",null);if(link.error)throw link.error;}
        const applied=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:saleId});if(applied.error)throw applied.error;if(!(applied.data?.applied||applied.data?.already_applied)){throw new Error("Ativação não confirmada: "+String(applied.data?.reason??"UNKNOWN"));}
+       // Affiliate commission: only a verified, approved referral and a validated paid plan can generate a ledger entry.
+       if(pr.data?.id&&mr.data?.plan_id&&Number.isFinite(price)&&price>0){
+        const referral=await db.from("affiliate_referrals").select("id,affiliate_user_id,status,expires_at").eq("referred_user_id",pr.data.id).in("status",["active","converted"]).maybeSingle();if(referral.error)throw referral.error;
+        if(referral.data){
+         const partner=await db.from("affiliate_profiles").select("user_id,status").eq("user_id",referral.data.affiliate_user_id).eq("status","approved").maybeSingle();if(partner.error)throw partner.error;
+         const plan=await db.from("subscription_plans").select("code").eq("id",mr.data.plan_id).maybeSingle();if(plan.error)throw plan.error;
+         const rule=plan.data?.code?await db.from("affiliate_commission_rules").select("initial_rate,renewal_rate,renewal_limit,is_active").eq("plan_code",plan.data.code).maybeSingle():{data:null,error:null};if(rule.error)throw rule.error;
+         if(partner.data&&plan.data?.code&&rule.data?.is_active){
+          const history=await db.from("affiliate_commissions").select("commission_type,status").eq("referral_id",referral.data.id).neq("status","reversed");if(history.error)throw history.error;
+          const prior=history.data??[],renewalCount=prior.filter((x:any)=>x.commission_type==="renewal").length;
+          let commissionType:"initial"|"renewal"|null=null,rate=0;
+          if(prior.length===0&&referral.data.status==="active"&&new Date(referral.data.expires_at).getTime()>=Date.now()){commissionType="initial";rate=Number(rule.data.initial_rate);}
+          else if(prior.length>0&&renewalCount<Number(rule.data.renewal_limit)){commissionType="renewal";rate=Number(rule.data.renewal_rate);}
+          if(commissionType&&rate>0){
+           const amount=Math.round((Number(price)*rate/100)*100)/100;
+           const savedCommission=await db.from("affiliate_commissions").upsert({referral_id:referral.data.id,affiliate_user_id:referral.data.affiliate_user_id,referred_user_id:pr.data.id,sale_id:saleId,plan_code:plan.data.code,commission_type:commissionType,rate,base_amount_aoa:Number(price),amount_aoa:amount,status:"pending",eligible_at:new Date(Date.now()+14*24*60*60*1000).toISOString(),updated_at:now},{onConflict:"sale_id",ignoreDuplicates:true});
+           if(savedCommission.error)throw savedCommission.error;
+           if(commissionType==="initial"){const converted=await db.from("affiliate_referrals").update({status:"converted",converted_at:now}).eq("id",referral.data.id).eq("status","active");if(converted.error)throw converted.error;}
+          }
+         }
+        }
+       }
        const ss=await db.from("kursinha_sales").select("subscription_id").eq("sale_id",saleId).maybeSingle();
        const sub:any=ss.data?.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",ss.data.subscription_id).maybeSingle():{data:null};
        const s0:any=sub.data;
@@ -93,6 +115,9 @@ Deno.serve(async(req:Request)=>{
    }else{
     const paid=prev?.status==="approved"||prev?.status==="refunded"||!!prev?.applied_at;
     const r=await db.from("kursinha_sales").upsert({...common,status:paid?"refunded":"cancelled",cancelled_at:now},{onConflict:"sale_id"});if(r.error)throw r.error;
+    const commissionCancel=await db.from("affiliate_commissions").update({status:"reversed",updated_at:now}).eq("sale_id",saleId).in("status",["pending","approved"]);if(commissionCancel.error)throw commissionCancel.error;
+    const requestedCommission=await db.from("affiliate_commissions").select("payout_request_id").eq("sale_id",saleId).eq("status","requested").maybeSingle();if(requestedCommission.error)throw requestedCommission.error;
+    if(requestedCommission.data?.payout_request_id){const request=await db.from("affiliate_payout_requests").select("admin_note").eq("id",requestedCommission.data.payout_request_id).maybeSingle();const note=[request.data?.admin_note,"ATENÇÃO: a venda associada a uma comissão solicitada foi cancelada/reembolsada; validar antes de pagar."].filter(Boolean).join("\n");await db.from("affiliate_payout_requests").update({admin_note:note,status:"pending_review"}).eq("id",requestedCommission.data.payout_request_id);}
     await sendEmail(db,{template:paid?"payment_refunded":"payment_cancelled",to:buyer,name:common.buyer_name,event,organizationId:prev?.organization_id,idempotencyKey:(paid?"payment_refunded:":"payment_cancelled:")+saleId,vars:{plan:productName,amount:common.amount_aoa,reference:common.order_id||saleId}});
     if(paid&&prev?.subscription_id){
      const sub=await db.from("organization_subscriptions").update({status:"cancelled",cancelled_at:now,updated_at:now}).eq("id",prev.subscription_id).eq("provider","kursinha").eq("provider_subscription_id",saleId);if(sub.error)throw sub.error;
