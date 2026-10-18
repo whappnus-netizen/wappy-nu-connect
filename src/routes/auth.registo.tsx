@@ -46,7 +46,7 @@ function SignupPage() {
     const params = new URLSearchParams(window.location.search);
     const referralCode = (params.get("ref") ?? "").trim().toLowerCase();
     const metadata: Record<string, string> = { full_name: fullName.trim(), phone: normalizedPhone };
-    if (/^[a-f0-9]{6,32}$/.test(referralCode)) metadata.affiliate_referral_code = referralCode;
+    if (/^[a-f0-9]{6,32}$/.test(referralCode)) metadata["affiliate_referral_code"] = referralCode;
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
