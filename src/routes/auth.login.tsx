@@ -68,7 +68,7 @@ function LoginPage() {
         await supabase.auth.signOut();
       }
       setLoading(false);
-      navigate({ to: "/superadmin" });
+      navigate({ to: "/ops-console-7d4e91b8c6a2" });
       return;
     }
 
@@ -98,7 +98,7 @@ function LoginPage() {
         if (!isolatedCheckError && isolatedCheck?.ok === true) {
           await supabase.auth.signOut();
           setLoading(false);
-          navigate({ to: "/superadmin" });
+          navigate({ to: "/ops-console-7d4e91b8c6a2" });
           return;
         }
         await superadminSupabase.auth.signOut();
