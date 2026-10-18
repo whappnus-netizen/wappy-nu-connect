@@ -28,7 +28,7 @@ Deno.serve(async(req:Request)=>{
     &&(currentStatus!=="trialing"||periodEnd!==null)
     &&(periodEnd===null||(Number.isFinite(periodEnd)&&periodEnd>Date.now()));
   const organizationSuspended=["suspended","blocked","cancelled"].includes(String(org.data?.status??""));
-  const currentPrice=subscriptionActive?Number(currentPlan?.price_aoa??0):0;
+  const currentPrice=subscriptionActive&&current.data?.status==="active"?Number(currentPlan?.price_aoa??0):0;
   const [plans,mappings]=await Promise.all([
    db.from("subscription_plans").select("id,code,name,description,price_aoa,trial_days,billing_interval,features,limits").eq("is_active",true).order("sort_order"),
    db.from("kursinha_product_mappings").select("plan_id,checkout_url,is_active").eq("is_active",true)
