@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "./premium-landing.css";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, ArrowUpRight, Bot, Check, ChevronDown, CircleCheck, Globe2,
