@@ -58,7 +58,7 @@ function SignupPage() {
     setLoading(false);
     if (error) {
       const message = error.message.toLowerCase();
-      if (message.includes("account_contact_conflict") || message.includes("contact_phone_already_registered") || message.includes("already registered") || message.includes("duplicate key")) {
+      if (message.includes("account_contact_conflict") || message.includes("contact_phone_already_registered") || message.includes("already registered") || message.includes("duplicate key") || message.includes("database error saving new user")) {
         toast.error("Não foi possível concluir o registo com estes dados. Se já tens uma conta, inicia sessão ou recupera a palavra-passe.");
       } else {
         toast.error(error.message);
