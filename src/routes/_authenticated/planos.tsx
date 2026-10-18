@@ -20,7 +20,7 @@ function UpgradePlansPage(){
   if(!data?.ok)throw new Error(data?.error||"Não foi possível carregar os planos.");
   return data.data as UpgradeData;
  },retry:false,refetchOnWindowFocus:true});
- useEffect(()=>{if(pendingPlanCode&&query.data?.currentPlan?.code===pendingPlanCode){toast.success("Pagamento confirmado e plano atualizado.");setPendingPlanCode(null);}},[pendingPlanCode,query.data?.currentPlan?.code]);
+ useEffect(()=>{if(pendingPlanCode&&query.data?.currentPlan?.code===pendingPlanCode&&query.data?.currentPlan?.status!=="expired"){toast.success("Pagamento confirmado e plano atualizado.");setPendingPlanCode(null);}},[pendingPlanCode,query.data?.currentPlan?.code]);
 
  return <AppShell title="Atualizar plano" description="Escolhe o plano adequado à tua operação. A assinatura só muda depois da confirmação do pagamento pela Kursinha.">
   {query.isLoading?<div className="flex items-center gap-2 p-6 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin"/>A carregar os planos disponíveis…</div>:null}
