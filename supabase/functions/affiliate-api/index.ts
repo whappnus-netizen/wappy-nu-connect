@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
      const d=p.payout_details_snapshot??{};
      return {...p,payout_details_snapshot:{method:d.method,account_name:null,bank_name:null,iban:null,phone:null,other_details:null}};
     });
-    return json({ok:true,data:{profiles:profilesWithEmail,commissions:commissions.data??[],payouts:payoutRows,rules:rules.data??[],photos,minPayout:10000}},200,origin);
+    return json({ok:true,data:{profiles:profilesWithEmail,commissions:commissions.data??[],payouts:payoutRows,rules:rules.data??[],photos,minPayout:10000,permissions:{canViewPayoutDetails,canManagePayouts:canViewPayoutDetails}}},200,origin);
    }
    if(action==="admin.review"){
     const userId=text(input.userId,80),status=text(input.status,30),tier=text(input.tier,30),reason=text(input.reason,500);
