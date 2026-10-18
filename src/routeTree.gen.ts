@@ -15,6 +15,7 @@ import { Route as DeletionRouteImport } from './routes/deletion'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
+import { Route as OpsAccessRouteImport } from './routes/ops-access-9f2c7a61d4'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
@@ -26,6 +27,7 @@ import { Route as AuthenticatedEquipaRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedIaRouteImport } from './routes/_authenticated/ia'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
+import { Route as AuthenticatedParceriasRouteImport } from './routes/_authenticated/parcerias'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthConfirmRouteImport } from './routes/auth.confirm'
@@ -64,6 +66,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
   path: '/superadmin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpsAccessRoute = OpsAccessRouteImport.update({
+  id: '/ops-access-9f2c7a61d4',
+  path: '/ops-access-9f2c7a61d4',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -132,6 +139,11 @@ const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   path: '/whatsapp',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedParceriasRoute = AuthenticatedParceriasRouteImport.update({
+  id: '/_authenticated/parcerias',
+  path: '/parcerias',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthConfirmRoute = AuthConfirmRouteImport.update({
   id: '/auth/confirm',
   path: '/auth/confirm',
@@ -181,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-access-9f2c7a61d4': typeof OpsAccessRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -194,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/parcerias': typeof AuthenticatedParceriasRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -209,6 +223,7 @@ export interface FileRoutesByTo {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-access-9f2c7a61d4': typeof OpsAccessRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -222,6 +237,7 @@ export interface FileRoutesByTo {
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/parcerias': typeof AuthenticatedParceriasRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -239,6 +255,7 @@ export interface FileRoutesById {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-access-9f2c7a61d4': typeof OpsAccessRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
@@ -252,6 +269,7 @@ export interface FileRoutesById {
   '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/_authenticated/parcerias': typeof AuthenticatedParceriasRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -269,6 +287,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-access-9f2c7a61d4'
     | '/termos'
     | '/terms'
     | '/automacoes'
@@ -282,6 +301,7 @@ export interface FileRouteTypes {
     | '/notificacoes'
     | '/onboarding'
     | '/whatsapp'
+    | '/parcerias'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -297,6 +317,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-access-9f2c7a61d4'
     | '/termos'
     | '/terms'
     | '/automacoes'
@@ -310,6 +331,7 @@ export interface FileRouteTypes {
     | '/notificacoes'
     | '/onboarding'
     | '/whatsapp'
+    | '/parcerias'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -326,6 +348,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-access-9f2c7a61d4'
     | '/termos'
     | '/terms'
     | '/_authenticated/automacoes'
@@ -339,6 +362,7 @@ export interface FileRouteTypes {
     | '/_authenticated/notificacoes'
     | '/_authenticated/onboarding'
     | '/_authenticated/whatsapp'
+    | '/_authenticated/parcerias'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -356,6 +380,7 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   PrivacyRoute: typeof PrivacyRoute
   SuperadminRoute: typeof SuperadminRoute
+  OpsAccessRoute: typeof OpsAccessRoute
   TermosRoute: typeof TermosRoute
   TermsRoute: typeof TermsRoute
   AuthConfirmRoute: typeof AuthConfirmRoute
@@ -410,6 +435,13 @@ declare module '@tanstack/react-router' {
       path: '/superadmin'
       fullPath: '/superadmin'
       preLoaderRoute: typeof SuperadminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ops-access-9f2c7a61d4': {
+      id: '/ops-access-9f2c7a61d4'
+      path: '/ops-access-9f2c7a61d4'
+      fullPath: '/ops-access-9f2c7a61d4'
+      preLoaderRoute: typeof OpsAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -503,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWhatsappRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/parcerias': {
+      id: '/_authenticated/parcerias'
+      path: '/parcerias'
+      fullPath: '/parcerias'
+      preLoaderRoute: typeof AuthenticatedParceriasRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/auth/confirm': {
       id: '/auth/confirm'
       path: '/auth/confirm'
@@ -574,6 +613,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
+  AuthenticatedParceriasRoute: typeof AuthenticatedParceriasRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -588,6 +628,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
+  AuthenticatedParceriasRoute: AuthenticatedParceriasRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -600,6 +641,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   PrivacyRoute: PrivacyRoute,
   SuperadminRoute: SuperadminRoute,
+  OpsAccessRoute: OpsAccessRoute,
   TermosRoute: TermosRoute,
   TermsRoute: TermsRoute,
   AuthConfirmRoute: AuthConfirmRoute,

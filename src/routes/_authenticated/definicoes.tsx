@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/app-shell";
@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Camera, Loader2, Building2, UserRound } from "lucide-react";
+import { Camera, Loader2, Building2, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
+import { BillingUpgradePanel } from "@/components/app/billing-upgrade-panel";
 
 export const Route = createFileRoute("/_authenticated/definicoes")({
   head: () => ({ meta: [{ title: "Definições — WhappNus" }] }),
@@ -144,6 +145,7 @@ function SettingsPage() {
   return (
     <AppShell title="Definições" description="Configurações da organização e da conta">
       <div className="grid gap-4 lg:grid-cols-2">
+        {membership?.role === "OWNER" ? <BillingUpgradePanel organizationId={orgId} /> : <section className="rounded-xl border border-border bg-card p-5 lg:col-span-2"><h2 className="font-display text-sm font-semibold">Assinatura e atualização do plano</h2><p className="mt-1 text-sm text-muted-foreground">Só o proprietário da organização pode alterar o plano. Contacta o OWNER para solicitar uma atualização.</p></section>}
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-sm font-semibold">Organização</h2>
           <div className="mt-2">
@@ -167,6 +169,17 @@ function SettingsPage() {
             <Row label="Nome" value={(user?.user_metadata?.["full_name"] as string) ?? "—"} />
             <Row label="Fuso horário da organização" value={timezone} />
             <Row label="Moeda da organização" value={currency} />
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><UsersRound className="size-5" /></div>
+            <div className="flex-1">
+              <h2 className="font-display text-sm font-semibold">Programa de parceiros</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Candidata-te para recomendar a WHAPPNUS. A participação depende de aprovação e o portal de parceiro continua disponível mesmo que o teste da plataforma termine.</p>
+              <Button asChild variant="outline" className="mt-4"><Link to="/parcerias">Consultar programa de parceiros</Link></Button>
+            </div>
           </div>
         </section>
 

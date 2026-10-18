@@ -19,6 +19,14 @@ export const Route = createFileRoute("/auth/registo")({
   component: SignupPage,
 });
 
+function normalizeSignupPhone(raw: string) {
+  let digits = raw.replace(/[^0-9]/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 10 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 9) digits = "244" + digits;
+  return digits ? "+" + digits : raw.trim();
+}
+
 function SignupPage() {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
@@ -33,18 +41,34 @@ function SignupPage() {
       toast.error("Este email está reservado ao proprietário do Super Admin e não pode criar uma conta de organização.");
       return;
     }
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = normalizeSignupPhone(phone);
+    const phoneDigits = normalizedPhone.replace(/[^0-9]/g, "");
+    if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+      toast.error("Indica um número de WhatsApp válido com o indicativo do país.");
+      return;
+    }
     setLoading(true);
+    const params = new URLSearchParams(window.location.search);
+    const referralCode = (params.get("ref") ?? "").trim().toLowerCase();
+    const metadata: Record<string, string> = { full_name: fullName.trim(), phone: normalizedPhone };
+    if (/^[a-f0-9]{6,32}$/.test(referralCode)) metadata["affiliate_referral_code"] = referralCode;
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
-        data: { full_name: fullName, phone: phone.trim() },
+        data: metadata,
         emailRedirectTo: "https://whappnus.online/auth/confirm",
       },
     });
     setLoading(false);
     if (error) {
-      toast.error(error.message);
+      const message = error.message.toLowerCase();
+      if (message.includes("account_contact_conflict") || message.includes("contact_phone_already_registered") || message.includes("already registered") || message.includes("duplicate key") || message.includes("database error saving new user") || message.includes("contact_phone_invalid")) {
+        toast.error("Não foi possível concluir o registo com estes dados. Se já tens uma conta, inicia sessão ou recupera a palavra-passe.");
+      } else {
+        toast.error(error.message);
+      }
       return;
     }
     if (data.session) {
@@ -52,7 +76,7 @@ function SignupPage() {
     } else {
       toast.success("Conta criada. Enviámos um link para confirmar o seu email.");
       // Muda imediatamente para Entrar; não guarda nem transporta a palavra-passe.
-      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(normalizedEmail)}`);
     }
   }
 
@@ -74,7 +98,7 @@ function SignupPage() {
         <div className="space-y-2">
           <Label htmlFor="phone">Número de WhatsApp de contacto</Label>
           <Input id="phone" type="tel" autoComplete="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+244 9xx xxx xxx" />
-          <p className="text-xs text-muted-foreground">Usaremos este contacto apenas para avisos importantes da sua assinatura e conta.</p>
+          <p className="text-xs text-muted-foreground">Usaremos este contacto para avisos importantes da conta. Cada número de WhatsApp só pode estar associado a uma conta.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email profissional</Label>

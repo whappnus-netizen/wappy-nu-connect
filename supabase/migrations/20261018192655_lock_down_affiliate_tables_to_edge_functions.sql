@@ -1,0 +1,3 @@
+-- Affiliate personal/payment data is only accessed through service-role Edge Functions.
+REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.affiliate_audit_logs, public.affiliate_commission_rules, public.affiliate_commissions, public.affiliate_payout_requests, public.affiliate_profiles, public.affiliate_referrals FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.affiliate_audit_logs, public.affiliate_commission_rules, public.affiliate_commissions, public.affiliate_payout_requests, public.affiliate_profiles, public.affiliate_referrals TO service_role;
