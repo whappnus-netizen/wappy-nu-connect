@@ -105,8 +105,8 @@ function AffiliatePage() {
 
   useEffect(() => {
     if (!user) return;
-    setFullName(String(user.user_metadata?.full_name ?? user.user_metadata?.name ?? ""));
-    setWhatsappPhone(String(user.user_metadata?.phone ?? ""));
+    setFullName(String(user.user_metadata?.["full_name"] ?? user.user_metadata?.["name"] ?? ""));
+    setWhatsappPhone(String(user.user_metadata?.["phone"] ?? ""));
   }, [user?.id]);
 
   useEffect(() => {
