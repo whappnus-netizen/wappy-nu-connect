@@ -34,17 +34,23 @@ function SignupPage() {
       return;
     }
     setLoading(true);
+    const normalizedEmail = email.trim().toLowerCase();
+    const referralCandidate = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ref") ?? "" : "";
+    const referralCode = /^[a-f0-9]{8,32}$/i.test(referralCandidate) ? referralCandidate.toLowerCase() : "";
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: normalizedEmail,
       password,
       options: {
-        data: { full_name: fullName, phone: phone.trim() },
+        data: { full_name: fullName.trim(), phone: phone.trim(), ...(referralCode ? { affiliate_referral_code: referralCode } : {}) },
         emailRedirectTo: "https://whappnus.online/auth/confirm",
       },
     });
     setLoading(false);
     if (error) {
-      toast.error(error.message);
+      const safeMessage = /database error saving new user|account_contact_conflict|duplicate key|users_phone_key|user already registered|already been registered|email.*already/i.test(error.message)
+        ? "Não foi possível criar a conta com estes dados. Verifica o e-mail e o número de WhatsApp ou contacta o suporte."
+        : error.message;
+      toast.error(safeMessage);
       return;
     }
     if (data.session) {
@@ -52,7 +58,7 @@ function SignupPage() {
     } else {
       toast.success("Conta criada. Enviámos um link para confirmar o seu email.");
       // Muda imediatamente para Entrar; não guarda nem transporta a palavra-passe.
-      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(email.trim().toLowerCase())}`);
+      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(normalizedEmail)}`);
     }
   }
 
