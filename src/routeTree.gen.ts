@@ -15,9 +15,12 @@ import { Route as DeletionRouteImport } from './routes/deletion'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
+import { Route as OpsConsoleRouteImport } from './routes/ops-console-7d4e91b8c6a2'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
+import { Route as AuthenticatedAfiliadosRouteImport } from './routes/_authenticated/afiliados'
+import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -66,6 +69,11 @@ const SuperadminRoute = SuperadminRouteImport.update({
   path: '/superadmin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OpsConsoleRoute = OpsConsoleRouteImport.update({
+  id: '/ops-console-7d4e91b8c6a2',
+  path: '/ops-console-7d4e91b8c6a2',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermosRoute = TermosRouteImport.update({
   id: '/termos',
   path: '/termos',
@@ -79,6 +87,16 @@ const TermsRoute = TermsRouteImport.update({
 const AuthenticatedAutomacoesRoute = AuthenticatedAutomacoesRouteImport.update({
   id: '/automacoes',
   path: '/automacoes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAfiliadosRoute = AuthenticatedAfiliadosRouteImport.update({
+  id: '/afiliados',
+  path: '/afiliados',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPlanosRoute = AuthenticatedPlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedContactosRoute = AuthenticatedContactosRouteImport.update({
@@ -181,9 +199,12 @@ export interface FileRoutesByFullPath {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-console-7d4e91b8c6a2': typeof OpsConsoleRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/afiliados': typeof AuthenticatedAfiliadosRoute
+  '/planos': typeof AuthenticatedPlanosRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -209,9 +230,12 @@ export interface FileRoutesByTo {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-console-7d4e91b8c6a2': typeof OpsConsoleRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/afiliados': typeof AuthenticatedAfiliadosRoute
+  '/planos': typeof AuthenticatedPlanosRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -239,9 +263,12 @@ export interface FileRoutesById {
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
   '/superadmin': typeof SuperadminRoute
+  '/ops-console-7d4e91b8c6a2': typeof OpsConsoleRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/_authenticated/afiliados': typeof AuthenticatedAfiliadosRoute
+  '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -269,9 +296,12 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-console-7d4e91b8c6a2'
     | '/termos'
     | '/terms'
     | '/automacoes'
+    | '/afiliados'
+    | '/planos'
     | '/contactos'
     | '/crm'
     | '/dashboard'
@@ -297,9 +327,12 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-console-7d4e91b8c6a2'
     | '/termos'
     | '/terms'
     | '/automacoes'
+    | '/afiliados'
+    | '/planos'
     | '/contactos'
     | '/crm'
     | '/dashboard'
@@ -326,9 +359,12 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/privacy'
     | '/superadmin'
+    | '/ops-console-7d4e91b8c6a2'
     | '/termos'
     | '/terms'
     | '/_authenticated/automacoes'
+    | '/_authenticated/afiliados'
+    | '/_authenticated/planos'
     | '/_authenticated/contactos'
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
@@ -356,6 +392,7 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   PrivacyRoute: typeof PrivacyRoute
   SuperadminRoute: typeof SuperadminRoute
+  OpsConsoleRoute: typeof OpsConsoleRoute
   TermosRoute: typeof TermosRoute
   TermsRoute: typeof TermsRoute
   AuthConfirmRoute: typeof AuthConfirmRoute
@@ -412,6 +449,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperadminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ops-console-7d4e91b8c6a2': {
+      id: '/ops-console-7d4e91b8c6a2'
+      path: '/ops-console-7d4e91b8c6a2'
+      fullPath: '/ops-console-7d4e91b8c6a2'
+      preLoaderRoute: typeof OpsConsoleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/termos': {
       id: '/termos'
       path: '/termos'
@@ -431,6 +475,20 @@ declare module '@tanstack/react-router' {
       path: '/automacoes'
       fullPath: '/automacoes'
       preLoaderRoute: typeof AuthenticatedAutomacoesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/afiliados': {
+      id: '/_authenticated/afiliados'
+      path: '/afiliados'
+      fullPath: '/afiliados'
+      preLoaderRoute: typeof AuthenticatedAfiliadosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/planos': {
+      id: '/_authenticated/planos'
+      path: '/planos'
+      fullPath: '/planos'
+      preLoaderRoute: typeof AuthenticatedPlanosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/contactos': {
@@ -564,6 +622,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAutomacoesRoute: typeof AuthenticatedAutomacoesRoute
+  AuthenticatedAfiliadosRoute: typeof AuthenticatedAfiliadosRoute
+  AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
   AuthenticatedContactosRoute: typeof AuthenticatedContactosRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -578,6 +638,8 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAutomacoesRoute: AuthenticatedAutomacoesRoute,
+  AuthenticatedAfiliadosRoute: AuthenticatedAfiliadosRoute,
+  AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
   AuthenticatedContactosRoute: AuthenticatedContactosRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -600,6 +662,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   PrivacyRoute: PrivacyRoute,
   SuperadminRoute: SuperadminRoute,
+  OpsConsoleRoute: OpsConsoleRoute,
   TermosRoute: TermosRoute,
   TermsRoute: TermsRoute,
   AuthConfirmRoute: AuthConfirmRoute,
