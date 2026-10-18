@@ -43,6 +43,11 @@ function SignupPage() {
     setLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = normalizeSignupPhone(phone);
+    const phoneDigits = normalizedPhone.replace(/[^0-9]/g, "");
+    if (phoneDigits.length < 8 || phoneDigits.length > 15) {
+      toast.error("Indica um número de WhatsApp válido com o indicativo do país.");
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     const referralCode = (params.get("ref") ?? "").trim().toLowerCase();
     const metadata: Record<string, string> = { full_name: fullName.trim(), phone: normalizedPhone };
@@ -58,7 +63,7 @@ function SignupPage() {
     setLoading(false);
     if (error) {
       const message = error.message.toLowerCase();
-      if (message.includes("account_contact_conflict") || message.includes("contact_phone_already_registered") || message.includes("already registered") || message.includes("duplicate key") || message.includes("database error saving new user")) {
+      if (message.includes("account_contact_conflict") || message.includes("contact_phone_already_registered") || message.includes("already registered") || message.includes("duplicate key") || message.includes("database error saving new user") || message.includes("contact_phone_invalid")) {
         toast.error("Não foi possível concluir o registo com estes dados. Se já tens uma conta, inicia sessão ou recupera a palavra-passe.");
       } else {
         toast.error(error.message);
