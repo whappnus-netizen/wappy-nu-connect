@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
  const actor=authData.user,db=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
  let input:Record<string,unknown>;try{const p=await req.json();if(!isObj(p))return fail("Pedido inválido.",400,origin);input=p;}catch{return fail("Pedido inválido.",400,origin);}
  const action=text(input.action,80);
- const requireAdmin=async()=>{const r=await db.from("superadmin_users").select("user_id,role,is_active").eq("user_id",actor.id).eq("is_active",true).maybeSingle();if(r.error)throw new Error("Não foi possível validar as permissões administrativas.");if(!r.data)throw Object.assign(new Error("Acesso restrito."),{status:403});return r.data;};
+ const requireAdmin=async()=>{const r=await db.from("superadmin_users").select("user_id,role,is_active").eq("user_id",actor.id).eq("is_active",true).maybeSingle();if(r.error)throw new Error("Não foi possível validar as permissões administrativas.");if(!r.data||!["PLATFORM_OWNER","PLATFORM_ADMIN","BILLING_ADMIN"].includes(String(r.data.role??"").toUpperCase()))throw Object.assign(new Error("Acesso restrito à equipa financeira e de plataforma."),{status:403});return r.data;};
  const approveEligible=async(userId?:string)=>{const now=new Date().toISOString();let q=db.from("affiliate_commissions").select("id,sale_id").eq("status","pending").lte("eligible_at",now).limit(500);if(userId)q=q.eq("affiliate_user_id",userId);const r=await q;if(r.error)throw r.error;if(!r.data?.length)return;const ids=r.data.map((x:any)=>x.sale_id);const sales=await db.from("kursinha_sales").select("sale_id").in("sale_id",ids).eq("status","approved");if(sales.error)throw sales.error;const ok=(sales.data??[]).map((x:any)=>x.sale_id),bad=ids.filter((x:string)=>!ok.includes(x));if(ok.length){const u=await db.from("affiliate_commissions").update({status:"approved",updated_at:now}).in("sale_id",ok).eq("status","pending");if(u.error)throw u.error;}if(bad.length){const u=await db.from("affiliate_commissions").update({status:"reversed",updated_at:now}).in("sale_id",bad).eq("status","pending");if(u.error)throw u.error;}};
  try{
   if(action==="photo.upload-url"){
@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
    }
    if(action==="admin.review"){
     const userId=text(input.userId,80),status=text(input.status,30),tier=text(input.tier,30),reason=text(input.reason,500);
-    if(!userId||!["approved","rejected","suspended"].includes(status))return fail("Ação de revisão inválida.",400,origin);
+    if(!userId||userId===actor.id||!["approved","rejected","suspended"].includes(status))return fail("Ação de revisão inválida.",400,origin);
     if(tier&&!["initial","pro","elite"].includes(tier))return fail("Nível de parceiro inválido.",400,origin);
     if(["rejected","suspended"].includes(status)&&!reason)return fail("Indica o motivo desta decisão.",400,origin);
     const patch:Record<string,unknown>={status,reviewed_by:actor.id,reviewed_at:new Date().toISOString(),rejection_reason:status==="rejected"?reason:null,updated_at:new Date().toISOString()};if(tier)patch.tier=tier;
