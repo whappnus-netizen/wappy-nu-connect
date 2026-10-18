@@ -145,7 +145,7 @@ function SettingsPage() {
   return (
     <AppShell title="Definições" description="Configurações da organização e da conta">
       <div className="grid gap-4 lg:grid-cols-2">
-        <BillingUpgradePanel organizationId={orgId} />
+        {membership?.role === "OWNER" ? <BillingUpgradePanel organizationId={orgId} /> : <section className="rounded-xl border border-border bg-card p-5 lg:col-span-2"><h2 className="font-display text-sm font-semibold">Assinatura e atualização do plano</h2><p className="mt-1 text-sm text-muted-foreground">Só o proprietário da organização pode alterar o plano. Contacta o OWNER para solicitar uma atualização.</p></section>}
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="font-display text-sm font-semibold">Organização</h2>
           <div className="mt-2">
