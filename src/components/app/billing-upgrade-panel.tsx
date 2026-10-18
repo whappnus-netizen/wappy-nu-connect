@@ -13,7 +13,7 @@ type UpgradeData = {
 const money = (value: number) => new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(value);
 const planStatus: Record<string, string> = { active: "Ativo", trialing: "Em teste", expired: "Expirado", suspended: "Suspenso" };
 
-export function BillingUpgradePanel({ organizationId }: { organizationId?: string }) {
+export function BillingUpgradePanel({ organizationId }: { organizationId: string | undefined }) {
   const query = useQuery({
     queryKey: ["billing-plan-options", organizationId],
     enabled: Boolean(organizationId),
