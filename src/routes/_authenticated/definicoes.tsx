@@ -50,7 +50,11 @@ function SettingsPage() {
     },
   });
   useEffect(() => {
-    setContactPhone(contactQuery.data ?? String(user?.user_metadata?.["phone"] ?? ""));
+    // Prioritise the organisation's saved contact, then fall back to the
+    // WhatsApp number collected during signup in Supabase Auth metadata.
+    const savedPhone = typeof contactQuery.data === "string" ? contactQuery.data.trim() : "";
+    const signupPhone = String(user?.user_metadata?.["phone"] ?? "").trim();
+    setContactPhone(savedPhone || signupPhone);
   }, [contactQuery.data, user?.user_metadata?.["phone"]]);
 
   const assetsQuery = useQuery({
