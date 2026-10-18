@@ -47,7 +47,7 @@ function SignupPage() {
     });
     setLoading(false);
     if (error) {
-      const safeMessage = /database error saving new user|account_contact_conflict|duplicate key|users_phone_key/i.test(error.message)
+      const safeMessage = /database error saving new user|account_contact_conflict|duplicate key|users_phone_key|user already registered|already been registered|email.*already/i.test(error.message)
         ? "Não foi possível criar a conta com estes dados. Verifica o e-mail e o número de WhatsApp ou contacta o suporte."
         : error.message;
       toast.error(safeMessage);
