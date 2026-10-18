@@ -73,7 +73,11 @@ Deno.serve(async (req: Request) => {
    return json({ok:true,data:{requestId:r.data}},200,origin);
   }
   if(action.startsWith("admin.")){
-   await requireAdmin();await approveEligible();
+   const adminActor=await requireAdmin();
+   const role=String(adminActor.role??"").toUpperCase();
+   const canViewPayoutDetails=["OWNER","PLATFORM_OWNER","BILLING_ADMIN"].includes(role);
+   if(["admin.rules.update","admin.payout.update"].includes(action)&&!canViewPayoutDetails)return fail("Acesso restrito à equipa financeira autorizada.",403,origin);
+   await approveEligible();
    if(action==="admin.dashboard"){
     const [profiles,commissions,payouts,rules]=await Promise.all([
      db.from("affiliate_profiles").select("*").order("created_at",{ascending:false}).limit(500),
@@ -86,9 +90,18 @@ Deno.serve(async (req: Request) => {
     const accountRows=profileRows.length?await db.from("profiles").select("id,email").in("id",profileRows.map((p:any)=>p.user_id)):{data:[],error:null};
     if(accountRows.error)throw accountRows.error;
     const accountEmails:Record<string,string>={};for(const row of accountRows.data??[]){accountEmails[row.id]=row.email??"";}
-    const profilesWithEmail=profileRows.map((p:any)=>({...p,account_email:accountEmails[p.user_id]??null}));
+    const profilesWithEmail=profileRows.map((p:any)=>({
+     ...p,
+     account_email:accountEmails[p.user_id]??null,
+     ...(canViewPayoutDetails?{}:{mother_name:null,payout_account_name:null,bank_name:null,payout_iban:null,payout_phone:null,payout_other_details:null})
+    }));
     const photos:Record<string,string>={};for(const p of profilesWithEmail){if(!p.profile_photo_path)continue;const s=await db.storage.from("affiliate-photos").createSignedUrl(p.profile_photo_path,300);if(!s.error&&s.data?.signedUrl)photos[p.user_id]=s.data.signedUrl;}
-    return json({ok:true,data:{profiles:profilesWithEmail,commissions:commissions.data??[],payouts:payouts.data??[],rules:rules.data??[],photos,minPayout:10000}},200,origin);
+    const payoutRows=(payouts.data??[]).map((p:any)=>{
+     if(canViewPayoutDetails)return p;
+     const d=p.payout_details_snapshot??{};
+     return {...p,payout_details_snapshot:{method:d.method,account_name:null,bank_name:null,iban:null,phone:null,other_details:null}};
+    });
+    return json({ok:true,data:{profiles:profilesWithEmail,commissions:commissions.data??[],payouts:payoutRows,rules:rules.data??[],photos,minPayout:10000}},200,origin);
    }
    if(action==="admin.review"){
     const userId=text(input.userId,80),status=text(input.status,30),tier=text(input.tier,30),reason=text(input.reason,500);
