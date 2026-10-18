@@ -112,17 +112,14 @@ Deno.serve(async (req: Request) => {
    if(action==="admin.payout.update"){
     const payoutId=text(input.payoutId,80),status=text(input.status,30),note=text(input.note,1000),reference=text(input.paymentReference,200),proofUrl=text(input.proofUrl,1000);
     if(!payoutId||!["approved","rejected","paid"].includes(status))return fail("Estado do pagamento inválido.",400,origin);
-    const current=await db.from("affiliate_payout_requests").select("id,affiliate_user_id,status").eq("id",payoutId).maybeSingle();if(current.error||!current.data)return fail("Pedido de pagamento não encontrado.",404,origin);
-    if(status==="paid"&&(current.data.status!=="approved"||!reference))return fail("Aprova primeiro o pedido e indica a referência da transferência antes de o marcar como pago.",400,origin);
-    if(status==="approved"&&current.data.status!=="pending_review")return fail("Só é possível aprovar pedidos pendentes.",400,origin);
+    if(status==="paid"&&!reference)return fail("Indica a referência da transferência efetuada.",400,origin);
     if(status==="rejected"&&!note)return fail("Indica o motivo da rejeição.",400,origin);
-    const now=new Date().toISOString(),patch:Record<string,unknown>={status,reviewed_by:actor.id,reviewed_at:now,admin_note:note||null};
-    if(status==="paid"){patch.paid_at=now;patch.payment_reference=reference;patch.proof_url=proofUrl||null;}if(status==="rejected")patch.rejection_reason=note;
-    const updated=await db.from("affiliate_payout_requests").update(patch).eq("id",payoutId).select("id,status,amount_aoa,affiliate_user_id").single();if(updated.error)return fail("Não foi possível atualizar o pedido de pagamento.",500,origin);
-    if(status==="paid"){const c=await db.from("affiliate_commissions").update({status:"paid",updated_at:now}).eq("payout_request_id",payoutId).eq("status","requested");if(c.error)return fail("O pagamento foi registado, mas as comissões precisam de reconciliação manual.",500,origin);}
-    else if(status==="rejected"){const c=await db.from("affiliate_commissions").update({status:"approved",payout_request_id:null,updated_at:now}).eq("payout_request_id",payoutId).eq("status","requested");if(c.error)return fail("O pedido foi rejeitado, mas o saldo precisa de reconciliação manual.",500,origin);}
-    await db.from("affiliate_audit_logs").insert({actor_user_id:actor.id,affiliate_user_id:current.data.affiliate_user_id,action:"payout.updated",details:{payoutId,status,note:note||null,paymentReference:reference||null}});
-    return json({ok:true,data:updated.data},200,origin);
+    const result=await db.rpc("review_affiliate_payout",{p_payout_id:payoutId,p_admin_id:actor.id,p_status:status,p_note:note||null,p_payment_reference:reference||null,p_proof_url:proofUrl||null});
+    if(result.error){
+      const message=result.error.message.includes("PAYOUT_NOT_FOUND")?"Pedido de pagamento não encontrado.":result.error.message.includes("PAYOUT_NOT_PENDING")?"Só é possível aprovar pedidos pendentes.":result.error.message.includes("PAYOUT_NOT_APPROVED_OR_REFERENCE_MISSING")?"Aprova primeiro o pedido e indica a referência da transferência.":result.error.message.includes("PAYOUT_CANNOT_BE_REJECTED")?"Este pedido já não pode ser rejeitado.":"Não foi possível atualizar o pedido de pagamento.";
+      return fail(message,400,origin);
+    }
+    return json({ok:true,data:result.data},200,origin);
    }
    return fail("Ação administrativa desconhecida.",404,origin);
   }
