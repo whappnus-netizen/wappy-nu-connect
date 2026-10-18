@@ -41,7 +41,6 @@ function SignupPage() {
       toast.error("Este email está reservado ao proprietário do Super Admin e não pode criar uma conta de organização.");
       return;
     }
-    setLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = normalizeSignupPhone(phone);
     const phoneDigits = normalizedPhone.replace(/[^0-9]/g, "");
@@ -49,6 +48,7 @@ function SignupPage() {
       toast.error("Indica um número de WhatsApp válido com o indicativo do país.");
       return;
     }
+    setLoading(true);
     const params = new URLSearchParams(window.location.search);
     const referralCode = (params.get("ref") ?? "").trim().toLowerCase();
     const metadata: Record<string, string> = { full_name: fullName.trim(), phone: normalizedPhone };
