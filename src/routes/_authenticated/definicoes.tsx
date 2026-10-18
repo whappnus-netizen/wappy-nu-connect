@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/app-shell";
@@ -168,6 +168,12 @@ function SettingsPage() {
             <Row label="Fuso horário da organização" value={timezone} />
             <Row label="Moeda da organização" value={currency} />
           </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="font-display text-sm font-semibold">Programa de parceiros WHAPPNUS</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Queres recomendar a WHAPPNUS a outras empresas? Podes apresentar uma candidatura a parceiro. A participação depende de aprovação e não altera o teu plano de cliente.</p>
+          <Button asChild className="mt-4"><Link to="/afiliados">Conhecer o programa de parceiros</Link></Button>
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5">
