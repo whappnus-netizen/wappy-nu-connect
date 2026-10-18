@@ -82,8 +82,13 @@ Deno.serve(async (req: Request) => {
      db.from("affiliate_commission_rules").select("*").order("plan_code")
     ]);
     for(const r of [profiles,commissions,payouts,rules])if(r.error)throw r.error;
-    const photos:Record<string,string>={};for(const p of profiles.data??[]){if(!p.profile_photo_path)continue;const s=await db.storage.from("affiliate-photos").createSignedUrl(p.profile_photo_path,300);if(!s.error&&s.data?.signedUrl)photos[p.user_id]=s.data.signedUrl;}
-    return json({ok:true,data:{profiles:profiles.data??[],commissions:commissions.data??[],payouts:payouts.data??[],rules:rules.data??[],photos,minPayout:10000}},200,origin);
+    const profileRows=profiles.data??[];
+    const accountRows=profileRows.length?await db.from("profiles").select("id,email").in("id",profileRows.map((p:any)=>p.user_id)):{data:[],error:null};
+    if(accountRows.error)throw accountRows.error;
+    const accountEmails:Record<string,string>={};for(const row of accountRows.data??[]){accountEmails[row.id]=row.email??"";}
+    const profilesWithEmail=profileRows.map((p:any)=>({...p,account_email:accountEmails[p.user_id]??null}));
+    const photos:Record<string,string>={};for(const p of profilesWithEmail){if(!p.profile_photo_path)continue;const s=await db.storage.from("affiliate-photos").createSignedUrl(p.profile_photo_path,300);if(!s.error&&s.data?.signedUrl)photos[p.user_id]=s.data.signedUrl;}
+    return json({ok:true,data:{profiles:profilesWithEmail,commissions:commissions.data??[],payouts:payouts.data??[],rules:rules.data??[],photos,minPayout:10000}},200,origin);
    }
    if(action==="admin.review"){
     const userId=text(input.userId,80),status=text(input.status,30),tier=text(input.tier,30),reason=text(input.reason,500);
