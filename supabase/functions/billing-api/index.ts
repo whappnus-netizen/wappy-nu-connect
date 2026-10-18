@@ -24,8 +24,8 @@ Deno.serve(async(req:Request)=>{
   const org=await db.from("organizations").select("status").eq("id",orgId).maybeSingle();
   if(org.error)throw org.error;
   const subscriptionActive=["active","trialing"].includes(String(current.data?.status??""))
-    &&(periodEnd===null||(Number.isFinite(periodEnd)&&periodEnd>Date.now()))
-    &&!["suspended","blocked","cancelled"].includes(String(org.data?.status??""));
+    &&(periodEnd===null||(Number.isFinite(periodEnd)&&periodEnd>Date.now()));
+  const organizationSuspended=["suspended","blocked","cancelled"].includes(String(org.data?.status??""));
   const currentPrice=subscriptionActive?Number(currentPlan?.price_aoa??0):0;
   const [plans,mappings]=await Promise.all([
    db.from("subscription_plans").select("id,code,name,description,price_aoa,trial_days,billing_interval,features,limits").eq("is_active",true).order("sort_order"),
@@ -34,6 +34,6 @@ Deno.serve(async(req:Request)=>{
   if(plans.error)throw plans.error;if(mappings.error)throw mappings.error;
   const urls=new Map((mappings.data??[]).map((m:any)=>[m.plan_id,m.checkout_url]));
   const options=(plans.data??[]).filter((p:any)=>Number(p.price_aoa)>currentPrice&&typeof urls.get(p.id)==="string"&&String(urls.get(p.id)).startsWith("https://pay.kursinha.com/")).map((p:any)=>({code:p.code,name:p.name,description:p.description,price_aoa:Number(p.price_aoa),billing_interval:p.billing_interval,features:p.features,limits:p.limits,checkout_url:urls.get(p.id)}));
-  return reply({ok:true,data:{currentPlan:currentPlan?{code:currentPlan.code,name:currentPlan.name,price_aoa:Number(currentPlan.price_aoa??0),status:subscriptionActive?(current.data?.status??"active"):"expired"}:null,options}},200,origin);
+  return reply({ok:true,data:{currentPlan:currentPlan?{code:currentPlan.code,name:currentPlan.name,price_aoa:Number(currentPlan.price_aoa??0),status:!subscriptionActive?"expired":organizationSuspended?"suspended":(current.data?.status??"active")}:null,options}},200,origin);
  }catch(e){console.error("[billing-api]",e instanceof Error?e.message:"unknown");return reply({ok:false,error:"Não foi possível carregar os planos disponíveis. Tenta novamente."},500,origin);}
 });
