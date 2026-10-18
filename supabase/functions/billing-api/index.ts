@@ -23,7 +23,9 @@ Deno.serve(async(req:Request)=>{
   const periodEnd=current.data?.current_period_end?new Date(current.data.current_period_end).getTime():null;
   const org=await db.from("organizations").select("status").eq("id",orgId).maybeSingle();
   if(org.error)throw org.error;
-  const subscriptionActive=["active","trialing"].includes(String(current.data?.status??""))
+  const currentStatus=String(current.data?.status??"");
+  const subscriptionActive=["active","trialing"].includes(currentStatus)
+    &&(currentStatus!=="trialing"||periodEnd!==null)
     &&(periodEnd===null||(Number.isFinite(periodEnd)&&periodEnd>Date.now()));
   const organizationSuspended=["suspended","blocked","cancelled"].includes(String(org.data?.status??""));
   const currentPrice=subscriptionActive?Number(currentPlan?.price_aoa??0):0;
