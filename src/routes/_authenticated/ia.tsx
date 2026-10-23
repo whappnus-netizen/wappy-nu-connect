@@ -442,7 +442,11 @@ function AgentWhatsAppAssignments({
       void qc.invalidateQueries({ queryKey: ["agent-whatsapp-assignments", orgId] });
       void qc.invalidateQueries({ queryKey: ["agent-whatsapp-numbers", orgId] });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      void qc.invalidateQueries({ queryKey: ["agent-whatsapp-assignments", orgId] });
+      void qc.invalidateQueries({ queryKey: ["agent-whatsapp-numbers", orgId] });
+    },
   });
 
   const numbers = numbersQuery.data ?? [];
@@ -675,6 +679,44 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
         .eq("id", agent.id)
         .eq("organization_id", orgId);
       if (error) throw new Error(error.message);
+
+      if (autoActivate) {
+        // First successful setup: automatically bind this agent to the first
+        // connected WhatsApp that has no explicit agent yet.
+        const { data: number, error: numberError } = await supabase.from("whatsapp_numbers")
+          .select("id")
+          .eq("organization_id", orgId)
+          .eq("status", "connected")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (numberError) throw new Error(numberError.message);
+        if (number) {
+          const { data: existingAssignment, error: assignmentError } = await supabase
+            .from("ai_agent_whatsapp_numbers")
+            .select("agent_id")
+            .eq("organization_id", orgId)
+            .eq("whatsapp_number_id", number.id)
+            .maybeSingle();
+          if (assignmentError) throw new Error(assignmentError.message);
+          if (!existingAssignment) {
+            const { error: assignError } = await supabase.from("ai_agent_whatsapp_numbers").insert({
+              organization_id: orgId,
+              agent_id: agent.id,
+              whatsapp_number_id: number.id,
+            });
+            if (assignError) throw new Error(assignError.message);
+            const { error: enableError } = await supabase.from("whatsapp_numbers")
+              .update({ ai_enabled: true }).eq("organization_id", orgId).eq("id", number.id);
+            if (enableError) throw new Error(enableError.message);
+          } else if (existingAssignment.agent_id === agent.id) {
+            const { error: enableError } = await supabase.from("whatsapp_numbers")
+              .update({ ai_enabled: true }).eq("organization_id", orgId).eq("id", number.id);
+            if (enableError) throw new Error(enableError.message);
+          }
+        }
+      }
       return autoActivate;
     },
     onSuccess: (autoActivated) => {
