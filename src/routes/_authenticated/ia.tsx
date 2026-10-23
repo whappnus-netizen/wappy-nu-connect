@@ -394,11 +394,11 @@ function AgentWhatsAppAssignments({
     enabled: Boolean(orgId),
     queryFn: async () => {
       const { data, error } = await supabase.from("whatsapp_numbers")
-        .select("id, display_name, phone_e164, provider, status")
+        .select("id, display_name, phone_e164, provider, status, ai_enabled")
         .eq("organization_id", orgId).is("deleted_at", null)
         .order("created_at", { ascending: true });
       if (error) throw new Error(error.message);
-      return (data ?? []) as Array<{ id: string; display_name: string | null; phone_e164: string | null; provider: string | null; status: string }>;
+      return (data ?? []) as Array<{ id: string; display_name: string | null; phone_e164: string | null; provider: string | null; status: string; ai_enabled: boolean }>;
     },
   });
   const assignmentsQuery = useQuery({
@@ -423,7 +423,13 @@ function AgentWhatsAppAssignments({
           updated_at: new Date().toISOString(),
         }, { onConflict: "whatsapp_number_id" });
         if (error) throw new Error(error.message);
+        const { error: enableError } = await supabase.from("whatsapp_numbers")
+          .update({ ai_enabled: true }).eq("organization_id", orgId).eq("id", input.numberId);
+        if (enableError) throw new Error(enableError.message);
       } else {
+        const { error: disableError } = await supabase.from("whatsapp_numbers")
+          .update({ ai_enabled: false }).eq("organization_id", orgId).eq("id", input.numberId);
+        if (disableError) throw new Error(disableError.message);
         const { error } = await supabase.from("ai_agent_whatsapp_numbers").delete()
           .eq("organization_id", orgId)
           .eq("agent_id", agentId)
@@ -458,13 +464,13 @@ function AgentWhatsAppAssignments({
         <div className="mt-4 divide-y divide-border">
           {numbers.map((number) => {
             const current = assignments.find((item) => item.whatsapp_number_id === number.id);
-            const isAssigned = current?.agent_id === agentId;
+            const isAssigned = current?.agent_id === agentId && number.ai_enabled;
             const assignedAgent = current ? agents.find((item) => item.id === current.agent_id) : null;
             return (
               <div key={number.id} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-medium">{number.display_name || number.phone_e164 || "WhatsApp sem nome"}</p>
-                  <p className="text-xs text-muted-foreground">{number.phone_e164 || "Número ainda não identificado"} · {number.provider === "qr" ? "QR Code" : "Meta Cloud API"} · {number.status}</p>
+                  <p className="text-xs text-muted-foreground">{number.phone_e164 || "Número ainda não identificado"} · {number.provider === "qr" ? "QR Code" : "Meta Cloud API"} · {number.status} · IA {number.ai_enabled ? "activa" : "pausada"}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {isAssigned ? "Este agente atende este número." : current ? `Associado a: ${assignedAgent?.name ?? "outro agente"}` : "Sem agente específico; será usado o comportamento padrão."}
                   </p>
@@ -657,15 +663,22 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
         payload[f.key] = v.length > 0 ? v : null;
       }
       if (!payload["name"]) throw new Error("O agente precisa de um nome.");
+      // A primeira configuração válida activa o agente automaticamente.
+      // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
+      const autoActivate = !agent.is_active && !agent.personality?.trim()
+        && Boolean(payload["personality"]?.trim() && payload["company_name"]?.trim());
+      const updatePayload: Record<string, unknown> = { ...payload };
+      if (autoActivate) updatePayload["is_active"] = true;
       const { error } = await supabase
         .from("ai_agents")
-        .update(payload)
+        .update(updatePayload)
         .eq("id", agent.id)
         .eq("organization_id", orgId);
       if (error) throw new Error(error.message);
+      return autoActivate;
     },
-    onSuccess: () => {
-      toast.success("Configuração da IA guardada.");
+    onSuccess: (autoActivated) => {
+      toast.success(autoActivated ? "Configuração guardada. A IA foi activada automaticamente." : "Configuração da IA guardada.");
       void qc.invalidateQueries({ queryKey: ["ai-agents", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
