@@ -438,7 +438,7 @@ function AgentWhatsAppAssignments({
       }
     },
     onSuccess: () => {
-      toast.success("Associação WhatsApp actualizada.");
+      toast.success("Associação e respostas automáticas actualizadas.");
       void qc.invalidateQueries({ queryKey: ["agent-whatsapp-assignments", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -453,7 +453,7 @@ function AgentWhatsAppAssignments({
       <div>
         <h3 className="font-display text-base font-semibold">WhatsApps associados a {agentName}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cada número pode ter um único agente associado. Se associares um número que já pertence a outro agente, a associação será transferida.
+          Cada número pode ter um único agente associado. Activar aqui associa o agente e liga as respostas automáticas desse WhatsApp; desligar pausa a IA nesse número e remove a associação específica.
         </p>
       </div>
       {numbersQuery.isLoading || assignmentsQuery.isLoading ? (
@@ -472,7 +472,7 @@ function AgentWhatsAppAssignments({
                   <p className="break-words text-sm font-medium">{number.display_name || number.phone_e164 || "WhatsApp sem nome"}</p>
                   <p className="text-xs text-muted-foreground">{number.phone_e164 || "Número ainda não identificado"} · {number.provider === "qr" ? "QR Code" : "Meta Cloud API"} · {number.status} · IA {number.ai_enabled ? "activa" : "pausada"}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {isAssigned ? "Este agente atende este número." : current ? `Associado a: ${assignedAgent?.name ?? "outro agente"}` : "Sem agente específico; será usado o comportamento padrão."}
+                    {isAssigned ? "Este agente atende este número e as respostas automáticas estão activas." : current ? `Associado a: ${assignedAgent?.name ?? "outro agente"}; respostas automáticas ${number.ai_enabled ? "activas" : "pausadas"}.` : number.ai_enabled ? "Sem agente específico; será usado o agente activo padrão." : "Respostas automáticas pausadas neste WhatsApp."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -487,7 +487,7 @@ function AgentWhatsAppAssignments({
                       }
                       assign.mutate({ numberId: number.id, checked });
                     }}
-                    aria-label={`Associar ${number.display_name || number.phone_e164 || "WhatsApp"} a ${agentName}`}
+                    aria-label={`Activar respostas automáticas de ${number.display_name || number.phone_e164 || "WhatsApp"} para ${agentName}`}
                   />
                 </div>
               </div>
@@ -667,8 +667,7 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
         && Boolean(payload["personality"]?.trim() && payload["company_name"]?.trim());
-      const updatePayload: Record<string, unknown> = { ...payload };
-      if (autoActivate) updatePayload["is_active"] = true;
+      const updatePayload = { ...payload, ...(autoActivate ? { is_active: true } : {}) };
       const { error } = await supabase
         .from("ai_agents")
         .update(updatePayload)
