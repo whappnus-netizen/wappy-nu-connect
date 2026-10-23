@@ -440,6 +440,7 @@ function AgentWhatsAppAssignments({
     onSuccess: () => {
       toast.success("Associação e respostas automáticas actualizadas.");
       void qc.invalidateQueries({ queryKey: ["agent-whatsapp-assignments", orgId] });
+      void qc.invalidateQueries({ queryKey: ["agent-whatsapp-numbers", orgId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
