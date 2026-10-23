@@ -671,7 +671,7 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
       // A primeira configuração válida activa o agente automaticamente.
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
-        && Boolean(payload["personality"]?.trim() && payload["company_name"]?.trim());
+        && Boolean(payload["personality"]?.trim());
       const updatePayload = { ...payload, ...(autoActivate ? { is_active: true } : {}) };
       const { error } = await supabase
         .from("ai_agents")
