@@ -58,6 +58,8 @@ type NumberRow = {
   provider: string | null;
   phone_number_id: string | null;
   phone_e164: string;
+  status: string;
+  ai_enabled: boolean;
 };
 
 /** Carrega o número (e por consequência a organização) de forma segura. */
@@ -65,7 +67,7 @@ async function loadNumber(whatsappNumberId: string): Promise<NumberRow> {
   const admin = serviceClient();
   const { data, error } = await admin
     .from("whatsapp_numbers")
-    .select("id, organization_id, provider, phone_number_id, phone_e164")
+    .select("id, organization_id, provider, phone_number_id, phone_e164, status, ai_enabled")
     .eq("id", whatsappNumberId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -579,15 +581,19 @@ export async function processIncomingMessage(
 
   // 12 + 13. IA automática só quando ligada na organização E na conversa,
   // e nunca quando um atendente humano assumiu a conversa.
-  const skip = currentAssignedTo && !currentAiEnabled
-    ? "human_agent"
-    : currentStatus !== "open"
-      ? "conversation_not_open"
-      : !res.auto_reply
-        ? "auto_reply_off"
-        : !currentAiEnabled
-          ? "conversation_ai_off"
-          : null;
+  const skip = !number.ai_enabled
+    ? "whatsapp_ai_off"
+    : number.status !== "connected"
+      ? "whatsapp_not_connected"
+      : currentAssignedTo && !currentAiEnabled
+        ? "human_agent"
+        : currentStatus !== "open"
+          ? "conversation_not_open"
+          : !res.auto_reply
+            ? "auto_reply_off"
+            : !currentAiEnabled
+              ? "conversation_ai_off"
+              : null;
 
   if (skip) {
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
