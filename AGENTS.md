@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+ 
+Landing media is selected from an explicit public-file inventory with safe fallbacks; absent optional uploads must never produce broken requests.
