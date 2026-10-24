@@ -40,21 +40,20 @@ export function PremiumLanding() {
           <div className="mt-8 flex flex-col gap-3 min-[420px]:flex-row"><Button asChild size="lg" className="hero-primary-btn h-[54px] rounded-xl px-6 text-sm font-bold"><Link to="/auth/registo">Criar conta grátis <ArrowRight className="ml-2 size-4"/></Link></Button><Button asChild size="lg" variant="outline" className="h-[54px] rounded-xl border-white/15 bg-white/[.035] px-6 text-sm text-white transition hover:border-emerald-300/40 hover:bg-white/[.07] hover:text-white"><a href="#plataforma">Ver como funciona <ChevronDown className="ml-2 size-4"/></a></Button></div>
           <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2.5 text-[11px] text-slate-400 sm:text-xs">{["Teste grátis durante 7 dias","Planos em Kwanza","Sem cartão para começar"].map(t=><span key={t} className="inline-flex items-center gap-1.5"><CircleCheck className="size-4 text-emerald-300"/>{t}</span>)}</div>
         </div>
-        <div className="hero-visual relative mx-auto mt-2 w-full max-w-[660px] lg:mt-0 lg:min-h-[610px]">
-          <div className="character-light absolute inset-x-[12%] bottom-[4%] top-[8%] rounded-full"/>
-          <div className="character-ring absolute right-[4%] top-[7%] aspect-square w-[90%] rounded-full"/>
-          <div className="hero-media-frame relative z-10 mx-auto w-full overflow-hidden rounded-[28px] border border-emerald-200/20 bg-[#0a1712] shadow-[0_30px_90px_-35px_rgba(16,185,129,.35)]">
-            <video className="hero-demo-video absolute inset-0 h-full w-full object-cover" src="/media/hero-whappnus.mp4" autoPlay muted loop playsInline preload="metadata" aria-label="Demonstração visual da WhappNus" onError={(event)=>{event.currentTarget.style.display="none";}} />
-            <img className="hero-video-fallback block aspect-[4/5] w-full object-cover sm:aspect-[5/4]" src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=1100&q=85" alt="Profissional a utilizar tecnologia para comunicar com clientes" fetchPriority="high" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#04100b]/80 via-transparent to-[#04100b]/10"/>
-            <div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/15 bg-[#07100d]/85 p-4 backdrop-blur-xl sm:bottom-5 sm:left-5 sm:right-5"><p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-300">WHAPPNUS · Atendimento inteligente</p><p className="mt-1.5 text-sm font-semibold text-white sm:text-base">Da primeira mensagem à próxima oportunidade.</p></div>
+        <div className="hero-visual relative mx-auto mt-2 w-full max-w-[660px] lg:mt-0 lg:min-h-[560px]">
+          <div className="hero-media-frame relative z-10 mx-auto aspect-[4/5] w-full overflow-hidden bg-[#07100d] sm:aspect-[5/4]">
+            <video className="hero-demo-video absolute inset-0 h-full w-full object-cover" src="/media/hero-whappnus.mp4" autoPlay muted loop playsInline preload="metadata" aria-label="Vídeo de apresentação da plataforma WHAPPNUS" onError={(event)=>{event.currentTarget.style.display="none";}} />
+            <div className="hero-video-fallback absolute inset-0 flex flex-col justify-end p-6 sm:p-8">
+              <div className="hero-video-orbit pointer-events-none absolute inset-[12%] rounded-full"/>
+              <div className="relative z-10 max-w-sm">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-emerald-200"><span className="size-1.5 rounded-full bg-emerald-300"/> WHAPPNUS</span>
+                <p className="mt-4 text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl">Conversas que aproximam. <span className="text-emerald-300">Atendimento que evolui.</span></p>
+                <p className="mt-3 text-sm leading-6 text-slate-300">O seu negócio, o seu conhecimento e uma IA preparada para atender melhor.</p>
+              </div>
+            </div>
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#04100b]/10 via-transparent to-[#04100b]/70"/>
           </div>
-          <div className="hero-image-blend pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[24%]"/>
-          <div className="hero-whatsapp absolute right-[5%] top-[12%] z-20 flex size-12 items-center justify-center rounded-2xl border border-emerald-100/20 bg-[#0b241b]/90 text-emerald-300 shadow-[0_0_35px_rgba(16,185,129,.22)] sm:right-[11%] sm:size-14"><MessageCircle className="size-6 sm:size-7"/></div>
-          <FloatingNote className="left-[-1%] top-[24%] float-delay-one" icon={Zap} title="Atendimento 24h" detail="Mais conversas acompanhadas"/>
-          <FloatingNote className="right-[-1%] top-[43%] float-delay-two" icon={Bot} title="Assistente inteligente" detail="Respostas com contexto"/>
-          <div className="absolute bottom-[12%] left-[2%] z-20 hidden rounded-2xl border border-white/10 bg-[#0a1712]/90 p-4 shadow-2xl backdrop-blur-xl sm:block"><div className="flex items-center gap-2"><span className="flex size-8 items-center justify-center rounded-lg bg-emerald-300/10 text-emerald-300"><Headphones className="size-4"/></span><div><p className="text-[11px] font-semibold text-white">Equipa alinhada</p><p className="mt-0.5 text-[10px] text-slate-400">Cada conversa tem contexto</p></div><Check className="ml-2 size-4 text-emerald-300"/></div></div>
-          <div className="absolute bottom-[7%] right-[2%] z-20 rounded-xl border border-emerald-200/15 bg-[#0a2119]/90 px-3 py-2.5 shadow-xl backdrop-blur-xl"><p className="flex items-center gap-2 text-[10px] font-semibold text-emerald-100"><span className="size-1.5 rounded-full bg-emerald-300"/> Fluxo organizado</p></div>
+        </div>
         </div>
       </div>
       <div className="hero-bottom-line mx-auto h-px max-w-[1320px]"/>
