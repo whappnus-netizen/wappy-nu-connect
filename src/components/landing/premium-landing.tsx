@@ -54,7 +54,6 @@ export function PremiumLanding() {
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#04100b]/10 via-transparent to-[#04100b]/70"/>
           </div>
         </div>
-        </div>
       </div>
       <div className="hero-bottom-line mx-auto h-px max-w-[1320px]"/>
     </section>
