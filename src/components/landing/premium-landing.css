@@ -35,3 +35,14 @@
 @media(min-width:1024px){.hero-visual{min-height:610px}.hero-woman{object-position:center 20%}}
 @media(max-width:639px){.hero-visual{min-height:330px}.hero-woman{height:355px;object-position:center 24%;max-width:100%}.hero-image-blend{height:19%}.globe-scene{max-width:440px;margin-top:-.5rem}.globe-sphere{inset:9%}.globe-scene>div:nth-last-child(2){right:0}.hero-copy h1{letter-spacing:-.055em}.hero-stage .mx-auto.grid{gap:1.5rem}}
 @media(prefers-reduced-motion:reduce){.whappnus-landing *, .whappnus-landing *::before,.whappnus-landing *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+/* Premium landing refresh: media-led editorial sections and reliable responsive fallbacks */
+.hero-media-frame{aspect-ratio:5/4;isolation:isolate}
+.hero-demo-video{z-index:1}
+.hero-video-fallback{position:relative;z-index:0;filter:saturate(.82) contrast(1.04)}
+.hero-media-frame:has(.hero-demo-video[style*="display: none"]) .hero-video-fallback{z-index:2}
+.connection-image-frame,.getting-started-visual{box-shadow:0 24px 80px -42px rgba(16,185,129,.22)}
+.connection-image-frame img,.getting-started-visual img{transition:transform .7s cubic-bezier(.2,.7,.2,1)}
+.connection-image-frame:hover img,.getting-started-visual:hover img{transform:scale(1.025)}
+.business-flow-visual{isolation:isolate}
+@media(max-width:639px){.hero-media-frame{aspect-ratio:4/5}.hero-video-fallback{height:100%;position:absolute;inset:0}.hero-media-frame:has(.hero-demo-video[style*="display: none"]) .hero-video-fallback{position:relative}.business-flow-visual{padding:1rem}}
