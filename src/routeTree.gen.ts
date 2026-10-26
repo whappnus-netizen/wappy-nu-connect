@@ -245,6 +245,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/parcerias': typeof AuthenticatedParceriasRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
+  '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -341,6 +342,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/parcerias'
     | '/whatsapp'
+    | '/pagamentos'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
