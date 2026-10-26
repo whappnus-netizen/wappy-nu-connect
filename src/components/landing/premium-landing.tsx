@@ -1,4 +1,6 @@
-import { ArrowRight, ArrowUpRight, Bot, Check, ChevronDown, CircleCheck, MessagesSquare, ShieldCheck, Smartphone, Sparkles, Users, Workflow, KanbanSquare, Clock3, Menu, MoveUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Bot, Check, ChevronDown, CircleCheck, MessagesSquare, ShieldCheck, Smartphone, Sparkles, Users, Workflow, KanbanSquare, Clock3, Menu, MoveUpRight, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/app/app-shell";
 
