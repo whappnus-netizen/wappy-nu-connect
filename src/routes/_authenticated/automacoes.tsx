@@ -113,15 +113,15 @@ function AutomationsPage() {
           }
           const file = step.file;
           if (!file) throw new Error("Escolha um ficheiro para cada etapa de mídia.");
-          const allowedMime = step.kind === "image" ? file.type.startsWith("image/") : step.kind === "audio" ? file.type.startsWith("audio/") : step.kind === "video" ? file.type.startsWith("video/") : step.kind === "document" ? true : false;
+          // Alguns navegadores não preenchem File.type em todos os ficheiros; inferir pelo sufixo conhecido.
+          const extension = file.name.toLowerCase().split(".").pop() ?? "";
+          const inferredMimeTypes: Record<string, string> = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", txt: "text/plain", csv: "text/csv", zip: "application/zip", mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", "3gp": "video/3gpp", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", ogg: "audio/ogg", mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac", amr: "audio/amr" };
+          const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || inferredMimeTypes[extension] || "application/octet-stream";
+          const allowedMime = step.kind === "image" ? mimeType.startsWith("image/") : step.kind === "audio" ? mimeType.startsWith("audio/") : step.kind === "video" ? mimeType.startsWith("video/") : step.kind === "document" ? true : false;
           if (!allowedMime) throw new Error(`Escolha um ficheiro ${step.kind} válido.`);
           if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("Cada ficheiro deve ter até 20 MB.");
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || (step.kind === "image" ? "imagem" : step.kind === "audio" ? "audio" : step.kind === "video" ? "video" : "documento");
           const storagePath = `${orgId}/${crypto.randomUUID()}-${safeName}`;
-          // Supabase guarda o MIME canónico; o parâmetro ";codecs=opus" é apenas um detalhe do MediaRecorder.
-          const extension = file.name.toLowerCase().split(".").pop() ?? "";
-          const inferredMimeTypes: Record<string, string> = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", txt: "text/plain", csv: "text/csv", zip: "application/zip", mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", ogg: "audio/ogg", mp3: "audio/mpeg", wav: "audio/wav" };
-          const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || inferredMimeTypes[extension] || "application/octet-stream";
           const { error: uploadError } = await supabase.storage.from("automation-media")
             .upload(storagePath, file, { contentType: mimeType, upsert: false });
           if (uploadError) throw new Error("Falha ao carregar mídia: " + uploadError.message);
@@ -315,7 +315,7 @@ function AutomationsPage() {
                   {rule.config!.steps!.map((step, index) => (
                     <div key={step.id} className="flex items-start gap-2 rounded-md bg-background p-2">
                       <div className="min-w-0 flex-1"><p className="text-xs font-semibold uppercase tracking-wide">Etapa {index + 1} · {step.kind === "text" ? "Texto" : step.kind === "image" ? "Imagem" : step.kind === "audio" ? "Áudio" : step.kind === "video" ? "Vídeo" : "Documento"}</p>
-                        <p className="mt-1 break-words whitespace-pre-wrap text-sm">{step.kind === "text" ? (step.text || "Texto vazio") : step.kind === "image" ? (step.fileName || "Imagem guardada") + (step.caption ? " — " + step.caption : "") : (step.fileName || "Áudio guardado") + (step.durationMs ? " · " + Math.floor(step.durationMs / 60000) + ":" + String(Math.floor(step.durationMs / 1000) % 60).padStart(2, "0") : "")}</p>
+                        <p className="mt-1 break-words whitespace-pre-wrap text-sm">{step.kind === "text" ? (step.text || "Texto vazio") : (step.fileName || (step.kind === "image" ? "Imagem guardada" : step.kind === "audio" ? "Áudio guardado" : step.kind === "video" ? "Vídeo guardado" : "Documento guardado")) + (step.caption ? " — " + step.caption : "") + (step.kind === "audio" && step.durationMs ? " · " + Math.floor(step.durationMs / 60000) + ":" + String(Math.floor(step.durationMs / 1000) % 60).padStart(2, "0") : "")}</p>
                       </div>
                       <div className="flex shrink-0 gap-1">
                         <Button type="button" variant="ghost" size="sm" aria-label={`Mover etapa ${index + 1} para cima`} disabled={!canManage || index === 0 || reorderSteps.isPending} onClick={() => reorderSteps.mutate({ rule, fromIndex: index, toIndex: index - 1 })}><ArrowUp className="size-4" /></Button>
