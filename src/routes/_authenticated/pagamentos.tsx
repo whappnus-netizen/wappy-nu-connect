@@ -138,8 +138,8 @@ function PaymentsPage() {
       const note = (reviewNotes[payment.id] ?? "").trim();
       const now = new Date().toISOString();
       const patch: Record<string, unknown> = { status, review_note: note || null, updated_at: now };
-      if (status === "confirmed") { patch.confirmed_by = user.id; patch.confirmed_at = now; patch.rejected_by = null; patch.rejected_at = null; }
-      if (status === "rejected" || status === "needs_review") { patch.rejected_by = status === "rejected" ? user.id : null; patch.rejected_at = status === "rejected" ? now : null; patch.confirmed_by = null; patch.confirmed_at = null; }
+      if (status === "confirmed") { patch["confirmed_by"] = user.id; patch["confirmed_at"] = now; patch["rejected_by"] = null; patch["rejected_at"] = null; }
+      if (status === "rejected" || status === "needs_review") { patch["rejected_by"] = status === "rejected" ? user.id : null; patch["rejected_at"] = status === "rejected" ? now : null; patch["confirmed_by"] = null; patch["confirmed_at"] = null; }
       const { data, error } = await supabase.from("customer_payments").update(patch).eq("id", payment.id).eq("organization_id", orgId).in("status", ["pending_review", "needs_review"]).select("id").maybeSingle();
       if (error) throw new Error(error.message);
       if (!data) throw new Error("Este pagamento já foi revisto ou não está disponível. Actualize a lista.");
