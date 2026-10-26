@@ -623,6 +623,55 @@ export async function processIncomingMessage(
     return { ...base, aiReplied: false, aiSkippedReason: "rate_limited" };
   }
 
+  // Respostas determinísticas sobre pagamentos registados: nunca inferir pagamento apenas pelo comprovativo.
+  const paymentQuestion = /\b(pagamento|pagamentos|transfer[eê]ncia|comprovativo|recibo|j[aá] paguei|foi pago|foi confirmado|confirmaram|receberam o valor|valor recebido|estado do pagamento|status do pagamento|liquidado|liquida[cç][aã]o)\b/i.test(incoming.body ?? "");
+  if (paymentQuestion && (res.contact_id || res.conversation_id)) {
+    const paymentQuery = admin.from("customer_payments")
+      .select("status,amount_aoa,description,reference,received_at,confirmed_at")
+      .eq("organization_id", number.organization_id)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    if (res.contact_id) paymentQuery.eq("contact_id", res.contact_id);
+    else paymentQuery.eq("conversation_id", res.conversation_id!);
+    const paymentResult = await paymentQuery;
+    if (paymentResult.error) {
+      await logWhatsAppEvent(number.organization_id, "error", {
+        whatsappNumberId: number.id, provider: incoming.provider,
+        detail: { stage: "customer_payment_lookup", error: paymentResult.error.message.slice(0, 200) },
+      });
+    } else if ((paymentResult.data ?? []).length > 0) {
+      const latest = paymentResult.data![0] as { status: string; amount_aoa: number; description: string; reference: string | null; received_at: string; confirmed_at: string | null };
+      const amountText = new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 2 }).format(Number(latest.amount_aoa));
+      const refText = latest.reference ? " Referência: " + latest.reference + "." : "";
+      const dateText = new Date(latest.received_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" });
+      const responseText = latest.status === "confirmed"
+        ? "Confirmamos que o pagamento de " + amountText + " (" + latest.description + ") consta como confirmado no nosso registo." + refText
+        : latest.status === "pending_review"
+          ? "Encontrámos o registo do pagamento de " + amountText + " (" + latest.description + "), recebido em " + dateText + ", mas ainda está pendente de verificação. O comprovativo, por si só, não significa que o valor já foi confirmado." + refText
+          : latest.status === "needs_review"
+            ? "O pagamento de " + amountText + " (" + latest.description + ") está em revisão adicional. A equipa irá verificar e actualizar o estado." + refText
+            : latest.status === "rejected"
+              ? "O registo do pagamento de " + amountText + " (" + latest.description + ") foi rejeitado após revisão." + (latest.reference ? " Referência: " + latest.reference + "." : "") + " Contacte a equipa se precisar de esclarecer o motivo."
+              : latest.status === "refunded"
+                ? "O pagamento de " + amountText + " (" + latest.description + ") consta como reembolsado no nosso registo." + refText
+                : latest.status === "cancelled"
+                  ? "O registo do pagamento de " + amountText + " (" + latest.description + ") consta como cancelado." + refText
+                  : "O pagamento de " + amountText + " consta como " + latest.status + " no nosso registo." + refText;
+      await sendOutgoingMessage({
+        organizationId: number.organization_id, whatsappNumberId: number.id,
+        conversationId: res.conversation_id, body: responseText, isAi: true,
+      });
+      return { ...base, aiReplied: true };
+    } else {
+      const responseText = "Não encontrei um pagamento registado associado a esta conversa. Para a equipa confirmar, envie a referência da transferência ou o comprovativo. O pagamento só será confirmado depois de a equipa verificar a entrada do valor.";
+      await sendOutgoingMessage({
+        organizationId: number.organization_id, whatsappNumberId: number.id,
+        conversationId: res.conversation_id, body: responseText, isAi: true,
+      });
+      return { ...base, aiReplied: true };
+    }
+  }
+
   try {
     const ai = await generateViaWhappNusAI({
       organizationId: number.organization_id,
