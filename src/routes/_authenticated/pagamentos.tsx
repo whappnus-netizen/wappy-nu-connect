@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
-import { CheckCircle2, Clock3, FileImage, FileText, Search, ShieldAlert, XCircle, ReceiptText } from "lucide-react";
+import { CheckCircle2, Clock3, FileImage, Search, ShieldAlert, XCircle, ReceiptText } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pagamentos")({
   head: () => ({ meta: [{ title: "Pagamentos — WHAPPNUS" }, { name: "description", content: "Registe, reveja e acompanhe pagamentos dos seus clientes." }] }),
@@ -202,6 +203,6 @@ function PaymentsPage() {
   );
 }
 
-function Metric({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: React.ReactNode }) {
+function Metric({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: ReactNode }) {
   return <div className="rounded-xl border border-border bg-card p-4"><div className="flex items-center justify-between text-muted-foreground"><span className="text-sm">{title}</span>{icon}</div><p className="mt-3 font-display text-2xl font-semibold">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
 }
