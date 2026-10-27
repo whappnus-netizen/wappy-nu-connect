@@ -13,9 +13,9 @@ const features = [
   { icon: ShieldCheck, n: "06", title: "Controlo para crescer com confiança", text: "Espaços de trabalho e permissões ajudam a manter a operação organizada à medida que cresce." },
 ];
 const plans = [
-  { name: "Start", price: "10.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 conversas com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
-  { name: "Pro", price: "25.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 conversas com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
-  { name: "Premium", price: "45.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 conversas com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
+  { name: "Start", price: "10.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
+  { name: "Pro", price: "25.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
+  { name: "Premium", price: "45.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
 ];
 
 export function PremiumLanding() {
