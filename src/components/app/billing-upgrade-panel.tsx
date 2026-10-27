@@ -15,9 +15,9 @@ const money = (value: number) => new Intl.NumberFormat("pt-AO", { style: "curren
 const planStatus: Record<string, string> = { active: "Ativo", trialing: "Teste gratuito", expired: "Expirado", suspended: "Suspenso" };
 const featuresFor = (code: string) => {
   const key = code.toLowerCase();
-  if (key.includes("premium") || key.includes("45")) return ["4 números WhatsApp", "4 agentes IA", "10.000 conversas com IA/mês", "15 automações activas", "Até 9 membros adicionais", "Inbox, CRM e ferramentas essenciais"];
-  if (key.includes("pro") || key.includes("25")) return ["2 números WhatsApp", "2 agentes IA", "4.000 conversas com IA/mês", "5 automações activas", "Até 3 membros adicionais", "Inbox, CRM e ferramentas essenciais"];
-  return ["1 número WhatsApp", "1 agente IA", "1.500 conversas com IA/mês", "2 automações activas", "1 membro adicional", "Inbox, CRM e ferramentas essenciais"];
+  if (key.includes("premium") || key.includes("45")) return ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais", "Inbox, CRM e ferramentas essenciais"];
+  if (key.includes("pro") || key.includes("25")) return ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais", "Inbox, CRM e ferramentas essenciais"];
+  return ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "1 membro adicional", "Inbox, CRM e ferramentas essenciais"];
 };
 
 export function BillingUpgradePanel({ organizationId }: { organizationId: string | undefined }) {
