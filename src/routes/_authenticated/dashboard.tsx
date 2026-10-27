@@ -98,12 +98,12 @@ function DashboardPage() {
       if (subscriptionResult.error) throw new Error(subscriptionResult.error.message);
       if (orgResult.error) throw new Error(orgResult.error.message);
       let usageQuery = supabase.from("ai_credit_ledger").select("id", { count: "exact", head: true })
-        .eq("organization_id", orgId!).eq("reason", "ai_conversation");
+        .eq("organization_id", orgId!).eq("reason", "ai_message");
       if (subscriptionResult.data?.current_period_start) usageQuery = usageQuery.gte("created_at", subscriptionResult.data.current_period_start);
       if (subscriptionResult.data?.current_period_end) usageQuery = usageQuery.lt("created_at", subscriptionResult.data.current_period_end);
       const usageResult = await usageQuery;
       if (usageResult.error) throw new Error(usageResult.error.message);
-      return { subscription: subscriptionResult.data, organization: orgResult.data, usedConversations: usageResult.count ?? 0 };
+      return { subscription: subscriptionResult.data, organization: orgResult.data, usedMessages: usageResult.count ?? 0 };
     },
   });
 
@@ -165,8 +165,8 @@ function DashboardPage() {
         const expired = Boolean(periodEnd && periodEnd.getTime() <= Date.now());
         const suspended = !subscription || !["active", "trialing"].includes(subscription.status) || expired || ["suspended", "blocked", "cancelled"].includes(organization?.status ?? "");
         const plan = subscription?.subscription_plans as { name?: string; code?: string; price_aoa?: number; limits?: Record<string, unknown>; features?: Record<string, boolean> } | null;
-        const limit = Number(plan?.limits?.["ai_conversations_monthly"] ?? 0);
-        const used = Number(subscriptionData.usedConversations ?? 0);
+        const limit = Number(plan?.limits?.["ai_messages_monthly"] ?? 0);
+        const used = Number(subscriptionData.usedMessages ?? 0);
         const progress = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
         return <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-soft">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -174,12 +174,12 @@ function DashboardPage() {
               <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
               <p className="mt-1 text-sm font-semibold text-primary">{new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(Number(subscription?.amount_aoa ?? plan?.price_aoa ?? 0))} / mês</p>
 
-              <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de conversas com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de mensagens com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
             </div>
             <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
           </div>
           <div className="mt-5">
-            <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Conversas com IA neste período</span><span className="font-semibold tabular-nums">{used.toLocaleString("pt-PT")} / {limit.toLocaleString("pt-PT")}</span></div>
+            <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Mensagens com IA neste período</span><span className="font-semibold tabular-nums">{used.toLocaleString("pt-PT")} / {limit.toLocaleString("pt-PT")}</span></div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-all" style={{ width: progress + "%" }} /></div>
             <p className="mt-2 text-xs text-muted-foreground">O histórico, os contactos e as oportunidades existentes permanecem guardados mesmo quando o período termina.</p>
           {Object.entries((plan?.features ?? {}) as Record<string, unknown>).some(([, enabled]) => enabled === true) && (
