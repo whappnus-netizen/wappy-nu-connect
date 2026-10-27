@@ -156,6 +156,20 @@ export const qrProvider: WhatsAppProvider = {
     );
   },
 
+  async markIncomingRead(input: SessionRef & { to: string; waMessageId: string }): Promise<void> {
+    await bridgeFetch(
+      `/sessions/${encodeURIComponent(qrSessionKey(input))}/read`,
+      { method: "POST", body: { to: input.to, waMessageId: input.waMessageId } },
+    );
+  },
+
+  async showTypingIndicator(input: SessionRef & { to: string; waMessageId: string }): Promise<void> {
+    await bridgeFetch(
+      `/sessions/${encodeURIComponent(qrSessionKey(input))}/presence`,
+      { method: "POST", body: { to: input.to, state: "composing" } },
+    );
+  },
+
   async getConnectionStatus(ref: SessionRef): Promise<StatusResult> {
     const s = await bridgeFetch<BridgeSession>(
       `/sessions/${encodeURIComponent(qrSessionKey(ref))}`,
