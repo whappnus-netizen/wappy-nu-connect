@@ -623,6 +623,53 @@ export async function processIncomingMessage(
     return { ...base, aiReplied: false, aiSkippedReason: "rate_limited" };
   }
 
+  const replyPacingLevel = await loadReplyPacingLevel(admin, number.organization_id, number.id);
+  const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
+  let inboundMeta: { phoneNumberId: string; token: string } | undefined;
+  if (number.provider !== "qr" && number.phone_number_id) {
+    try {
+      const { metaTokenForNumber } = await import("../whatsapp.server");
+      inboundMeta = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
+    } catch (error) {
+      console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
+    }
+  }
+
+  // Mark as read before model inference so the customer sees acknowledgement while the reply is prepared.
+  try {
+    await replyProvider.markIncomingRead?.({
+      organizationId: number.organization_id,
+      whatsappNumberId: number.id,
+      to: incoming.fromWaId,
+      waMessageId: incoming.waMessageId,
+      ...(inboundMeta ? { meta: inboundMeta } : {}),
+    });
+  } catch (error) {
+    await logWhatsAppEvent(number.organization_id, "error", {
+      whatsappNumberId: number.id, provider: incoming.provider,
+      detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
+    });
+  }
+
+  const showTypingAndPace = async (text: string) => {
+    try {
+      await replyProvider.showTypingIndicator?.({
+        organizationId: number.organization_id,
+        whatsappNumberId: number.id,
+        to: incoming.fromWaId,
+        waMessageId: incoming.waMessageId,
+        ...(inboundMeta ? { meta: inboundMeta } : {}),
+      });
+    } catch (error) {
+      await logWhatsAppEvent(number.organization_id, "error", {
+        whatsappNumberId: number.id, provider: incoming.provider,
+        detail: { stage: "typing_indicator", error: (error as Error).message.slice(0, 200) },
+      });
+    }
+    const delayMs = calculateReplyPacingDelayMs(text, replyPacingLevel);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  };
+
   // Respostas determinísticas sobre pagamentos registados: nunca inferir pagamento apenas pelo comprovativo.
   const paymentQuestion = /\b(pagamento|pagamentos|transfer[eê]ncia|comprovativo|recibo|j[aá] paguei|foi pago|foi confirmado|confirmaram|receberam o valor|valor recebido|estado do pagamento|status do pagamento|liquidado|liquida[cç][aã]o)\b/i.test(incoming.body ?? "");
   if (paymentQuestion && (res.contact_id || res.conversation_id)) {
@@ -657,6 +704,7 @@ export async function processIncomingMessage(
                 : latest.status === "cancelled"
                   ? "O registo do pagamento de " + amountText + " (" + latest.description + ") consta como cancelado." + refText
                   : "O pagamento de " + amountText + " consta como " + latest.status + " no nosso registo." + refText;
+      await showTypingAndPace(responseText);
       await sendOutgoingMessage({
         organizationId: number.organization_id, whatsappNumberId: number.id,
         conversationId: res.conversation_id, body: responseText, isAi: true,
@@ -664,6 +712,7 @@ export async function processIncomingMessage(
       return { ...base, aiReplied: true };
     } else {
       const responseText = "Não encontrei um pagamento registado associado a esta conversa. Para a equipa confirmar, envie a referência da transferência ou o comprovativo. O pagamento só será confirmado depois de a equipa verificar a entrada do valor.";
+      await showTypingAndPace(responseText);
       await sendOutgoingMessage({
         organizationId: number.organization_id, whatsappNumberId: number.id,
         conversationId: res.conversation_id, body: responseText, isAi: true,
@@ -688,6 +737,7 @@ export async function processIncomingMessage(
         : null,
       mediaMimeType: incoming.mediaMimeType ?? null,
     });
+    await showTypingAndPace(ai.text);
     await sendOutgoingMessage({
       organizationId: number.organization_id,
       whatsappNumberId: number.id,
@@ -730,6 +780,41 @@ export async function conversationHistory(
     }))
     .filter((m) => m.content.length > 0)
     .slice(0, -1);
+}
+
+async function loadReplyPacingLevel(
+  admin: ReturnType<typeof serviceClient>,
+  organizationId: string,
+  whatsappNumberId: string,
+): Promise<number> {
+  try {
+    const { data: assignment } = await admin.from("ai_agent_whatsapp_numbers")
+      .select("agent_id").eq("organization_id", organizationId)
+      .eq("whatsapp_number_id", whatsappNumberId).maybeSingle();
+    let query = admin.from("ai_agents").select("config")
+      .eq("organization_id", organizationId).eq("is_active", true);
+    if (assignment?.agent_id) query = query.eq("id", assignment.agent_id);
+    else query = query.order("created_at", { ascending: true }).limit(1);
+    const { data: agent } = await query.maybeSingle();
+    const config = agent?.config && typeof agent.config === "object"
+      ? agent.config as Record<string, unknown>
+      : {};
+    const value = config["replyPacingLevel"];
+    return typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, Math.min(10, Math.round(value)))
+      : 5;
+  } catch {
+    return 5;
+  }
+}
+
+function calculateReplyPacingDelayMs(text: string, level: number): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  // UX pacing only: bounded delay based on reply length and the customer's selected rhythm.
+  // Keep well below WhatsApp's 25-second typing-indicator expiry.
+  const perWordMs = 65 + Math.max(0, Math.min(10, level)) * 24;
+  const jitterMs = 250 + Math.random() * 750;
+  return Math.min(10_000, Math.max(900, 350 + Math.min(words, 100) * perWordMs + jitterMs));
 }
 
 /**
