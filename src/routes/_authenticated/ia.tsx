@@ -1097,7 +1097,7 @@ function PdfUploadPanel({ orgId, agentId, canManage }: { orgId: string; agentId:
           const part = extracted.slice(offset, offset + size).trim();
           if (part) chunks.push({
             organization_id: orgId, agent_id: agentId, source_document_id: documentId,
-            title: `${file.name} — trecho ${chunks.length + 1}`, content: part, category: "documento_pdf",
+            title: `${file.name} — trecho ${chunks.length + 1}`, content: part, category: "geral",
           });
         }
         const { error: chunkError } = await supabase.from("ai_knowledge").insert(chunks);
