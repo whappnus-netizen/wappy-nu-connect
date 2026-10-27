@@ -139,6 +139,7 @@ export interface WhatsAppProvider {
 // ---------------------------------------------------------------------------
 
 const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH_TYPING = "https://graph.facebook.com/v25.0";
 
 function graphError(json: Record<string, unknown>, status: number): Error {
   const message =
@@ -283,7 +284,7 @@ export const metaProvider: WhatsAppProvider = {
 
   async showTypingIndicator({ meta, waMessageId }) {
     if (!meta) throw new Error("Cloud API: phoneNumberId e token são obrigatórios para mostrar o indicador de escrita.");
-    const res = await fetch(`${GRAPH}/${meta.phoneNumberId}/messages`, {
+    const res = await fetch(`${GRAPH_TYPING}/${meta.phoneNumberId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${meta.token}`, "content-type": "application/json" },
       body: JSON.stringify({
