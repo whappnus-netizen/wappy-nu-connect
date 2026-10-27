@@ -167,6 +167,7 @@ function DashboardPage() {
         const plan = subscription?.subscription_plans as { name?: string; code?: string; price_aoa?: number; limits?: Record<string, unknown>; features?: Record<string, boolean> } | null;
         const limit = Number(plan?.limits?.["ai_messages_monthly"] ?? 0);
         const used = Number(subscriptionData.usedMessages ?? 0);
+        const allowanceExhausted = limit > 0 && used >= limit;
         const progress = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
         return <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-soft">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -174,9 +175,9 @@ function DashboardPage() {
               <h2 className="mt-1 font-display text-lg font-bold">{plan?.name ?? "Sem plano associado"}</h2>
               <p className="mt-1 text-sm font-semibold text-primary">{new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 0 }).format(Number(subscription?.amount_aoa ?? plan?.price_aoa ?? 0))} / mês</p>
 
-              <p className="mt-1 text-sm text-muted-foreground">{suspended ? (organization?.suspension_reason === "ai_conversations_exhausted" ? "Limite de mensagens com IA atingido" : expired ? "Período terminado" : "Acesso suspenso pelo administrador") : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{suspended ? (expired ? "Período terminado" : "Acesso suspenso pelo administrador") : allowanceExhausted ? "Limite de mensagens com IA atingido. O histórico, os contactos, o CRM e as oportunidades continuam disponíveis." : periodEnd ? "Válido até " + periodEnd.toLocaleDateString("pt-PT") : "Estado da assinatura: " + (subscription?.status ?? "não configurada")}</p>
             </div>
-            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
+            <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold ${suspended ? "bg-destructive/10 text-destructive" : allowanceExhausted ? "bg-amber-500/10 text-amber-700" : "bg-primary/10 text-primary"}`}>{suspended ? "Acesso limitado" : allowanceExhausted ? "Limite de IA atingido" : subscription?.status === "trialing" ? "Teste grátis activo" : "Assinatura activa"}</span>
           </div>
           <div className="mt-5">
             <div className="flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">Mensagens com IA neste período</span><span className="font-semibold tabular-nums">{used.toLocaleString("pt-PT")} / {limit.toLocaleString("pt-PT")}</span></div>
