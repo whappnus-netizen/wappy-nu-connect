@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase/client";
 export type PlanLimits = {
   whatsapp_numbers?: number;
   agents?: number;
-  ai_conversations_monthly?: number;
+  ai_messages_monthly?: number;
   automations?: number;
   team_members?: number;
 };
