@@ -58,6 +58,8 @@ export type SendMessageInput = SessionRef & {
   to: string;
   body: string;
   media?: OutgoingMedia;
+  /** Optional bounded typing-indicator duration, in milliseconds, for QR sessions. */
+  presenceDelayMs?: number;
   /** Só o provedor Meta usa estes campos. */
   meta?: { phoneNumberId: string; token: string } | undefined;
 };
