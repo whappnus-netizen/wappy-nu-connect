@@ -144,7 +144,7 @@ export const qrProvider: WhatsAppProvider = {
   async sendMessage(input: SendMessageInput): Promise<SendResult> {
     const out = await bridgeFetch<{ waMessageId?: string | null }>(
       `/sessions/${encodeURIComponent(qrSessionKey(input))}/messages`,
-      { method: "POST", body: { to: input.to, body: input.body, media: input.media } },
+      { method: "POST", body: { to: input.to, body: input.body, media: input.media, presenceDelayMs: input.presenceDelayMs } },
     );
     return { waMessageId: out.waMessageId ?? null, provider: "qr" };
   },
