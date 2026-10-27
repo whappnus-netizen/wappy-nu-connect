@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -67,7 +66,6 @@ type Agent = {
   handoff_instructions: string | null;
   greeting_message: string | null;
   extra_instructions: string | null;
-  config: Record<string, unknown> | null;
 };
 
 type Knowledge = {
@@ -89,7 +87,7 @@ type Example = {
 const AGENT_FIELDS = [
   "id, organization_id, name, model, is_active, goal, personality, company_name, company_description",
   "products_services, business_hours, location, payment_methods, faq, tone",
-  "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions, config",
+  "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions",
 ].join(", ");
 
 const CATEGORIES = [
@@ -637,7 +635,6 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
   const qc = useQueryClient();
   const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
-  const [replyPacingLevel, setReplyPacingLevel] = useState(5);
   const [recordingField, setRecordingField] = useState<string | null>(null);
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [organizingField, setOrganizingField] = useState<string | null>(null);
@@ -648,8 +645,6 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
-    const savedPacing = agent.config?.["replyPacingLevel"];
-    setReplyPacingLevel(typeof savedPacing === "number" && Number.isFinite(savedPacing) ? Math.max(0, Math.min(10, Math.round(savedPacing))) : 5);
     recordingFieldRef.current = null;
     setRecordingField(null);
     setTranscriptPreview("");
@@ -677,11 +672,7 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
         && Boolean(payload["personality"]?.trim());
-      const updatePayload = {
-        ...payload,
-        config: { ...(agent.config ?? {}), replyPacingLevel },
-        ...(autoActivate ? { is_active: true } : {}),
-      };
+      const updatePayload = { ...payload, ...(autoActivate ? { is_active: true } : {}) };
       const { error } = await supabase
         .from("ai_agents")
         .update(updatePayload)
@@ -903,34 +894,6 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
           </div>
         ))}
       </div>
-      <section className="space-y-4 rounded-lg border border-border bg-card p-4 sm:p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <Label htmlFor="reply-pacing">Ritmo de resposta no WhatsApp</Label>
-            <p className="text-sm text-muted-foreground">
-              Controla a duração da indicação “a escrever…” antes de a resposta ser enviada. A mensagem é marcada como lida quando o sistema começa a preparar a resposta.
-            </p>
-          </div>
-          <span className="shrink-0 rounded-md bg-secondary px-3 py-1 text-sm font-medium">{replyPacingLevel}/10</span>
-        </div>
-        <Slider
-          id="reply-pacing"
-          min={0}
-          max={10}
-          step={1}
-          value={[replyPacingLevel]}
-          onValueChange={(values) => setReplyPacingLevel(values[0] ?? 5)}
-          aria-label="Ritmo de resposta no WhatsApp"
-        />
-        <div className="flex justify-between gap-3 text-xs text-muted-foreground">
-          <span>Mais rápido</span>
-          <span>Padrão recomendado: 5</span>
-          <span>Mais pausado</span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          O tempo varia moderadamente com o tamanho da resposta e tem um limite máximo para não deixar o cliente à espera. Esta definição não altera o conteúdo da resposta.
-        </p>
-      </section>
       <p className="rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">Dica: pode ditar instruções longas e depois usar “Organizar com IA”. O texto será estruturado sem inventar preços, políticas ou informações que não forneceu. Revê sempre o resultado antes de guardar.</p>
       <Button type="submit" disabled={save.isPending}>
         {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
