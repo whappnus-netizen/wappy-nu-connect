@@ -400,7 +400,7 @@ Deno.serve(async (req: Request) => {
         const metadata = authUser?.user_metadata ?? {};
         const periodStart = s.current_period_start ?? s.starts_at ?? s.created_at;
         let usageQuery = db.from("ai_credit_ledger").select("id", { count: "exact", head: true })
-          .eq("organization_id", s.organization_id).eq("reason", "ai_conversation");
+          .eq("organization_id", s.organization_id).eq("reason", "ai_message");
         if (periodStart) usageQuery = usageQuery.gte("created_at", periodStart);
         if (s.current_period_end) usageQuery = usageQuery.lt("created_at", s.current_period_end);
         const { count: aiUsed, error: usageError } = await usageQuery;
@@ -410,8 +410,8 @@ Deno.serve(async (req: Request) => {
           client_email: profile?.email ?? authUser?.email ?? null,
           client_phone: s.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? authUser?.phone ?? null,
           days_remaining: endMs === null ? null : Math.max(0, Math.ceil((endMs - Date.now()) / 86400000)),
-          ai_conversations_used: aiUsed ?? 0,
-          ai_conversations_limit: Number(s.subscription_plans?.limits?.ai_conversations_monthly ?? 0),
+          ai_messages_used: aiUsed ?? 0,
+          ai_messages_limit: Number(s.subscription_plans?.limits?.ai_messages_monthly ?? 0),
           plan_limits: s.subscription_plans?.limits ?? {}, plan_features: s.subscription_plans?.features ?? {},
         };
       }));
@@ -526,11 +526,11 @@ Deno.serve(async (req: Request) => {
         updated_at: startsAt.toISOString(),
       }).eq("id", subscriptionId).select("id,organization_id,plan_id,status,current_period_start,current_period_end,amount_aoa").single();
       if (error) throw error;
-      const conversationLimit = Number((plan.limits as Record<string, unknown> | null)?.["ai_conversations_monthly"] ?? 0);
+      const messageLimit = Number((plan.limits as Record<string, unknown> | null)?.["ai_messages_monthly"] ?? 0);
       const { error: creditError } = await db.from("ai_credit_accounts").upsert({
         organization_id: before.organization_id,
-        balance: conversationLimit,
-        monthly_limit: conversationLimit,
+        balance: messageLimit,
+        monthly_limit: messageLimit,
         updated_at: startsAt.toISOString(),
       }, { onConflict: "organization_id" });
       if (creditError) throw creditError;
