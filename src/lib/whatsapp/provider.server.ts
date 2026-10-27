@@ -120,6 +120,18 @@ export interface WhatsAppProvider {
     body: string;
   }): Promise<SendResult>;
   markRead?(phoneNumberId: string, token: string, waMessageId: string): Promise<void>;
+  /** Mark an inbound message as read when an automatic reply is about to be prepared. */
+  markIncomingRead?(input: SessionRef & {
+    to: string;
+    waMessageId: string;
+    meta?: { phoneNumberId: string; token: string } | undefined;
+  }): Promise<void>;
+  /** Display the supported WhatsApp typing indicator before an automatic reply. */
+  showTypingIndicator?(input: SessionRef & {
+    to: string;
+    waMessageId: string;
+    meta?: { phoneNumberId: string; token: string } | undefined;
+  }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +269,31 @@ export const metaProvider: WhatsAppProvider = {
     });
     const json = (await res.json()) as Record<string, unknown>;
     if (!res.ok) throw graphError(json, res.status);
+  },
+
+  async markIncomingRead({ meta, waMessageId }) {
+    if (!meta) throw new Error("Cloud API: phoneNumberId e token são obrigatórios para marcar a mensagem como lida.");
+    const res = await fetch(`${GRAPH}/${meta.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${meta.token}`, "content-type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", status: "read", message_id: waMessageId }),
+    });
+    if (!res.ok) throw graphError((await res.json()) as Record<string, unknown>, res.status);
+  },
+
+  async showTypingIndicator({ meta, waMessageId }) {
+    if (!meta) throw new Error("Cloud API: phoneNumberId e token são obrigatórios para mostrar o indicador de escrita.");
+    const res = await fetch(`${GRAPH}/${meta.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${meta.token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: waMessageId,
+        typing_indicator: { type: "text" },
+      }),
+    });
+    if (!res.ok) throw graphError((await res.json()) as Record<string, unknown>, res.status);
   },
 
   async markRead(phoneNumberId, token, waMessageId) {
