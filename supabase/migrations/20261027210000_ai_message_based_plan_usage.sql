@@ -109,3 +109,7 @@ set status='active', suspension_reason=null, suspended_at=null, updated_at=now()
 where o.suspension_reason='ai_conversations_exhausted' and o.status='suspended'
   and exists(select 1 from public.organization_subscriptions s where s.organization_id=o.id
     and s.status in ('active','trialing') and (s.current_period_end is null or s.current_period_end>now()));
+
+-- Move existing organizations away from the unavailable Gemini 2.5 model alias.
+update public.ai_settings set default_model='gemini-3.8-flash', updated_at=now()
+where default_model in ('google/gemini-2.5-flash','gemini-2.5-flash');
