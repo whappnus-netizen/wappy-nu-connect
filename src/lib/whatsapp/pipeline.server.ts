@@ -651,7 +651,12 @@ export async function processIncomingMessage(
   }
 
   const replyPacingLevel = await loadReplyPacingLevel(admin, number.organization_id, number.id);
-  const showTypingAndPace = async (text: string) => {
+  const showTypingAndPace = async (text: string): Promise<number | undefined> => {
+    const delayMs = calculateReplyPacingDelayMs(text, replyPacingLevel);
+    if (number.provider === "qr") {
+      // The Baileys bridge shows "composing" and applies this duration during send.
+      return delayMs;
+    }
     try {
       await replyProvider.showTypingIndicator?.({
         organizationId: number.organization_id,
@@ -666,8 +671,8 @@ export async function processIncomingMessage(
         detail: { stage: "typing_indicator", error: (error as Error).message.slice(0, 200) },
       });
     }
-    const delayMs = calculateReplyPacingDelayMs(text, replyPacingLevel);
     await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return undefined;
   };
 
   // Respostas determinísticas sobre pagamentos registados: nunca inferir pagamento apenas pelo comprovativo.
@@ -704,18 +709,20 @@ export async function processIncomingMessage(
                 : latest.status === "cancelled"
                   ? "O registo do pagamento de " + amountText + " (" + latest.description + ") consta como cancelado." + refText
                   : "O pagamento de " + amountText + " consta como " + latest.status + " no nosso registo." + refText;
-      await showTypingAndPace(responseText);
+      const presenceDelayMs = await showTypingAndPace(responseText);
       await sendOutgoingMessage({
         organizationId: number.organization_id, whatsappNumberId: number.id,
         conversationId: res.conversation_id, body: responseText, isAi: true,
+        ...(presenceDelayMs !== undefined ? { presenceDelayMs } : {}),
       });
       return { ...base, aiReplied: true };
     } else {
       const responseText = "Não encontrei um pagamento registado associado a esta conversa. Para a equipa confirmar, envie a referência da transferência ou o comprovativo. O pagamento só será confirmado depois de a equipa verificar a entrada do valor.";
-      await showTypingAndPace(responseText);
+      const presenceDelayMs = await showTypingAndPace(responseText);
       await sendOutgoingMessage({
         organizationId: number.organization_id, whatsappNumberId: number.id,
         conversationId: res.conversation_id, body: responseText, isAi: true,
+        ...(presenceDelayMs !== undefined ? { presenceDelayMs } : {}),
       });
       return { ...base, aiReplied: true };
     }
@@ -737,13 +744,14 @@ export async function processIncomingMessage(
         : null,
       mediaMimeType: incoming.mediaMimeType ?? null,
     });
-    await showTypingAndPace(ai.text);
+    const presenceDelayMs = await showTypingAndPace(ai.text);
     await sendOutgoingMessage({
       organizationId: number.organization_id,
       whatsappNumberId: number.id,
       conversationId: res.conversation_id,
       body: ai.text,
       isAi: true,
+      ...(presenceDelayMs !== undefined ? { presenceDelayMs } : {}),
       ...(ai.reactionEmoji ? { reaction: { waMessageId: incoming.waMessageId, emoji: ai.reactionEmoji } } : {}),
     });
     return { ...base, aiReplied: true };
