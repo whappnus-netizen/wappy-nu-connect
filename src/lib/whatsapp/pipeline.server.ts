@@ -141,12 +141,39 @@ export async function processIncomingMessage(
 ): Promise<IngestOutcome> {
   const admin = serviceClient();
   const number = await loadNumber(whatsappNumberId);
-  await persistMetaAttachment(number, incoming);
 
   // 14. Nunca processar mensagens próprias (evita loops entre automações).
   if (incoming.fromMe) {
     return { ok: false, duplicate: false, reason: "own_message", aiReplied: false };
   }
+
+  // Acknowledge immediately, before media download or AI inference can take time.
+  const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
+  let inboundMeta: { phoneNumberId: string; token: string } | undefined;
+  if (number.provider !== "qr" && number.phone_number_id) {
+    try {
+      const { metaTokenForNumber } = await import("../whatsapp.server");
+      inboundMeta = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
+    } catch (error) {
+      console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
+    }
+  }
+  try {
+    await replyProvider.markIncomingRead?.({
+      organizationId: number.organization_id,
+      whatsappNumberId: number.id,
+      to: incoming.fromWaId,
+      waMessageId: incoming.waMessageId,
+      ...(inboundMeta ? { meta: inboundMeta } : {}),
+    });
+  } catch (error) {
+    await logWhatsAppEvent(number.organization_id, "error", {
+      whatsappNumberId: number.id, provider: incoming.provider,
+      detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
+    });
+  }
+
+  await persistMetaAttachment(number, incoming);
 
   const { data, error } = await admin.rpc("ingest_provider_message", {
     _whatsapp_number_id: number.id,
@@ -624,33 +651,6 @@ export async function processIncomingMessage(
   }
 
   const replyPacingLevel = await loadReplyPacingLevel(admin, number.organization_id, number.id);
-  const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
-  let inboundMeta: { phoneNumberId: string; token: string } | undefined;
-  if (number.provider !== "qr" && number.phone_number_id) {
-    try {
-      const { metaTokenForNumber } = await import("../whatsapp.server");
-      inboundMeta = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
-    } catch (error) {
-      console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
-    }
-  }
-
-  // Mark as read before model inference so the customer sees acknowledgement while the reply is prepared.
-  try {
-    await replyProvider.markIncomingRead?.({
-      organizationId: number.organization_id,
-      whatsappNumberId: number.id,
-      to: incoming.fromWaId,
-      waMessageId: incoming.waMessageId,
-      ...(inboundMeta ? { meta: inboundMeta } : {}),
-    });
-  } catch (error) {
-    await logWhatsAppEvent(number.organization_id, "error", {
-      whatsappNumberId: number.id, provider: incoming.provider,
-      detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
-    });
-  }
-
   const showTypingAndPace = async (text: string) => {
     try {
       await replyProvider.showTypingIndicator?.({
