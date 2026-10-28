@@ -27,6 +27,16 @@ export type WhatsAppEventType =
   | "error";
 
 /** Aguarda o intervalo configurado antes de solicitar o recibo real de leitura. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 function waitForHumanReadDelay(seconds: number): Promise<void> {
   const delayMs = Math.round(Math.max(0, Math.min(10, seconds)) * 1000);
   return delayMs === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -271,16 +281,17 @@ export async function processIncomingMessage(
   }
   await waitForHumanReadDelay(behavior.readDelaySeconds);
   try {
-    await Promise.race([
-      replyProvider.markIncomingRead?.({
+    await withTimeout(
+      Promise.resolve(replyProvider.markIncomingRead?.({
         organizationId: number.organization_id,
         whatsappNumberId: number.id,
         to: incoming.fromWaId,
         waMessageId: incoming.waMessageId,
         ...(inboundMeta ? { meta: inboundMeta } : {}),
-      }) ?? Promise.resolve(),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("read_receipt_timeout")), 5000)),
-    ]);
+      }) ?? undefined),
+      5000,
+      "read_receipt_timeout",
+    );
   } catch (error) {
     await logWhatsAppEvent(number.organization_id, "error", {
       whatsappNumberId: number.id, provider: incoming.provider,
@@ -796,24 +807,21 @@ export async function processIncomingMessage(
 
     let ai: Awaited<ReturnType<typeof generateViaWhappNusAI>>;
     try {
-      ai = await Promise.race([
-        generateViaWhappNusAI({
-          organizationId: number.organization_id,
-          whatsappNumberId: number.id,
-          conversationId: res.conversation_id,
-          contactId: res.contact_id ?? null,
-          messageId: incoming.waMessageId,
-          fromWaId: incoming.fromWaId,
-          profileName: incoming.profileName,
-          text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
-          messageType: incoming.messageType,
-          mediaPath: incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
-            ? incoming.mediaId
-            : null,
-          mediaMimeType: incoming.mediaMimeType ?? null,
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("AI_ENGINE_TIMEOUT")), 45000)),
-      ]);
+      ai = await generateViaWhappNusAI({
+        organizationId: number.organization_id,
+        whatsappNumberId: number.id,
+        conversationId: res.conversation_id,
+        contactId: res.contact_id ?? null,
+        messageId: incoming.waMessageId,
+        fromWaId: incoming.fromWaId,
+        profileName: incoming.profileName,
+        text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
+        messageType: incoming.messageType,
+        mediaPath: incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
+          ? incoming.mediaId
+          : null,
+        mediaMimeType: incoming.mediaMimeType ?? null,
+      });
     } catch (generationError) {
       const errorCode = (generationError as Error).message;
       await logWhatsAppEvent(number.organization_id, "message_failed", {
