@@ -26,9 +26,15 @@ export type WhatsAppEventType =
   | "ai_skipped"
   | "error";
 
-/** Espera variável antes do recibo de leitura para evitar a confirmação instantânea. */
+/** Pequena espera variável antes do recibo, sem confirmação instantânea. */
 function waitForHumanReadDelay(): Promise<void> {
-  const delayMs = 10_000 + Math.floor(Math.random() * 10_001); // 10–20 segundos
+  const delayMs = 1_000 + Math.floor(Math.random() * 2_001); // 1–3 segundos
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+/** Pausa breve após marcar como lida e antes de começar a preparar a resposta. */
+function waitAfterReadReceipt(): Promise<void> {
+  const delayMs = 900 + Math.floor(Math.random() * 601); // 0,9–1,5 segundos
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
@@ -153,9 +159,8 @@ export async function processIncomingMessage(
     return { ok: false, duplicate: false, reason: "own_message", aiReplied: false };
   }
 
-  // Primeiro preparar o provider e as credenciais; o recibo só será enviado
-  // depois de um atraso variável de 10–20 segundos. A IA só começa a preparar
-  // a resposta depois deste recibo, e o envio mantém o indicador de escrita.
+  // O recibo de leitura espera 1–3 segundos com variação. Depois do recibo,
+  // fazemos uma pausa breve antes de continuar o processamento da resposta.
   const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
   let inboundMeta: { phoneNumberId: string; token: string } | undefined;
   if (number.provider !== "qr" && number.phone_number_id) {
@@ -181,6 +186,9 @@ export async function processIncomingMessage(
       detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
     });
   }
+
+  // Evita que o indicador de escrita apareça colado ao recibo de leitura.
+  await waitAfterReadReceipt();
 
   await persistMetaAttachment(number, incoming);
 
