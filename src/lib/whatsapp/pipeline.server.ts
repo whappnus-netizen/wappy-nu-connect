@@ -279,24 +279,30 @@ export async function processIncomingMessage(
       console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
     }
   }
-  await waitForHumanReadDelay(behavior.readDelaySeconds);
-  try {
-    await withTimeout(
-      Promise.resolve(replyProvider.markIncomingRead?.({
-        organizationId: number.organization_id,
-        whatsappNumberId: number.id,
-        to: incoming.fromWaId,
-        waMessageId: incoming.waMessageId,
-        ...(inboundMeta ? { meta: inboundMeta } : {}),
-      }) ?? undefined),
-      5000,
-      "read_receipt_timeout",
-    );
-  } catch (error) {
-    await logWhatsAppEvent(number.organization_id, "error", {
-      whatsappNumberId: number.id, provider: incoming.provider,
-      detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
-    });
+  // As sessões QR enviam o recibo antes de chamar este endpoint: esperar aqui
+  // mantinha o pedido HTTP aberto até 25 s e, somado à geração da IA, causava
+  // timeout da função Netlify antes de a resposta ser enviada. Cloud API continua
+  // a gerir o recibo neste pipeline.
+  if (number.provider !== "qr") {
+    await waitForHumanReadDelay(behavior.readDelaySeconds);
+    try {
+      await withTimeout(
+        Promise.resolve(replyProvider.markIncomingRead?.({
+          organizationId: number.organization_id,
+          whatsappNumberId: number.id,
+          to: incoming.fromWaId,
+          waMessageId: incoming.waMessageId,
+          ...(inboundMeta ? { meta: inboundMeta } : {}),
+        }) ?? undefined),
+        5000,
+        "read_receipt_timeout",
+      );
+    } catch (error) {
+      await logWhatsAppEvent(number.organization_id, "error", {
+        whatsappNumberId: number.id, provider: incoming.provider,
+        detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
+      });
+    }
   }
 
   if (!res.conversation_id) {
