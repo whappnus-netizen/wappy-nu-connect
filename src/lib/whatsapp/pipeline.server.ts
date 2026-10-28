@@ -26,6 +26,18 @@ export type WhatsAppEventType =
   | "ai_skipped"
   | "error";
 
+/** Pequena espera variável antes do recibo, sem confirmação instantânea. */
+function waitForHumanReadDelay(): Promise<void> {
+  const delayMs = 1_000 + Math.floor(Math.random() * 2_001); // 1–3 segundos
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+/** Pausa breve após marcar como lida e antes de começar a preparar a resposta. */
+function waitAfterReadReceipt(): Promise<void> {
+  const delayMs = 900 + Math.floor(Math.random() * 601); // 0,9–1,5 segundos
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
 /** Log técnico. Nunca grava conteúdo de mensagens nem credenciais. */
 export async function logWhatsAppEvent(
   organizationId: string,
@@ -147,7 +159,8 @@ export async function processIncomingMessage(
     return { ok: false, duplicate: false, reason: "own_message", aiReplied: false };
   }
 
-  // Acknowledge immediately, before media download or AI inference can take time.
+  // O recibo de leitura espera 1–3 segundos com variação. Depois do recibo,
+  // fazemos uma pausa breve antes de continuar o processamento da resposta.
   const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
   let inboundMeta: { phoneNumberId: string; token: string } | undefined;
   if (number.provider !== "qr" && number.phone_number_id) {
@@ -158,6 +171,7 @@ export async function processIncomingMessage(
       console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
     }
   }
+  await waitForHumanReadDelay();
   try {
     await replyProvider.markIncomingRead?.({
       organizationId: number.organization_id,
@@ -172,6 +186,9 @@ export async function processIncomingMessage(
       detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
     });
   }
+
+  // Evita que o indicador de escrita apareça colado ao recibo de leitura.
+  await waitAfterReadReceipt();
 
   await persistMetaAttachment(number, incoming);
 
