@@ -147,6 +147,51 @@ async function persistMetaAttachment(number: NumberRow, incoming: NormalizedInco
   }
 }
 
+/** Read per-agent response pacing; safe defaults keep older agents compatible. */
+async function getResponseDelayRange(
+  organizationId: string,
+  whatsappNumberId: string,
+): Promise<{ minSeconds: number; maxSeconds: number }> {
+  const defaults = { minSeconds: 2, maxSeconds: 4 };
+  const admin = serviceClient();
+  try {
+    const { data: assignment, error: assignmentError } = await admin
+      .from("ai_agent_whatsapp_numbers")
+      .select("agent_id")
+      .eq("organization_id", organizationId)
+      .eq("whatsapp_number_id", whatsappNumberId)
+      .maybeSingle();
+    if (assignmentError) throw assignmentError;
+
+    let query = admin.from("ai_agents").select("config")
+      .eq("organization_id", organizationId);
+    if (assignment?.agent_id) {
+      query = query.eq("id", assignment.agent_id);
+    } else {
+      query = query.eq("is_active", true).order("created_at", { ascending: true }).limit(1);
+    }
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    const config = data?.config && typeof data.config === "object"
+      ? data.config as Record<string, unknown>
+      : {};
+    const rawMin = Number(config["responseDelayMinSeconds"]);
+    const rawMax = Number(config["responseDelayMaxSeconds"]);
+    const minSeconds = Number.isFinite(rawMin) ? Math.min(30, Math.max(0, Math.floor(rawMin))) : defaults.minSeconds;
+    const maxSeconds = Number.isFinite(rawMax) ? Math.min(30, Math.max(minSeconds, Math.floor(rawMax))) : Math.max(minSeconds, defaults.maxSeconds);
+    return { minSeconds, maxSeconds };
+  } catch (error) {
+    console.warn("[whappnus] não foi possível ler o tempo de resposta configurado; a usar o padrão:", (error as Error).message);
+    return defaults;
+  }
+}
+
+function waitForResponseStart(range: { minSeconds: number; maxSeconds: number }): Promise<void> {
+  const span = Math.max(0, range.maxSeconds - range.minSeconds);
+  const delayMs = (range.minSeconds + Math.random() * span) * 1000;
+  return new Promise((resolve) => setTimeout(resolve, Math.round(delayMs)));
+}
+
 export async function processIncomingMessage(
   whatsappNumberId: string,
   incoming: NormalizedIncoming,
@@ -739,7 +784,14 @@ export async function processIncomingMessage(
   }
 
   try {
-    await showTypingIndicator();
+    const responseDelay = await getResponseDelayRange(number.organization_id, number.id);
+    // Meta Cloud can show typing while the model prepares its answer.
+    // Baileys starts the composing indicator as part of sendMessage, so its pause
+    // must happen after generation and immediately before sending.
+    if (number.provider !== "qr") {
+      await waitForResponseStart(responseDelay);
+      await showTypingIndicator();
+    }
     const ai = await generateViaWhappNusAI({
       organizationId: number.organization_id,
       whatsappNumberId: number.id,
@@ -755,6 +807,7 @@ export async function processIncomingMessage(
         : null,
       mediaMimeType: incoming.mediaMimeType ?? null,
     });
+    if (number.provider === "qr") await waitForResponseStart(responseDelay);
     await sendOutgoingMessage({
       organizationId: number.organization_id,
       whatsappNumberId: number.id,
