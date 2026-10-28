@@ -26,6 +26,12 @@ export type WhatsAppEventType =
   | "ai_skipped"
   | "error";
 
+/** Espera variável antes do recibo de leitura para evitar a confirmação instantânea. */
+function waitForHumanReadDelay(): Promise<void> {
+  const delayMs = 10_000 + Math.floor(Math.random() * 10_001); // 10–20 segundos
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
 /** Log técnico. Nunca grava conteúdo de mensagens nem credenciais. */
 export async function logWhatsAppEvent(
   organizationId: string,
@@ -147,7 +153,9 @@ export async function processIncomingMessage(
     return { ok: false, duplicate: false, reason: "own_message", aiReplied: false };
   }
 
-  // Acknowledge immediately, before media download or AI inference can take time.
+  // Primeiro preparar o provider e as credenciais; o recibo só será enviado
+  // depois de um atraso variável de 10–20 segundos. A IA só começa a preparar
+  // a resposta depois deste recibo, e o envio mantém o indicador de escrita.
   const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
   let inboundMeta: { phoneNumberId: string; token: string } | undefined;
   if (number.provider !== "qr" && number.phone_number_id) {
@@ -158,6 +166,7 @@ export async function processIncomingMessage(
       console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
     }
   }
+  await waitForHumanReadDelay();
   try {
     await replyProvider.markIncomingRead?.({
       organizationId: number.organization_id,
