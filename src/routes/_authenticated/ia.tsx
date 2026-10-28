@@ -637,8 +637,8 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
   const qc = useQueryClient();
   const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
-  const [responseDelayMin, setResponseDelayMin] = useState(2);
-  const [responseDelayMax, setResponseDelayMax] = useState(4);
+  const [readDelaySeconds, setReadDelaySeconds] = useState(1.5);
+  const [responseDelaySeconds, setResponseDelaySeconds] = useState(2);
   const [recordingField, setRecordingField] = useState<string | null>(null);
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [organizingField, setOrganizingField] = useState<string | null>(null);
@@ -650,10 +650,17 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
     const storedConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
-    const minDelay = Number(storedConfig["responseDelayMinSeconds"]);
-    const maxDelay = Number(storedConfig["responseDelayMaxSeconds"]);
-    setResponseDelayMin(Number.isFinite(minDelay) ? Math.min(30, Math.max(0, minDelay)) : 2);
-    setResponseDelayMax(Number.isFinite(maxDelay) ? Math.min(30, Math.max(0, maxDelay)) : 4);
+    const readDelay = Number(storedConfig["readDelaySeconds"]);
+    const responseDelay = Number(storedConfig["responseDelaySeconds"]);
+    const legacyMin = Number(storedConfig["responseDelayMinSeconds"]);
+    const legacyMax = Number(storedConfig["responseDelayMaxSeconds"]);
+    const legacyResponse = Number.isFinite(legacyMin) && Number.isFinite(legacyMax)
+      ? (legacyMin + legacyMax) / 2
+      : 2;
+    setReadDelaySeconds(Number.isFinite(readDelay) ? Math.round(Math.min(10, Math.max(0, readDelay)) * 2) / 2 : 1.5);
+    setResponseDelaySeconds(Number.isFinite(responseDelay)
+      ? Math.round(Math.min(15, Math.max(0, responseDelay)) * 2) / 2
+      : Math.round(Math.min(15, Math.max(0, legacyResponse)) * 2) / 2);
     recordingFieldRef.current = null;
     setRecordingField(null);
     setTranscriptPreview("");
@@ -681,15 +688,15 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
         && Boolean(payload["personality"]?.trim());
-      const safeMinDelay = Math.min(30, Math.max(0, Math.floor(responseDelayMin)));
-      const safeMaxDelay = Math.min(30, Math.max(safeMinDelay, Math.floor(responseDelayMax)));
+      const safeReadDelay = Math.round(Math.min(10, Math.max(0, readDelaySeconds)) * 2) / 2;
+      const safeResponseDelay = Math.round(Math.min(15, Math.max(0, responseDelaySeconds)) * 2) / 2;
       const existingConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
       const updatePayload = {
         ...payload,
         config: {
           ...existingConfig,
-          responseDelayMinSeconds: safeMinDelay,
-          responseDelayMaxSeconds: safeMaxDelay,
+          readDelaySeconds: safeReadDelay,
+          responseDelaySeconds: safeResponseDelay,
         },
         ...(autoActivate ? { is_active: true } : {}),
       };
@@ -914,32 +921,54 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
           </div>
         ))}
       </div>
-      <section className="rounded-xl border border-border bg-secondary/30 p-4 sm:p-5 space-y-4">
+      <section className="rounded-xl border border-border bg-secondary/30 p-4 sm:p-5 space-y-5">
         <div>
-          <h3 className="font-semibold">Tempo de resposta</h3>
+          <h3 className="font-semibold">Comportamento das mensagens</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Define a pausa variável antes de a IA começar a responder. O padrão recomendado é 2–4 segundos; a simulação de digitação continua a depender do tamanho da resposta.
+            Personaliza os intervalos de leitura e resposta da IA para proporcionar uma experiência de atendimento mais natural, sem comprometer a rapidez e a qualidade do serviço.
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="response-delay-min">Tempo mínimo (segundos)</Label>
-            <Input id="response-delay-min" type="number" min={0} max={30} step={1}
-              value={responseDelayMin}
-              onChange={(e) => setResponseDelayMin(Number(e.target.value))}
-              disabled={!canManage || save.isPending}
-            />
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Label htmlFor="read-delay-seconds">Tempo para visualizar a mensagem</Label>
+              <p id="read-delay-help" className="mt-1 text-sm text-muted-foreground">
+                Define quanto tempo a IA aguarda depois de receber a mensagem antes de a marcar como lida, quando o canal suporta essa funcionalidade.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-md bg-background px-3 py-1 text-sm font-semibold tabular-nums">{readDelaySeconds.toLocaleString("pt-AO", { maximumFractionDigits: 1 })} s</span>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="response-delay-max">Tempo máximo (segundos)</Label>
-            <Input id="response-delay-max" type="number" min={0} max={30} step={1}
-              value={responseDelayMax}
-              onChange={(e) => setResponseDelayMax(Number(e.target.value))}
-              disabled={!canManage || save.isPending}
-            />
-          </div>
+          <input
+            id="read-delay-seconds" type="range" min={0} max={10} step={0.5}
+            value={readDelaySeconds}
+            onChange={(e) => setReadDelaySeconds(Number(e.target.value))}
+            disabled={!canManage || save.isPending}
+            aria-describedby="read-delay-help"
+            className="w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground"><span>0 s — Imediatamente</span><span>10 s — Máximo</span></div>
         </div>
-        <p className="text-xs text-muted-foreground">O mínimo e o máximo são aplicados com variação aleatória por resposta. Usa valores entre 0 e 30 segundos; o máximo nunca será inferior ao mínimo.</p>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Label htmlFor="response-delay-seconds">Tempo de resposta da IA</Label>
+              <p id="response-delay-help" className="mt-1 text-sm text-muted-foreground">
+                Define a espera adicional depois de a IA concluir a resposta. O processamento normal e a latência do canal continuam a influenciar o tempo total.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-md bg-background px-3 py-1 text-sm font-semibold tabular-nums">{responseDelaySeconds.toLocaleString("pt-AO", { maximumFractionDigits: 1 })} s</span>
+          </div>
+          <input
+            id="response-delay-seconds" type="range" min={0} max={15} step={0.5}
+            value={responseDelaySeconds}
+            onChange={(e) => setResponseDelaySeconds(Number(e.target.value))}
+            disabled={!canManage || save.isPending}
+            aria-describedby="response-delay-help"
+            className="w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground"><span>0 s — Sem espera adicional</span><span>15 s — Máximo</span></div>
+        </div>
+        <p className="text-xs text-muted-foreground">Padrões recomendados: 1,5 s para leitura e 2 s para resposta. O valor 0 remove a espera artificial adicional.</p>
       </section>
       <p className="rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">Dica: pode ditar instruções longas e depois usar “Organizar com IA”. O texto será estruturado sem inventar preços, políticas ou informações que não forneceu. Revê sempre o resultado antes de guardar.</p>
       <Button type="submit" disabled={save.isPending}>

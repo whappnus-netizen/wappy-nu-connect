@@ -26,16 +26,20 @@ export type WhatsAppEventType =
   | "ai_skipped"
   | "error";
 
-/** Pequena espera variável antes do recibo, sem confirmação instantânea. */
-function waitForHumanReadDelay(): Promise<void> {
-  const delayMs = 1_000 + Math.floor(Math.random() * 2_001); // 1–3 segundos
-  return new Promise((resolve) => setTimeout(resolve, delayMs));
+/** Aguarda o intervalo configurado antes de solicitar o recibo real de leitura. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
 }
 
-/** Pausa breve após marcar como lida e antes de começar a preparar a resposta. */
-function waitAfterReadReceipt(): Promise<void> {
-  const delayMs = 900 + Math.floor(Math.random() * 601); // 0,9–1,5 segundos
-  return new Promise((resolve) => setTimeout(resolve, delayMs));
+function waitForHumanReadDelay(seconds: number): Promise<void> {
+  const delayMs = Math.round(Math.max(0, Math.min(10, seconds)) * 1000);
+  return delayMs === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 /** Log técnico. Nunca grava conteúdo de mensagens nem credenciais. */
@@ -147,12 +151,14 @@ async function persistMetaAttachment(number: NumberRow, incoming: NormalizedInco
   }
 }
 
-/** Read per-agent response pacing; safe defaults keep older agents compatible. */
-async function getResponseDelayRange(
+type MessageBehaviorSettings = { readDelaySeconds: number; responseDelaySeconds: number };
+
+/** Lê as definições do agente atribuído; agentes antigos continuam compatíveis. */
+async function getMessageBehaviorSettings(
   organizationId: string,
   whatsappNumberId: string,
-): Promise<{ minSeconds: number; maxSeconds: number }> {
-  const defaults = { minSeconds: 2, maxSeconds: 4 };
+): Promise<MessageBehaviorSettings> {
+  const defaults: MessageBehaviorSettings = { readDelaySeconds: 1.5, responseDelaySeconds: 2 };
   const admin = serviceClient();
   try {
     const { data: assignment, error: assignmentError } = await admin
@@ -175,21 +181,31 @@ async function getResponseDelayRange(
     const config = data?.config && typeof data.config === "object"
       ? data.config as Record<string, unknown>
       : {};
-    const rawMin = Number(config["responseDelayMinSeconds"]);
-    const rawMax = Number(config["responseDelayMaxSeconds"]);
-    const minSeconds = Number.isFinite(rawMin) ? Math.min(30, Math.max(0, Math.floor(rawMin))) : defaults.minSeconds;
-    const maxSeconds = Number.isFinite(rawMax) ? Math.min(30, Math.max(minSeconds, Math.floor(rawMax))) : Math.max(minSeconds, defaults.maxSeconds);
-    return { minSeconds, maxSeconds };
+
+    const readValue = Number(config["readDelaySeconds"]);
+    const responseValue = Number(config["responseDelaySeconds"]);
+    const legacyMin = Number(config["responseDelayMinSeconds"]);
+    const legacyMax = Number(config["responseDelayMaxSeconds"]);
+    const legacyResponse = Number.isFinite(legacyMin) && Number.isFinite(legacyMax)
+      ? (legacyMin + legacyMax) / 2
+      : defaults.responseDelaySeconds;
+
+    const readDelaySeconds = Number.isFinite(readValue)
+      ? Math.round(Math.min(10, Math.max(0, readValue)) * 2) / 2
+      : defaults.readDelaySeconds;
+    const responseDelaySeconds = Number.isFinite(responseValue)
+      ? Math.round(Math.min(15, Math.max(0, responseValue)) * 2) / 2
+      : Math.round(Math.min(15, Math.max(0, legacyResponse)) * 2) / 2;
+    return { readDelaySeconds, responseDelaySeconds };
   } catch (error) {
-    console.warn("[whappnus] não foi possível ler o tempo de resposta configurado; a usar o padrão:", (error as Error).message);
+    console.warn("[whappnus] não foi possível ler os tempos de comportamento; a usar os padrões:", (error as Error).message);
     return defaults;
   }
 }
 
-function waitForResponseStart(range: { minSeconds: number; maxSeconds: number }): Promise<void> {
-  const span = Math.max(0, range.maxSeconds - range.minSeconds);
-  const delayMs = (range.minSeconds + Math.random() * span) * 1000;
-  return new Promise((resolve) => setTimeout(resolve, Math.round(delayMs)));
+function waitForResponseDelay(seconds: number): Promise<void> {
+  const delayMs = Math.round(Math.max(0, Math.min(15, seconds)) * 1000);
+  return delayMs === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 export async function processIncomingMessage(
@@ -203,37 +219,6 @@ export async function processIncomingMessage(
   if (incoming.fromMe) {
     return { ok: false, duplicate: false, reason: "own_message", aiReplied: false };
   }
-
-  // O recibo de leitura espera 1–3 segundos com variação. Depois do recibo,
-  // fazemos uma pausa breve antes de continuar o processamento da resposta.
-  const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
-  let inboundMeta: { phoneNumberId: string; token: string } | undefined;
-  if (number.provider !== "qr" && number.phone_number_id) {
-    try {
-      const { metaTokenForNumber } = await import("../whatsapp.server");
-      inboundMeta = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
-    } catch (error) {
-      console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
-    }
-  }
-  await waitForHumanReadDelay();
-  try {
-    await replyProvider.markIncomingRead?.({
-      organizationId: number.organization_id,
-      whatsappNumberId: number.id,
-      to: incoming.fromWaId,
-      waMessageId: incoming.waMessageId,
-      ...(inboundMeta ? { meta: inboundMeta } : {}),
-    });
-  } catch (error) {
-    await logWhatsAppEvent(number.organization_id, "error", {
-      whatsappNumberId: number.id, provider: incoming.provider,
-      detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
-    });
-  }
-
-  // Evita que o indicador de escrita apareça colado ao recibo de leitura.
-  await waitAfterReadReceipt();
 
   await persistMetaAttachment(number, incoming);
 
@@ -280,6 +265,38 @@ export async function processIncomingMessage(
       aiReplied: false,
       aiSkippedReason: "duplicate",
     };
+  }
+
+  // A mensagem já está persistida e deduplicada. Falhas no recibo nunca bloqueiam a IA.
+  const behavior = await getMessageBehaviorSettings(number.organization_id, number.id);
+  const replyProvider = providerByName(number.provider === "qr" ? "qr" : "meta_cloud");
+  let inboundMeta: { phoneNumberId: string; token: string } | undefined;
+  if (number.provider !== "qr" && number.phone_number_id) {
+    try {
+      const { metaTokenForNumber } = await import("../whatsapp.server");
+      inboundMeta = { phoneNumberId: number.phone_number_id, token: await metaTokenForNumber(number.id) };
+    } catch (error) {
+      console.warn("[whappnus] não foi possível preparar recibos de leitura:", (error as Error).message);
+    }
+  }
+  await waitForHumanReadDelay(behavior.readDelaySeconds);
+  try {
+    await withTimeout(
+      Promise.resolve(replyProvider.markIncomingRead?.({
+        organizationId: number.organization_id,
+        whatsappNumberId: number.id,
+        to: incoming.fromWaId,
+        waMessageId: incoming.waMessageId,
+        ...(inboundMeta ? { meta: inboundMeta } : {}),
+      }) ?? undefined),
+      5000,
+      "read_receipt_timeout",
+    );
+  } catch (error) {
+    await logWhatsAppEvent(number.organization_id, "error", {
+      whatsappNumberId: number.id, provider: incoming.provider,
+      detail: { stage: "read_receipt", error: (error as Error).message.slice(0, 200) },
+    });
   }
 
   if (!res.conversation_id) {
@@ -784,30 +801,50 @@ export async function processIncomingMessage(
   }
 
   try {
-    const responseDelay = await getResponseDelayRange(number.organization_id, number.id);
-    // Meta Cloud can show typing while the model prepares its answer.
-    // Baileys starts the composing indicator as part of sendMessage, so its pause
-    // must happen after generation and immediately before sending.
-    if (number.provider !== "qr") {
-      await waitForResponseStart(responseDelay);
-      await showTypingIndicator();
+    // Só mostramos "a escrever" quando existe uma decisão válida de gerar resposta.
+    // Na Cloud API o indicador acompanha a preparação; no QR o provider trata disso no envio.
+    if (number.provider !== "qr") await showTypingIndicator();
+
+    let ai: Awaited<ReturnType<typeof generateViaWhappNusAI>>;
+    try {
+      ai = await generateViaWhappNusAI({
+        organizationId: number.organization_id,
+        whatsappNumberId: number.id,
+        conversationId: res.conversation_id,
+        contactId: res.contact_id ?? null,
+        messageId: incoming.waMessageId,
+        fromWaId: incoming.fromWaId,
+        profileName: incoming.profileName,
+        text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
+        messageType: incoming.messageType,
+        mediaPath: incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
+          ? incoming.mediaId
+          : null,
+        mediaMimeType: incoming.mediaMimeType ?? null,
+      });
+    } catch (generationError) {
+      const errorCode = (generationError as Error).message;
+      await logWhatsAppEvent(number.organization_id, "message_failed", {
+        whatsappNumberId: number.id,
+        provider: incoming.provider,
+        detail: { stage: "ai_generation", error: errorCode.slice(0, 200) },
+      });
+      // Não contornar limites de plano nem estados de atendimento intencionais.
+      if (["AUTO_REPLY_DISABLED", "NO_ACTIVE_AGENT", "SUBSCRIPTION_REQUIRED", "ACCOUNT_SUSPENDED", "AI_CONVERSATIONS_EXHAUSTED", "PLAN_HAS_NO_AI_CONVERSATIONS"].includes(errorCode)) {
+        return { ...base, aiReplied: false, aiSkippedReason: errorCode };
+      }
+      const fallbackText = "Peço desculpa, estou com uma dificuldade momentânea para processar a tua mensagem. Podes tentar novamente dentro de instantes? Se for urgente, a nossa equipa pode ajudar.";
+      await sendOutgoingMessage({
+        organizationId: number.organization_id,
+        whatsappNumberId: number.id,
+        conversationId: res.conversation_id,
+        body: fallbackText,
+        isAi: true,
+      });
+      return { ...base, aiReplied: true, aiSkippedReason: "ai_generation_fallback" };
     }
-    const ai = await generateViaWhappNusAI({
-      organizationId: number.organization_id,
-      whatsappNumberId: number.id,
-      conversationId: res.conversation_id,
-      contactId: res.contact_id ?? null,
-      messageId: incoming.waMessageId,
-      fromWaId: incoming.fromWaId,
-      profileName: incoming.profileName,
-      text: incoming.body ?? `[O cliente enviou ${incoming.messageType}]`,
-      messageType: incoming.messageType,
-      mediaPath: incoming.mediaId?.startsWith(`${number.organization_id}/${number.id}/`)
-        ? incoming.mediaId
-        : null,
-      mediaMimeType: incoming.mediaMimeType ?? null,
-    });
-    if (number.provider === "qr") await waitForResponseStart(responseDelay);
+
+    await waitForResponseDelay(behavior.responseDelaySeconds);
     await sendOutgoingMessage({
       organizationId: number.organization_id,
       whatsappNumberId: number.id,

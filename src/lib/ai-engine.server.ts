@@ -53,6 +53,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
       authorization: "Bearer " + secret,
     },
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(45_000),
   });
 
   const raw = await response.text();
