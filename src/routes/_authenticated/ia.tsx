@@ -657,7 +657,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
     const legacyResponse = Number.isFinite(legacyMin) && Number.isFinite(legacyMax)
       ? (legacyMin + legacyMax) / 2
       : 2;
-    setReadDelaySeconds(Number.isFinite(readDelay) ? Math.round(Math.min(10, Math.max(0, readDelay)) * 2) / 2 : 1.5);
+    setReadDelaySeconds(Number.isFinite(readDelay) ? Math.round(Math.min(25, Math.max(0, readDelay)) * 2) / 2 : 1.5);
     setResponseDelaySeconds(Number.isFinite(responseDelay)
       ? Math.round(Math.min(15, Math.max(0, responseDelay)) * 2) / 2
       : Math.round(Math.min(15, Math.max(0, legacyResponse)) * 2) / 2);
@@ -688,7 +688,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
         && Boolean(payload["personality"]?.trim());
-      const safeReadDelay = Math.round(Math.min(10, Math.max(0, readDelaySeconds)) * 2) / 2;
+      const safeReadDelay = Math.round(Math.min(25, Math.max(0, readDelaySeconds)) * 2) / 2;
       const safeResponseDelay = Math.round(Math.min(15, Math.max(0, responseDelaySeconds)) * 2) / 2;
       const existingConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
       const updatePayload = {
@@ -939,14 +939,14 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
             <span className="shrink-0 rounded-md bg-background px-3 py-1 text-sm font-semibold tabular-nums">{readDelaySeconds.toLocaleString("pt-AO", { maximumFractionDigits: 1 })} s</span>
           </div>
           <input
-            id="read-delay-seconds" type="range" min={0} max={10} step={0.5}
+            id="read-delay-seconds" type="range" min={0} max={25} step={0.5}
             value={readDelaySeconds}
             onChange={(e) => setReadDelaySeconds(Number(e.target.value))}
             disabled={!canManage || save.isPending}
             aria-describedby="read-delay-help"
             className="w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
           />
-          <div className="flex justify-between text-xs text-muted-foreground"><span>0 s — Imediatamente</span><span>10 s — Máximo</span></div>
+          <div className="flex justify-between text-xs text-muted-foreground"><span>0 s — Imediatamente</span><span>25 s — Máximo</span></div>
         </div>
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
