@@ -66,6 +66,7 @@ type Agent = {
   handoff_instructions: string | null;
   greeting_message: string | null;
   extra_instructions: string | null;
+  config: Record<string, unknown> | null;
 };
 
 type Knowledge = {
@@ -88,6 +89,7 @@ const AGENT_FIELDS = [
   "id, organization_id, name, model, is_active, goal, personality, company_name, company_description",
   "products_services, business_hours, location, payment_methods, faq, tone",
   "service_rules, can_do, cannot_do, handoff_instructions, greeting_message, extra_instructions",
+  "config",
 ].join(", ");
 
 const CATEGORIES = [
@@ -343,7 +345,7 @@ function AiPage() {
             </TabsContent>
 
             <TabsContent value="config">
-              <ConfigForm agent={agent} orgId={orgId} />
+              <ConfigForm agent={agent} orgId={orgId} canManage={canManage} />
             </TabsContent>
 
             <TabsContent value="knowledge">
@@ -631,10 +633,12 @@ type SpeechRecognitionLike = {
   abort?: () => void;
 };
 
-function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
+function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; canManage: boolean }) {
   const qc = useQueryClient();
   const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [responseDelayMin, setResponseDelayMin] = useState(2);
+  const [responseDelayMax, setResponseDelayMax] = useState(4);
   const [recordingField, setRecordingField] = useState<string | null>(null);
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [organizingField, setOrganizingField] = useState<string | null>(null);
@@ -645,6 +649,11 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
+    const storedConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
+    const minDelay = Number(storedConfig["responseDelayMinSeconds"]);
+    const maxDelay = Number(storedConfig["responseDelayMaxSeconds"]);
+    setResponseDelayMin(Number.isFinite(minDelay) ? Math.min(30, Math.max(0, minDelay)) : 2);
+    setResponseDelayMax(Number.isFinite(maxDelay) ? Math.min(30, Math.max(0, maxDelay)) : 4);
     recordingFieldRef.current = null;
     setRecordingField(null);
     setTranscriptPreview("");
@@ -672,7 +681,18 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
         && Boolean(payload["personality"]?.trim());
-      const updatePayload = { ...payload, ...(autoActivate ? { is_active: true } : {}) };
+      const safeMinDelay = Math.min(30, Math.max(0, Math.floor(responseDelayMin)));
+      const safeMaxDelay = Math.min(30, Math.max(safeMinDelay, Math.floor(responseDelayMax)));
+      const existingConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
+      const updatePayload = {
+        ...payload,
+        config: {
+          ...existingConfig,
+          responseDelayMinSeconds: safeMinDelay,
+          responseDelayMaxSeconds: safeMaxDelay,
+        },
+        ...(autoActivate ? { is_active: true } : {}),
+      };
       const { error } = await supabase
         .from("ai_agents")
         .update(updatePayload)
@@ -894,6 +914,33 @@ function ConfigForm({ agent, orgId }: { agent: Agent; orgId: string }) {
           </div>
         ))}
       </div>
+      <section className="rounded-xl border border-border bg-secondary/30 p-4 sm:p-5 space-y-4">
+        <div>
+          <h3 className="font-semibold">Tempo de resposta</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Define a pausa variável antes de a IA começar a responder. O padrão recomendado é 2–4 segundos; a simulação de digitação continua a depender do tamanho da resposta.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="response-delay-min">Tempo mínimo (segundos)</Label>
+            <Input id="response-delay-min" type="number" min={0} max={30} step={1}
+              value={responseDelayMin}
+              onChange={(e) => setResponseDelayMin(Number(e.target.value))}
+              disabled={!canManage || save.isPending}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="response-delay-max">Tempo máximo (segundos)</Label>
+            <Input id="response-delay-max" type="number" min={0} max={30} step={1}
+              value={responseDelayMax}
+              onChange={(e) => setResponseDelayMax(Number(e.target.value))}
+              disabled={!canManage || save.isPending}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">O mínimo e o máximo são aplicados com variação aleatória por resposta. Usa valores entre 0 e 30 segundos; o máximo nunca será inferior ao mínimo.</p>
+      </section>
       <p className="rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">Dica: pode ditar instruções longas e depois usar “Organizar com IA”. O texto será estruturado sem inventar preços, políticas ou informações que não forneceu. Revê sempre o resultado antes de guardar.</p>
       <Button type="submit" disabled={save.isPending}>
         {save.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
