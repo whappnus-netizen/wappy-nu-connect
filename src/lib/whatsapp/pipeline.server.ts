@@ -38,7 +38,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 }
 
 function waitForHumanReadDelay(seconds: number): Promise<void> {
-  const delayMs = Math.round(Math.max(0, Math.min(10, seconds)) * 1000);
+  const delayMs = Math.round(Math.max(0, Math.min(25, seconds)) * 1000);
   return delayMs === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
@@ -191,7 +191,7 @@ async function getMessageBehaviorSettings(
       : defaults.responseDelaySeconds;
 
     const readDelaySeconds = Number.isFinite(readValue)
-      ? Math.round(Math.min(10, Math.max(0, readValue)) * 2) / 2
+      ? Math.round(Math.min(25, Math.max(0, readValue)) * 2) / 2
       : defaults.readDelaySeconds;
     const responseDelaySeconds = Number.isFinite(responseValue)
       ? Math.round(Math.min(15, Math.max(0, responseValue)) * 2) / 2
