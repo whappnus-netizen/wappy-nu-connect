@@ -71,10 +71,15 @@ export function AppShell({
   const tourStepKey = user?.id ? `whappnus:first-access-tour:step:${user.id}` : null;
 
   useEffect(() => {
-    if (!user?.id || !organizationId || pathname !== "/dashboard" || typeof window === "undefined") return;
+    if (!user?.id || !organizationId || typeof window === "undefined") return;
     if (window.localStorage.getItem(tourDoneKey!) === "1") return;
-    const saved = Number(window.localStorage.getItem(tourStepKey!) ?? "0");
-    setTourStep(Number.isInteger(saved) && saved >= 0 && saved <= 3 ? saved : 0);
+    const stored = window.localStorage.getItem(tourStepKey!);
+    if (stored !== null) {
+      const saved = Number(stored);
+      setTourStep(Number.isInteger(saved) && saved >= 0 && saved <= 3 ? saved : 0);
+    } else if (pathname === "/dashboard") {
+      setTourStep(0);
+    }
   }, [user?.id, organizationId, pathname]);
 
   useEffect(() => {
@@ -99,6 +104,8 @@ export function AppShell({
   }
 
   function advanceTour() {
+    const next = tourStep === null ? null : tourStep + 1;
+    if (next !== null && next <= 3 && tourStepKey) window.localStorage.setItem(tourStepKey, String(next));
     if (tourStep === 0) { setTourStep(1); void navigate({ to: "/whatsapp" }); return; }
     if (tourStep === 1) { setTourStep(2); void navigate({ to: "/ia" }); return; }
     if (tourStep === 2) { setTourStep(3); void navigate({ to: "/mini-curso" }); return; }
@@ -217,7 +224,6 @@ export function AppShell({
 <main className="min-w-0 flex-1 p-3 sm:p-4 lg:p-8">{children}</main>
         {tourStep !== null && (
           <>
-            <div className="fixed inset-0 z-[70] bg-slate-950/35" aria-hidden="true" />
             <section role="dialog" aria-modal="true" aria-labelledby="whappnus-tour-title" className="fixed bottom-4 left-4 right-4 z-[80] mx-auto max-w-lg rounded-2xl border border-emerald-400/30 bg-[#07130e] p-5 text-white shadow-[0_24px_90px_rgba(0,0,0,.5)] sm:bottom-6 sm:left-auto sm:right-6 sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-300">Primeiros passos · {tourStep + 1}/4</span>
