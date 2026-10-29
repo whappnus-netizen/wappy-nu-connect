@@ -222,3 +222,21 @@ display: none !important;
 @media (prefers-reduced-motion: reduce) {
   .whappnus-landing .hero-demo-video { transform: none; }
 }
+
+
+/* First-access guide focus ring: keep the real action visible and identifiable. */
+.whappnus-tour-highlight {
+  position: relative !important;
+  outline: 3px solid rgb(16 185 129 / 95%) !important;
+  outline-offset: 5px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 0 8px rgb(16 185 129 / 14%), 0 0 34px rgb(16 185 129 / 35%) !important;
+  animation: whappnus-tour-pulse 1.8s ease-in-out infinite;
+}
+@keyframes whappnus-tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 6px rgb(16 185 129 / 12%), 0 0 22px rgb(16 185 129 / 28%); }
+  50% { box-shadow: 0 0 0 10px rgb(16 185 129 / 20%), 0 0 36px rgb(16 185 129 / 42%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .whappnus-tour-highlight { animation: none; }
+}
