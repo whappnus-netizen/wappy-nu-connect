@@ -251,7 +251,7 @@ function AiPage() {
               </p>
             </div>
             {canManage && (
-              <Button onClick={() => createAgent.mutate()} disabled={createAgent.isPending || !canCreateAgent || agentLimitReached} className="w-full sm:w-auto">
+              <Button data-tour="ia-create-agent" onClick={() => createAgent.mutate()} disabled={createAgent.isPending || !canCreateAgent || agentLimitReached} className="w-full sm:w-auto">
                 {createAgent.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                 Criar agente
               </Button>
