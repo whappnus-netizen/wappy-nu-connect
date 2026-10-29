@@ -309,7 +309,7 @@ function WhatsAppPage() {
           <Button size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" variant="outline" disabled={!orgId || !canConnect} onClick={() => setMethod("meta_cloud")}>
             <Cloud className="size-4" /> Cloud API
           </Button>
-          <Button size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" disabled={!orgId || !canConnect || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
+          <Button data-tour="whatsapp-connect" size="sm" className="px-2 text-xs sm:px-3 sm:text-sm" disabled={!orgId || !canConnect || startQr.isPending || startPairing.isPending} onClick={() => { setPairingCode(null); setError(null); setMethod("qr"); }}>
             <QrCode className="size-4" /> Conectar WhatsApp
           </Button>
         </div>
