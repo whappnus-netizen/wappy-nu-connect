@@ -40,20 +40,27 @@ export function PremiumLanding() {
           <h1 className="mt-7 max-w-[700px] text-[clamp(2.8rem,6.1vw,5.7rem)] font-semibold leading-[.99] tracking-[-.065em]">O seu WhatsApp pode fazer <span className="hero-green-text">muito mais pelo seu negócio.</span></h1>
           <p className="mt-6 max-w-[540px] text-[15px] leading-7 text-slate-300 sm:text-[17px] sm:leading-8">Ligue o WhatsApp da sua empresa, prepare uma IA com os seus produtos, serviços e regras de atendimento. Responda com mais consistência, organize conversas e acompanhe oportunidades — sem perder o toque do seu negócio.</p>
           <div className="mt-8 flex flex-col gap-3 min-[420px]:flex-row"><Button asChild size="lg" className="hero-primary-btn h-[54px] rounded-xl px-6 text-sm font-bold"><Link to="/auth/registo">Criar conta grátis <ArrowRight className="ml-2 size-4"/></Link></Button><Button asChild size="lg" variant="outline" className="h-[54px] rounded-xl border-white/15 bg-white/[.035] px-6 text-sm text-white transition hover:border-emerald-300/40 hover:bg-white/[.07] hover:text-white"><a href="#plataforma">Ver como funciona <ChevronDown className="ml-2 size-4"/></a></Button></div>
-          <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2.5 text-[11px] text-slate-400 sm:text-xs">{["Teste grátis durante 7 dias","Planos em Kwanza","Sem cartão para começar"].map(t=><span key={t} className="inline-flex items-center gap-1.5"><CircleCheck className="size-4 text-emerald-300"/>{t}</span>)}</div>
+
         </div>
         <div className="hero-visual relative mx-auto mt-2 w-full max-w-[660px] lg:mt-0 lg:min-h-[560px]">
           <div className="hero-media-frame relative z-10 mx-auto aspect-[4/5] w-full overflow-hidden bg-[#07100d] sm:aspect-[5/4]">
-            <video className="hero-demo-video absolute inset-0 h-full w-full object-cover" src="/media/hero-whappnus.mp4" autoPlay muted loop playsInline preload="metadata" aria-label="Vídeo de apresentação da plataforma WHAPPNUS" onError={(event)=>{event.currentTarget.style.display="none";}} />
-            <div className="hero-video-fallback absolute inset-0 flex flex-col justify-end p-6 sm:p-8">
-              <div className="hero-video-orbit pointer-events-none absolute inset-[12%] rounded-full"/>
+            <iframe
+              className="hero-demo-video absolute inset-0 z-0 h-full w-full border-0"
+              src="https://preview--vidlink.base44.app/embed/dBjZXDzWUcRW?autoplay=1&muted=1&loop=1&controls=0"
+              title="Apresentação da plataforma WHAPPNUS"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              loading="eager"
+            />
+            <div className="hero-video-fallback pointer-events-none absolute inset-0 z-10 flex flex-col justify-end p-6 sm:p-8">
+              <div className="hero-video-orbit absolute inset-[12%] rounded-full"/>
               <div className="relative z-10 max-w-sm">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-emerald-200"><span className="size-1.5 rounded-full bg-emerald-300"/> WHAPPNUS</span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-[#04100b]/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-emerald-100 backdrop-blur-md"><span className="size-1.5 rounded-full bg-emerald-300"/> WHAPPNUS</span>
                 <p className="mt-4 text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl">Conversas que aproximam. <span className="text-emerald-300">Atendimento que evolui.</span></p>
-                <p className="mt-3 text-sm leading-6 text-slate-300">O seu negócio, o seu conhecimento e uma IA preparada para atender melhor.</p>
+                <p className="mt-3 text-sm leading-6 text-slate-100">O seu negócio, o seu conhecimento e uma IA preparada para atender melhor.</p>
               </div>
             </div>
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#04100b]/10 via-transparent to-[#04100b]/70"/>
+            <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-br from-[#04100b]/20 via-transparent to-[#04100b]/75"/>
           </div>
         </div>
       </div>

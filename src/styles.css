@@ -186,3 +186,39 @@
 #lovable-badge {
 display: none !important;
 }
+
+
+/* WHAPPNUS landing hero: cinematic video layer without competing with the copy. */
+.whappnus-landing .hero-media-frame {
+  isolation: isolate;
+  border: 1px solid rgb(110 231 183 / 16%);
+  border-radius: 1.75rem;
+  box-shadow: 0 35px 100px -42px rgb(16 185 129 / 42%);
+  background: #06100c;
+}
+.whappnus-landing .hero-demo-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scale(1.08);
+  pointer-events: none;
+  background: #06100c;
+}
+.whappnus-landing .hero-video-fallback {
+  text-shadow: 0 2px 18px rgb(0 0 0 / 70%);
+}
+.whappnus-landing .hero-video-orbit {
+  border: 1px solid rgb(110 231 183 / 18%);
+  box-shadow: inset 0 0 90px rgb(16 185 129 / 9%), 0 0 90px rgb(16 185 129 / 8%);
+}
+.whappnus-landing .hero-media-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgb(4 16 11 / 18%), transparent 48%, rgb(4 16 11 / 18%)), linear-gradient(0deg, rgb(4 16 11 / 30%), transparent 55%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .whappnus-landing .hero-demo-video { transform: none; }
+}
