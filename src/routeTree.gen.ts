@@ -241,6 +241,7 @@ export interface FileRoutesByTo {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -340,6 +341,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/automacoes'
+    | '/agendamentos'
     | '/contactos'
     | '/crm'
     | '/dashboard'
