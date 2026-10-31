@@ -104,6 +104,11 @@ begin
   and b.status in ('pending_confirmation','confirmed','in_progress') and tstzrange(b.starts_at,b.ends_at,'[)') && tstzrange(p_starts_at,v_ends_at,'[)')) then
   raise exception 'BOOKING_RESOURCE_SLOT_TAKEN' using errcode='23P01';
  end if;
+ if (select count(*) from public.bookings b where b.organization_id=p_organization_id and b.service_id=v_booking.service_id
+   and b.id<>p_booking_id and b.status in ('pending_confirmation','confirmed','in_progress')
+   and tstzrange(b.starts_at,b.ends_at,'[)') && tstzrange(p_starts_at,v_ends_at,'[)')) >= v_service.capacity then
+  raise exception 'BOOKING_SERVICE_CAPACITY_REACHED' using errcode='23P01';
+ end if;
  update public.bookings set starts_at=p_starts_at,ends_at=v_ends_at,staff_id=p_staff_id,resource_id=p_resource_id,updated_at=pg_catalog.now()
  where id=p_booking_id and organization_id=p_organization_id returning * into v_booking;
  insert into public.booking_events(organization_id,booking_id,event_type,actor_type,actor_user_id,details)
