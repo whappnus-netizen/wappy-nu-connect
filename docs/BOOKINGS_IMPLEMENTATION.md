@@ -27,8 +27,8 @@ The organization chooses automatic confirmation or human approval. A service may
 
 ## First-release limitations
 
-- Weekly organization opening hours are supported. Staff/resource-specific weekly rules are read by the AI availability engine; advanced exception editing is not yet exposed in the dashboard.
-- Dashboard booking creation is a basic operational form, not a full drag-and-drop calendar.
+- Weekly organization opening hours are supported. Staff/resource-specific weekly rules are read by the AI availability engine; advanced exception editing is not yet exposed in the dashboard. The first dashboard release provides a seven-day calendar and list management, not drag-and-drop rescheduling. Resources are treated as one active reservation per resource in V1.
+- Dashboard booking creation is a basic operational form with a seven-day calendar view; drag-and-drop rescheduling and month view are future work.
 - Internal notifications are created for booking events. WhatsApp reminders are not sent yet; the reminder flags remain disabled until a reliable scheduled sender exists.
 - Public booking pages, external calendar synchronization, waitlists, recurring and multi-day reservations are future work.
 
