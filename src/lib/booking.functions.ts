@@ -168,7 +168,7 @@ export const createDashboardBooking = createServerFn({ method: "POST" })
     if(orgError||!org) throw new Error("Não foi possível identificar o fuso horário da organização.");
     if(serviceError||!service?.is_active) throw new Error("Serviço indisponível.");
     const startsAt=localDateTimeToUtc(data.startsAtLocal,org.timezone||"Africa/Luanda");
-    const {data:result,error}=await admin.rpc("create_booking_v1",{
+    const {data:result,error}=await admin.rpc("create_booking_v2",{
       p_organization_id:data.organizationId,p_contact_id:data.contactId,p_conversation_id:null,p_service_id:data.serviceId,
       p_staff_id:data.staffId,p_resource_id:data.resourceId,p_starts_at:startsAt,p_source:"dashboard",
       p_customer_notes:data.customerNotes??null,p_idempotency_key:crypto.randomUUID(),p_actor_user_id:actor.userId,
