@@ -96,8 +96,8 @@ begin
  end if;
  perform public.validate_booking_slot_v1(p_organization_id,v_booking.service_id,p_starts_at,p_staff_id,p_resource_id,p_booking_id);
  v_ends_at:=p_starts_at+pg_catalog.make_interval(mins=>v_service.duration_minutes);
- if p_staff_id is not null and exists(select 1 from public.bookings b where b.organization_id=p_organization_id and b.staff_id=p_staff_id and b.id<>p_booking_id
-  and b.status in ('pending_confirmation','confirmed','in_progress') and tstzrange(b.starts_at,b.ends_at,'[)') && tstzrange(p_starts_at-v_service.buffer_before_minutes*interval '1 minute',v_ends_at+v_service.buffer_after_minutes*interval '1 minute','[)')) then
+ if p_staff_id is not null and exists(select 1 from public.bookings b join public.booking_services prior_service on prior_service.id=b.service_id and prior_service.organization_id=b.organization_id where b.organization_id=p_organization_id and b.staff_id=p_staff_id and b.id<>p_booking_id
+  and b.status in ('pending_confirmation','confirmed','in_progress') and tstzrange(b.starts_at-prior_service.buffer_before_minutes*interval '1 minute',b.ends_at+prior_service.buffer_after_minutes*interval '1 minute','[)') && tstzrange(p_starts_at-v_service.buffer_before_minutes*interval '1 minute',v_ends_at+v_service.buffer_after_minutes*interval '1 minute','[)')) then
   raise exception 'BOOKING_STAFF_SLOT_TAKEN' using errcode='23P01';
  end if;
  if p_resource_id is not null and exists(select 1 from public.bookings b where b.organization_id=p_organization_id and b.resource_id=p_resource_id and b.id<>p_booking_id
