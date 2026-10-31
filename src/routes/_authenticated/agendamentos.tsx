@@ -57,7 +57,6 @@ function BookingsPage() {
   const [staffServicesInitialized,setStaffServicesInitialized] = useState(false);
   const [resourceName,setResourceName] = useState("");
   const [resourceType,setResourceType] = useState<"room"|"table"|"equipment"|"vehicle"|"space"|"other">("room");
-  const [resourceCapacity,setResourceCapacity] = useState("1");
   const [resourceService,setResourceService] = useState("");
   const [bookingResource,setBookingResource] = useState("");
   const [bookingService,setBookingService] = useState("");
@@ -124,8 +123,8 @@ function BookingsPage() {
     onError:(e:Error)=>toast.error(e.message),
   });
   const resourceMutation=useMutation({
-    mutationFn:()=>saveBookingResource({data:{organizationId:organizationId!,name:resourceName,resourceType,capacity:Number(resourceCapacity),serviceIds:resourceService?[resourceService]:[],isActive:true}}),
-    onSuccess:()=>{toast.success("Recurso adicionado.");setResourceName("");setResourceService("");setResourceCapacity("1");void refresh();},
+    mutationFn:()=>saveBookingResource({data:{organizationId:organizationId!,name:resourceName,resourceType,capacity:1,serviceIds:resourceService?[resourceService]:[],isActive:true}}),
+    onSuccess:()=>{toast.success("Recurso adicionado.");setResourceName("");setResourceService("");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
   const scheduleMutation=useMutation({
@@ -221,7 +220,7 @@ function BookingsPage() {
               <Field label="Nome"><Input value={resourceName} onChange={e=>setResourceName(e.target.value)} placeholder="Ex.: Sala 1, Mesa 4, Viatura A"/></Field>
               <Field label="Tipo"><Select value={resourceType} onValueChange={v=>setResourceType(v as typeof resourceType)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="room">Sala</SelectItem><SelectItem value="table">Mesa</SelectItem><SelectItem value="equipment">Equipamento</SelectItem><SelectItem value="vehicle">Viatura</SelectItem><SelectItem value="space">Espaço</SelectItem><SelectItem value="other">Outro</SelectItem></SelectContent></Select></Field>
               <Field label="Serviço associado"><Select value={resourceService||"all"} onValueChange={v=>setResourceService(v==="all"?"":v)}><SelectTrigger><SelectValue placeholder="Todos / sem restrição"/></SelectTrigger><SelectContent><SelectItem value="all">Sem associação específica</SelectItem>{services.map(s=><SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></Field>
-              <Field label="Capacidade"><Input type="number" min="1" max="1000" value={resourceCapacity} onChange={e=>setResourceCapacity(e.target.value)}/></Field>
+              
               <div className="md:col-span-3 flex justify-end"><Button disabled={!resourceName.trim()||resourceMutation.isPending} onClick={()=>resourceMutation.mutate()}><Plus className="size-4"/>Adicionar recurso</Button></div>
             </div></CardContent></Card>}
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.resources.map(r=><Card key={r.id}><CardContent className="flex items-center gap-3 p-4"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package className="size-5"/></div><div className="min-w-0 flex-1"><p className="font-semibold">{r.name}</p><p className="text-xs text-muted-foreground">{r.resource_type} · Capacidade {r.capacity}</p></div><Badge variant={r.is_active?"default":"secondary"}>{r.is_active?"Activo":"Inactivo"}</Badge></CardContent></Card>)}</div>
