@@ -49,7 +49,11 @@ function BookingsPage() {
   const [serviceDescription,setServiceDescription] = useState("");
   const [serviceDuration,setServiceDuration] = useState("60");
   const [servicePrice,setServicePrice] = useState("");
-  const [staffName,setStaffName] = useState("");\n  const [resourceName,setResourceName] = useState("");\n  const [resourceType,setResourceType] = useState<"room"|"table"|"equipment"|"vehicle"|"space"|"other">("room");\n  const [resourceService,setResourceService] = useState("");\n  const [bookingResource,setBookingResource] = useState("");
+  const [staffName,setStaffName] = useState("");
+  const [resourceName,setResourceName] = useState("");
+  const [resourceType,setResourceType] = useState<"room"|"table"|"equipment"|"vehicle"|"space"|"other">("room");
+  const [resourceService,setResourceService] = useState("");
+  const [bookingResource,setBookingResource] = useState("");
   const [bookingService,setBookingService] = useState("");
   const [bookingContact,setBookingContact] = useState("");
   const [bookingStaff,setBookingStaff] = useState("");
@@ -177,7 +181,8 @@ function BookingsPage() {
                 <Field label="Serviço"><Select value={bookingService} onValueChange={setBookingService}><SelectTrigger><SelectValue placeholder="Escolher serviço"/></SelectTrigger><SelectContent>{services.filter(s=>s.is_active).map(s=><SelectItem key={s.id} value={s.id}>{s.name} · {s.duration_minutes} min</SelectItem>)}</SelectContent></Select></Field>
                 <Field label="Cliente"><Select value={bookingContact} onValueChange={setBookingContact}><SelectTrigger><SelectValue placeholder="Escolher contacto"/></SelectTrigger><SelectContent>{data.contacts.map(c=><SelectItem key={c.id} value={c.id}>{c.full_name||c.phone_e164}</SelectItem>)}</SelectContent></Select></Field>
                 <Field label="Profissional (opcional)"><Select value={bookingStaff||"any"} onValueChange={v=>setBookingStaff(v==="any"?"":v)}><SelectTrigger><SelectValue placeholder="Qualquer disponível"/></SelectTrigger><SelectContent><SelectItem value="any">Qualquer disponível</SelectItem>{staff.filter(s=>s.is_active).map(s=><SelectItem key={s.id} value={s.id}>{s.display_name}</SelectItem>)}</SelectContent></Select></Field>
-                <Field label="Recurso (opcional)"><Select value={bookingResource||"none"} onValueChange={v=>setBookingResource(v==="none"?"":v)}><SelectTrigger><SelectValue placeholder="Sem recurso específico"/></SelectTrigger><SelectContent><SelectItem value="none">Sem recurso específico</SelectItem>{data.resources.filter(r=>r.is_active).map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></Field>\n                <Field label="Data e hora"><Input type="datetime-local" value={bookingStart} onChange={e=>setBookingStart(e.target.value)}/></Field>
+                <Field label="Recurso (opcional)"><Select value={bookingResource||"none"} onValueChange={v=>setBookingResource(v==="none"?"":v)}><SelectTrigger><SelectValue placeholder="Sem recurso específico"/></SelectTrigger><SelectContent><SelectItem value="none">Sem recurso específico</SelectItem>{data.resources.filter(r=>r.is_active).map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></Field>
+                <Field label="Data e hora"><Input type="datetime-local" value={bookingStart} onChange={e=>setBookingStart(e.target.value)}/></Field>
                 <Field label="Observações"><Input value={bookingNotes} onChange={e=>setBookingNotes(e.target.value)} placeholder="Informação adicional"/></Field>
                 <div className="flex items-end"><Button className="w-full" disabled={!canOperate||!data.settings.enabled||!bookingService||!bookingStart||createMutation.isPending} onClick={()=>createMutation.mutate()}>{createMutation.isPending?<Loader2 className="size-4 animate-spin"/>:<Plus className="size-4"/>}Criar marcação</Button></div>
               </div></CardContent></Card>}
