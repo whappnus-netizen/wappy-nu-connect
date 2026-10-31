@@ -808,7 +808,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
       if (finalText) {
         setForm((current) => ({
           ...current,
-          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("
+          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("\n"), finalText].filter(Boolean).join("
 "),
         }));
       }
@@ -1172,9 +1172,7 @@ function PdfUploadPanel({ orgId, agentId, canManage }: { orgId: string; agentId:
       } finally {
         await pdf.destroy();
       }
-      const extracted = pageTexts.join("
-
-").replace(/[ \t]+/g, " ").trim().slice(0, 150000);
+      const extracted = pageTexts.join("\n\n").replace(/[ \t]+/g, " ").trim().slice(0, 150000);
       if (extracted.length < 20) throw new Error("Este PDF não contém texto extraível. PDFs digitalizados como imagens precisam de OCR, que ainda não está incluído.");
 
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "documento.pdf";
