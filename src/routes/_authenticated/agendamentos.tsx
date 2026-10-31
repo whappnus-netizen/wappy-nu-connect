@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  CalendarDays, CalendarClock, CalendarCheck, Clock, Users, Wrench, Settings2,
+  CalendarDays, CalendarClock, CalendarCheck, Clock, Package, Settings2,
   Plus, CheckCircle2, XCircle, CircleAlert, Loader2, RefreshCw, UserRound,
 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
@@ -49,7 +49,7 @@ function BookingsPage() {
   const [serviceDescription,setServiceDescription] = useState("");
   const [serviceDuration,setServiceDuration] = useState("60");
   const [servicePrice,setServicePrice] = useState("");
-  const [staffName,setStaffName] = useState("");
+  const [staffName,setStaffName] = useState("");\n  const [resourceName,setResourceName] = useState("");\n  const [resourceType,setResourceType] = useState<"room"|"table"|"equipment"|"vehicle"|"space"|"other">("room");\n  const [resourceService,setResourceService] = useState("");\n  const [bookingResource,setBookingResource] = useState("");
   const [bookingService,setBookingService] = useState("");
   const [bookingContact,setBookingContact] = useState("");
   const [bookingStaff,setBookingStaff] = useState("");
@@ -111,18 +111,23 @@ function BookingsPage() {
     onSuccess:()=>{toast.success("Profissional adicionado.");setStaffName("");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
+  const resourceMutation=useMutation({
+    mutationFn:()=>saveBookingResource({data:{organizationId:organizationId!,name:resourceName,resourceType,capacity:1,serviceIds:resourceService?[resourceService]:[],isActive:true}}),
+    onSuccess:()=>{toast.success("Recurso adicionado.");setResourceName("");setResourceService("");void refresh();},
+    onError:(e:Error)=>toast.error(e.message),
+  });
   const scheduleMutation=useMutation({
     mutationFn:()=>saveBookingSchedule({data:{organizationId:organizationId!,days}}),
     onSuccess:()=>{toast.success("Horário de funcionamento guardado.");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
   const settingsMutation=useMutation({
-    mutationFn:()=>saveBookingSettings({data:{organizationId:organizationId!,enabled,confirmationMode,minNoticeMinutes:Number(minNotice),maxDaysAhead:Number(maxDays),pendingExpiryMinutes:Number(pendingExpiry),allowCustomerCancel:allowCancel,allowCustomerReschedule:allowReschedule,reminder24h,reminder2h}}),
+    mutationFn:()=>saveBookingSettings({data:{organizationId:organizationId!,enabled,confirmationMode,minNoticeMinutes:Number(minNotice),maxDaysAhead:Number(maxDays),pendingExpiryMinutes:Number(pendingExpiry),allowCustomerCancel:allowCancel,allowCustomerReschedule:allowReschedule,reminder24h:false,reminder2h:false}}),
     onSuccess:()=>{toast.success("Configurações guardadas.");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
   const createMutation=useMutation({
-    mutationFn:()=>createDashboardBooking({data:{organizationId:organizationId!,contactId:bookingContact||null,serviceId:bookingService,staffId:bookingStaff||null,resourceId:null,startsAtLocal:bookingStart,customerNotes:bookingNotes}}),
+    mutationFn:()=>createDashboardBooking({data:{organizationId:organizationId!,contactId:bookingContact||null,serviceId:bookingService,staffId:bookingStaff||null,resourceId:bookingResource||null,startsAtLocal:bookingStart,customerNotes:bookingNotes}}),
     onSuccess:()=>{toast.success("Pedido de agendamento registado.");setBookingStart("");setBookingNotes("");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
@@ -172,7 +177,7 @@ function BookingsPage() {
                 <Field label="Serviço"><Select value={bookingService} onValueChange={setBookingService}><SelectTrigger><SelectValue placeholder="Escolher serviço"/></SelectTrigger><SelectContent>{services.filter(s=>s.is_active).map(s=><SelectItem key={s.id} value={s.id}>{s.name} · {s.duration_minutes} min</SelectItem>)}</SelectContent></Select></Field>
                 <Field label="Cliente"><Select value={bookingContact} onValueChange={setBookingContact}><SelectTrigger><SelectValue placeholder="Escolher contacto"/></SelectTrigger><SelectContent>{data.contacts.map(c=><SelectItem key={c.id} value={c.id}>{c.full_name||c.phone_e164}</SelectItem>)}</SelectContent></Select></Field>
                 <Field label="Profissional (opcional)"><Select value={bookingStaff||"any"} onValueChange={v=>setBookingStaff(v==="any"?"":v)}><SelectTrigger><SelectValue placeholder="Qualquer disponível"/></SelectTrigger><SelectContent><SelectItem value="any">Qualquer disponível</SelectItem>{staff.filter(s=>s.is_active).map(s=><SelectItem key={s.id} value={s.id}>{s.display_name}</SelectItem>)}</SelectContent></Select></Field>
-                <Field label="Data e hora"><Input type="datetime-local" value={bookingStart} onChange={e=>setBookingStart(e.target.value)}/></Field>
+                <Field label="Recurso (opcional)"><Select value={bookingResource||"none"} onValueChange={v=>setBookingResource(v==="none"?"":v)}><SelectTrigger><SelectValue placeholder="Sem recurso específico"/></SelectTrigger><SelectContent><SelectItem value="none">Sem recurso específico</SelectItem>{data.resources.filter(r=>r.is_active).map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></Field>\n                <Field label="Data e hora"><Input type="datetime-local" value={bookingStart} onChange={e=>setBookingStart(e.target.value)}/></Field>
                 <Field label="Observações"><Input value={bookingNotes} onChange={e=>setBookingNotes(e.target.value)} placeholder="Informação adicional"/></Field>
                 <div className="flex items-end"><Button className="w-full" disabled={!canOperate||!data.settings.enabled||!bookingService||!bookingStart||createMutation.isPending} onClick={()=>createMutation.mutate()}>{createMutation.isPending?<Loader2 className="size-4 animate-spin"/>:<Plus className="size-4"/>}Criar marcação</Button></div>
               </div></CardContent></Card>}
@@ -195,6 +200,17 @@ function BookingsPage() {
             {canManage&&<Card><CardHeader><CardTitle className="text-base">Adicionar profissional</CardTitle></CardHeader><CardContent><div className="flex flex-col gap-3 sm:flex-row"><Field label="Nome do profissional"><Input value={staffName} onChange={e=>setStaffName(e.target.value)} placeholder="Nome"/></Field><div className="flex items-end"><Button disabled={!staffName.trim()||staffMutation.isPending} onClick={()=>staffMutation.mutate()}><Plus className="size-4"/>Adicionar</Button></div></div><p className="mt-2 text-xs text-muted-foreground">O profissional será associado aos serviços activos. A associação individual poderá ser ajustada na gestão avançada.</p></CardContent></Card>}
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{staff.map(s=><Card key={s.id}><CardContent className="flex items-center gap-3 p-4"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><UserRound className="size-5"/></div><div className="min-w-0 flex-1"><p className="font-semibold">{s.display_name}</p><p className="text-xs text-muted-foreground">{s.description||"Profissional da equipa"}</p></div><Badge variant={s.is_active?"default":"secondary"}>{s.is_active?"Activo":"Inactivo"}</Badge></CardContent></Card>)}</div>
             {!staff.length&&<EmptyPanel title="Sem profissionais registados" text="Podes começar sem equipa ou adicionar os profissionais que atendem os clientes."/>}
+          </TabsContent>
+          <TabsContent value="recursos" className="space-y-4">
+            <SectionHeading title="Recursos reserváveis" description="Salas, mesas, equipamentos, viaturas ou espaços necessários para determinados serviços."/>
+            {canManage&&<Card><CardHeader><CardTitle className="text-base">Adicionar recurso</CardTitle></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-3">
+              <Field label="Nome"><Input value={resourceName} onChange={e=>setResourceName(e.target.value)} placeholder="Ex.: Sala 1, Mesa 4, Viatura A"/></Field>
+              <Field label="Tipo"><Select value={resourceType} onValueChange={v=>setResourceType(v as typeof resourceType)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="room">Sala</SelectItem><SelectItem value="table">Mesa</SelectItem><SelectItem value="equipment">Equipamento</SelectItem><SelectItem value="vehicle">Viatura</SelectItem><SelectItem value="space">Espaço</SelectItem><SelectItem value="other">Outro</SelectItem></SelectContent></Select></Field>
+              <Field label="Serviço associado"><Select value={resourceService||"all"} onValueChange={v=>setResourceService(v==="all"?"":v)}><SelectTrigger><SelectValue placeholder="Todos / sem restrição"/></SelectTrigger><SelectContent><SelectItem value="all">Sem associação específica</SelectItem>{services.map(s=><SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></Field>
+              <div className="md:col-span-3 flex justify-end"><Button disabled={!resourceName.trim()||resourceMutation.isPending} onClick={()=>resourceMutation.mutate()}><Plus className="size-4"/>Adicionar recurso</Button></div>
+            </div></CardContent></Card>}
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.resources.map(r=><Card key={r.id}><CardContent className="flex items-center gap-3 p-4"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package className="size-5"/></div><div className="min-w-0 flex-1"><p className="font-semibold">{r.name}</p><p className="text-xs text-muted-foreground">{r.resource_type} · Capacidade {r.capacity}</p></div><Badge variant={r.is_active?"default":"secondary"}>{r.is_active?"Activo":"Inactivo"}</Badge></CardContent></Card>)}</div>
+            {!data.resources.length&&<EmptyPanel title="Sem recursos registados" text="Adiciona salas, mesas, equipamentos ou outros recursos quando o teu negócio precisar de controlar a disponibilidade deles."/>}
           </TabsContent>
           <TabsContent value="horarios" className="space-y-4">
             <SectionHeading title="Horário de funcionamento" description="Define os dias e as horas em que a organização aceita marcações."/>
