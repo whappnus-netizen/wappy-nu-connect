@@ -638,7 +638,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
   const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
   const [readDelaySeconds, setReadDelaySeconds] = useState(1.5);
-  const [responseDelaySeconds, setResponseDelaySeconds] = useState(2);
+  const [responseDelaySeconds, setResponseDelaySeconds] = useState(2);\n  const [bookingEnabled, setBookingEnabled] = useState(false);\n  const [bookingCanCreate, setBookingCanCreate] = useState(false);\n  const [bookingCanCancel, setBookingCanCancel] = useState(false);\n  const [bookingCanReschedule, setBookingCanReschedule] = useState(false);
   const [recordingField, setRecordingField] = useState<string | null>(null);
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [organizingField, setOrganizingField] = useState<string | null>(null);
@@ -649,7 +649,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
-    const storedConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
+    const storedConfig = agent.config && typeof agent.config === "object" ? agent.config : {};\n    const booking = storedConfig["booking"] && typeof storedConfig["booking"] === "object" ? storedConfig["booking"] as Record<string, unknown> : {};\n    setBookingEnabled(booking["enabled"] === true);\n    setBookingCanCreate(booking["canCreate"] === true);\n    setBookingCanCancel(booking["canCancel"] === true);\n    setBookingCanReschedule(booking["canReschedule"] === true);
     const readDelay = Number(storedConfig["readDelaySeconds"]);
     const responseDelay = Number(storedConfig["responseDelaySeconds"]);
     const legacyMin = Number(storedConfig["responseDelayMinSeconds"]);
@@ -696,7 +696,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
         config: {
           ...existingConfig,
           readDelaySeconds: safeReadDelay,
-          responseDelaySeconds: safeResponseDelay,
+          responseDelaySeconds: safeResponseDelay,\n          booking: { enabled: bookingEnabled, canCreate: bookingCanCreate, canCancel: bookingCanCancel, canReschedule: bookingCanReschedule },
         },
         ...(autoActivate ? { is_active: true } : {}),
       };
@@ -969,6 +969,18 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
           <div className="flex justify-between text-xs text-muted-foreground"><span>0 s — Sem espera adicional</span><span>15 s — Máximo</span></div>
         </div>
         <p className="text-xs text-muted-foreground">Padrões recomendados: 1,5 s para leitura e 2 s para resposta. O valor 0 remove a espera artificial adicional.</p>
+      </section>
+      <section className="space-y-4 rounded-xl border border-border bg-secondary/30 p-4 sm:p-5">
+        <div>
+          <h3 className="font-semibold">Agendamentos inteligentes</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Autoriza este agente a executar operações reais de agendamento. O módulo também precisa estar activo e configurado na aba Agendamentos.</p>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Activar ferramentas de agendamento</p><p className="text-xs text-muted-foreground">Permite consultar serviços e horários disponíveis.</p></div><Switch checked={bookingEnabled} onCheckedChange={setBookingEnabled} disabled={!canManage || save.isPending}/></div>
+          <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Criar agendamentos</p><p className="text-xs text-muted-foreground">A IA pode registar uma reserva depois de o cliente escolher um horário disponível.</p></div><Switch checked={bookingCanCreate} onCheckedChange={setBookingCanCreate} disabled={!canManage || !bookingEnabled || save.isPending}/></div>
+          <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Cancelar agendamentos</p><p className="text-xs text-muted-foreground">A IA pode cancelar uma reserva do próprio cliente, respeitando a política da empresa.</p></div><Switch checked={bookingCanCancel} onCheckedChange={setBookingCanCancel} disabled={!canManage || !bookingEnabled || save.isPending}/></div>
+          <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">Remarcar agendamentos</p><p className="text-xs text-muted-foreground">A IA pode procurar outro horário e alterar uma reserva do próprio cliente.</p></div><Switch checked={bookingCanReschedule} onCheckedChange={setBookingCanReschedule} disabled={!canManage || !bookingEnabled || save.isPending}/></div>
+        </div>
       </section>
       <p className="rounded-md bg-secondary/60 p-3 text-xs text-muted-foreground">Dica: pode ditar instruções longas e depois usar “Organizar com IA”. O texto será estruturado sem inventar preços, políticas ou informações que não forneceu. Revê sempre o resultado antes de guardar.</p>
       <Button type="submit" disabled={save.isPending}>
