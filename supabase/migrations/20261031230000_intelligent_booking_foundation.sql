@@ -390,7 +390,7 @@ create or replace function public.reschedule_booking_v1(
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_booking public.bookings%rowtype;
   v_service public.booking_services%rowtype;
