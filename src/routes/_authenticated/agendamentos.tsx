@@ -103,7 +103,7 @@ function BookingsPage() {
   const todayCount = bookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:data?.organization?.timezone??"Africa/Luanda"})===today).length;
 
   useEffect(()=>{
-    if(!data || initializedSettingsFor.current===organizationId) return;
+    if(!data || !organizationId || initializedSettingsFor.current===organizationId) return;
     initializedSettingsFor.current=organizationId;
     setEnabled(Boolean(data.settings.enabled));
     setConfirmationMode(data.settings.confirmation_mode==="manual"?"manual":"automatic");
