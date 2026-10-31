@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";\nimport type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
   CalendarDays, CalendarClock, CalendarCheck, Clock, Package, Settings2,
@@ -193,7 +193,7 @@ function BookingsPage() {
               <div className="flex items-end"><Button className="w-full" disabled={!serviceName.trim()||serviceMutation.isPending} onClick={()=>serviceMutation.mutate()}><Plus className="size-4"/>Adicionar serviço</Button></div>
               <div className="md:col-span-2 xl:col-span-4"><Field label="Descrição"><Textarea value={serviceDescription} onChange={e=>setServiceDescription(e.target.value)} placeholder="Descreve o serviço e o que o cliente deve saber."/></Field></div>
             </div></CardContent></Card>}
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{services.map(s=><Card key={s.id}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{s.name}</p><p className="mt-1 text-xs text-muted-foreground">{s.description||"Sem descrição"}</p></div><Badge variant={s.is_active?"default":"secondary"}>{s.is_active?"Activo":"Inactivo"}</Badge></div><div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground"><span className="flex items-center gap-1"><Clock className="size-3"/> {s.duration_minutes} min</span><span>{s.price_amount!=null?Number(s.price_amount).toLocaleString("pt-AO")+" Kz":"Preço sob consulta"}</span></div></CardContent></Card>)}</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{services.map(s=><Card key={s.id}><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{s.name}</p><p className="mt-1 text-xs text-muted-foreground">{s.description||"Sem descrição"}</p></div><Badge variant={s.is_active?"default":"secondary"}>{s.is_active?"Activo":"Inactivo"}</Badge></div><div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground"><span className="flex items-center gap-1"><Clock className="size-3"/> {s.duration_minutes} min</span><span>{s.price_amount!=null?Number(s.price_amount).toLocaleString("pt-AO")+" "+(data.organization?.currency??"AOA"):"Preço sob consulta"}</span></div></CardContent></Card>)}</div>
             {!services.length&&<EmptyPanel title="Nenhum serviço cadastrado" text="Adiciona o primeiro serviço para começares a receber marcações."/>}
           </TabsContent>
           <TabsContent value="equipa" className="space-y-4">
@@ -249,7 +249,7 @@ function BookingsPage() {
 function Metric({icon:Icon,label,value}:{icon:typeof CalendarDays;label:string;value:number}) {
   return <Card><CardContent className="flex items-center gap-3 p-4"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="size-5"/></div><div><p className="text-2xl font-semibold tabular-nums">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div></CardContent></Card>;
 }
-function Field({label,children}:{label:string;children:React.ReactNode}) { return <div className="min-w-0 space-y-1.5"><Label>{label}</Label>{children}</div>; }
+function Field({label,children}:{label:string;children:ReactNode}) { return <div className="min-w-0 space-y-1.5"><Label>{label}</Label>{children}</div>; }
 function SectionHeading({title,description}:{title:string;description:string}) { return <div><h2 className="font-display text-lg font-semibold">{title}</h2><p className="text-sm text-muted-foreground">{description}</p></div>; }
 function SettingRow({title,description,children}:{title:string;description:string;children:React.ReactNode}) { return <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>{children}</div>; }
 function EmptyPanel({title,text}:{title:string;text:string}) { return <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center"><CalendarDays className="mx-auto mb-2 size-7 text-muted-foreground"/><p className="font-medium">{title}</p><p className="mt-1 text-sm text-muted-foreground">{text}</p></div>; }
