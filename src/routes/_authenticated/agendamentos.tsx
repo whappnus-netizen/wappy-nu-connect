@@ -207,7 +207,7 @@ function BookingsPage() {
                       <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{contactNameFor(b.contact_id)}</p>
                       <Badge className="mt-1 max-w-full" variant={statusVariants[b.status]??"outline"}>{statusLabels[b.status]??b.status}</Badge>
                     </div>)}
-                    {!orderedBookings.some(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone})===day.key&&b.status!=="cancelled"&&b.status!=="expired")&&<p className="px-1 py-4 text-center text-[10px] text-muted-foreground">Sem reservas</p>}
+                    {!orderedBookings.some(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:timezone})===day.key&&b.status!=="cancelled"&&b.status!=="expired")&&<p className="px-1 py-4 text-center text-[10px] text-muted-foreground">Sem reservas</p>}
                   </div>
                 </div>)}
               </div>
