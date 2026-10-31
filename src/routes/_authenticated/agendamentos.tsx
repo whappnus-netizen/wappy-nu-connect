@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,8 +53,11 @@ function BookingsPage() {
   const [servicePrice,setServicePrice] = useState("");
   const [serviceConfirmationMode,setServiceConfirmationMode] = useState<""|"automatic"|"manual">("");
   const [staffName,setStaffName] = useState("");
+  const [staffServiceIds,setStaffServiceIds] = useState<string[]>([]);
+  const [staffServicesInitialized,setStaffServicesInitialized] = useState(false);
   const [resourceName,setResourceName] = useState("");
   const [resourceType,setResourceType] = useState<"room"|"table"|"equipment"|"vehicle"|"space"|"other">("room");
+  const [resourceCapacity,setResourceCapacity] = useState("1");
   const [resourceService,setResourceService] = useState("");
   const [bookingResource,setBookingResource] = useState("");
   const [bookingService,setBookingService] = useState("");
@@ -102,6 +106,12 @@ function BookingsPage() {
     }));
   },[data?.settings,data?.rules]);
 
+  useEffect(()=>{
+    if(!staffServicesInitialized&&services.length){
+      setStaffServiceIds(services.filter(s=>s.is_active).map(s=>s.id));
+      setStaffServicesInitialized(true);
+    }
+  },[services,staffServicesInitialized]);
   const refresh=()=>queryClient.invalidateQueries({queryKey:["booking-workspace",organizationId]});
   const serviceMutation=useMutation({
     mutationFn:()=>saveBookingService({data:{organizationId:organizationId!,name:serviceName,description:serviceDescription,durationMinutes:Number(serviceDuration),bufferBeforeMinutes:0,bufferAfterMinutes:0,priceAmount:servicePrice?Number(servicePrice):null,capacity:1,confirmationMode:serviceConfirmationMode||null,isActive:true}}),
@@ -109,13 +119,13 @@ function BookingsPage() {
     onError:(e:Error)=>toast.error(e.message),
   });
   const staffMutation=useMutation({
-    mutationFn:()=>saveBookingStaff({data:{organizationId:organizationId!,displayName:staffName,serviceIds:services.map(s=>s.id),isActive:true}}),
+    mutationFn:()=>saveBookingStaff({data:{organizationId:organizationId!,displayName:staffName,serviceIds:staffServiceIds,isActive:true}}),
     onSuccess:()=>{toast.success("Profissional adicionado.");setStaffName("");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
   const resourceMutation=useMutation({
-    mutationFn:()=>saveBookingResource({data:{organizationId:organizationId!,name:resourceName,resourceType,capacity:1,serviceIds:resourceService?[resourceService]:[],isActive:true}}),
-    onSuccess:()=>{toast.success("Recurso adicionado.");setResourceName("");setResourceService("");void refresh();},
+    mutationFn:()=>saveBookingResource({data:{organizationId:organizationId!,name:resourceName,resourceType,capacity:Number(resourceCapacity),serviceIds:resourceService?[resourceService]:[],isActive:true}}),
+    onSuccess:()=>{toast.success("Recurso adicionado.");setResourceName("");setResourceService("");setResourceCapacity("1");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
   const scheduleMutation=useMutation({
@@ -201,7 +211,7 @@ function BookingsPage() {
           </TabsContent>
           <TabsContent value="equipa" className="space-y-4">
             <SectionHeading title="Profissionais e equipa" description="Associa funcionários aos serviços que podem executar."/>
-            {canManage&&<Card><CardHeader><CardTitle className="text-base">Adicionar profissional</CardTitle></CardHeader><CardContent><div className="flex flex-col gap-3 sm:flex-row"><Field label="Nome do profissional"><Input value={staffName} onChange={e=>setStaffName(e.target.value)} placeholder="Nome"/></Field><div className="flex items-end"><Button disabled={!staffName.trim()||staffMutation.isPending} onClick={()=>staffMutation.mutate()}><Plus className="size-4"/>Adicionar</Button></div></div><p className="mt-2 text-xs text-muted-foreground">O profissional será associado aos serviços activos. A associação individual poderá ser ajustada na gestão avançada.</p></CardContent></Card>}
+            {canManage&&<Card><CardHeader><CardTitle className="text-base">Adicionar profissional</CardTitle></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-[1fr_auto]"><Field label="Nome do profissional"><Input value={staffName} onChange={e=>setStaffName(e.target.value)} placeholder="Nome"/></Field><div className="flex items-end"><Button disabled={!staffName.trim()||staffMutation.isPending} onClick={()=>staffMutation.mutate()}><Plus className="size-4"/>Adicionar</Button></div></div><div className="mt-4 space-y-2"><Label>Serviços que este profissional pode executar</Label><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{services.filter(s=>s.is_active).map(s=><label key={s.id} className="flex items-center gap-2 rounded-lg border border-border p-2 text-sm"><Checkbox checked={staffServiceIds.includes(s.id)} onCheckedChange={checked=>setStaffServiceIds(old=>checked===true?[...old,s.id]:old.filter(id=>id!==s.id))}/>{s.name}</label>)}</div></div></CardContent></Card>}
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{staff.map(s=><Card key={s.id}><CardContent className="flex items-center gap-3 p-4"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><UserRound className="size-5"/></div><div className="min-w-0 flex-1"><p className="font-semibold">{s.display_name}</p><p className="text-xs text-muted-foreground">{s.description||"Profissional da equipa"}</p></div><Badge variant={s.is_active?"default":"secondary"}>{s.is_active?"Activo":"Inactivo"}</Badge></CardContent></Card>)}</div>
             {!staff.length&&<EmptyPanel title="Sem profissionais registados" text="Podes começar sem equipa ou adicionar os profissionais que atendem os clientes."/>}
           </TabsContent>
@@ -211,6 +221,7 @@ function BookingsPage() {
               <Field label="Nome"><Input value={resourceName} onChange={e=>setResourceName(e.target.value)} placeholder="Ex.: Sala 1, Mesa 4, Viatura A"/></Field>
               <Field label="Tipo"><Select value={resourceType} onValueChange={v=>setResourceType(v as typeof resourceType)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="room">Sala</SelectItem><SelectItem value="table">Mesa</SelectItem><SelectItem value="equipment">Equipamento</SelectItem><SelectItem value="vehicle">Viatura</SelectItem><SelectItem value="space">Espaço</SelectItem><SelectItem value="other">Outro</SelectItem></SelectContent></Select></Field>
               <Field label="Serviço associado"><Select value={resourceService||"all"} onValueChange={v=>setResourceService(v==="all"?"":v)}><SelectTrigger><SelectValue placeholder="Todos / sem restrição"/></SelectTrigger><SelectContent><SelectItem value="all">Sem associação específica</SelectItem>{services.map(s=><SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select></Field>
+              <Field label="Capacidade"><Input type="number" min="1" max="1000" value={resourceCapacity} onChange={e=>setResourceCapacity(e.target.value)}/></Field>
               <div className="md:col-span-3 flex justify-end"><Button disabled={!resourceName.trim()||resourceMutation.isPending} onClick={()=>resourceMutation.mutate()}><Plus className="size-4"/>Adicionar recurso</Button></div>
             </div></CardContent></Card>}
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{data.resources.map(r=><Card key={r.id}><CardContent className="flex items-center gap-3 p-4"><div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package className="size-5"/></div><div className="min-w-0 flex-1"><p className="font-semibold">{r.name}</p><p className="text-xs text-muted-foreground">{r.resource_type} · Capacidade {r.capacity}</p></div><Badge variant={r.is_active?"default":"secondary"}>{r.is_active?"Activo":"Inactivo"}</Badge></CardContent></Card>)}</div>
