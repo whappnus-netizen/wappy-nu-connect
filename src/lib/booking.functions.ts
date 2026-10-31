@@ -74,3 +74,120 @@ export const saveBookingService = createServerFn({ method: "POST" })
     if (result.error) throw new Error(result.error.message);
     return { id:result.data.id };
   });
+
+export const saveBookingStaff = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    organizationId:z.string().uuid(),id:z.string().uuid().optional(),displayName:z.string().trim().min(2).max(120),
+    description:z.string().max(1000).optional(),userId:z.string().uuid().nullable().optional(),
+    serviceIds:z.array(z.string().uuid()).max(100),isActive:z.boolean(),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN"]);
+    const values = { organization_id:data.organizationId,display_name:data.displayName,description:data.description??null,
+      user_id:data.userId??null,is_active:data.isActive,updated_at:new Date().toISOString() };
+    const result = data.id
+      ? await admin.from("booking_staff").update(values).eq("organization_id",data.organizationId).eq("id",data.id).select("id").single()
+      : await admin.from("booking_staff").insert(values).select("id").single();
+    if (result.error) throw new Error(result.error.message);
+    const staffId=result.data.id;
+    const { error:delError } = await admin.from("booking_service_staff").delete().eq("organization_id",data.organizationId).eq("staff_id",staffId);
+    if (delError) throw new Error(delError.message);
+    if (data.serviceIds.length) {
+      const { error } = await admin.from("booking_service_staff").insert(data.serviceIds.map(serviceId=>({organization_id:data.organizationId,staff_id:staffId,service_id:serviceId})));
+      if (error) throw new Error(error.message);
+    }
+    return { id:staffId };
+  });
+
+export const saveBookingResource = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    organizationId:z.string().uuid(),id:z.string().uuid().optional(),name:z.string().trim().min(2).max(120),
+    resourceType:z.enum(["room","table","equipment","vehicle","space","other"]),capacity:z.number().int().min(1).max(1000),
+    serviceIds:z.array(z.string().uuid()).max(100),isActive:z.boolean(),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN"]);
+    const values={organization_id:data.organizationId,name:data.name,resource_type:data.resourceType,capacity:data.capacity,is_active:data.isActive,updated_at:new Date().toISOString()};
+    const result=data.id
+      ? await admin.from("booking_resources").update(values).eq("organization_id",data.organizationId).eq("id",data.id).select("id").single()
+      : await admin.from("booking_resources").insert(values).select("id").single();
+    if(result.error) throw new Error(result.error.message);
+    const resourceId=result.data.id;
+    const {error:delError}=await admin.from("booking_service_resources").delete().eq("organization_id",data.organizationId).eq("resource_id",resourceId);
+    if(delError) throw new Error(delError.message);
+    if(data.serviceIds.length){
+      const {error}=await admin.from("booking_service_resources").insert(data.serviceIds.map(serviceId=>({organization_id:data.organizationId,resource_id:resourceId,service_id:serviceId})));
+      if(error) throw new Error(error.message);
+    }
+    return {id:resourceId};
+  });
+
+export const saveBookingSchedule = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    organizationId:z.string().uuid(),
+    days:z.array(z.object({weekday:z.number().int().min(0).max(6),enabled:z.boolean(),
+      startsAt:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),endsAt:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/)})).length(7),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN"]);
+    const days=data.days.filter(d=>d.enabled);
+    if(days.some(d=>d.endsAt<=d.startsAt)) throw new Error("O horário de fecho deve ser posterior à abertura.");
+    const {error:delError}=await admin.from("booking_availability_rules").delete().eq("organization_id",data.organizationId).eq("scope_type","organization");
+    if(delError) throw new Error(delError.message);
+    if(days.length){
+      const {error}=await admin.from("booking_availability_rules").insert(days.map(d=>({organization_id:data.organizationId,scope_type:"organization",scope_id:null,
+        weekday:d.weekday,starts_at:d.startsAt+":00",ends_at:d.endsAt+":00",is_available:true})));
+      if(error) throw new Error(error.message);
+    }
+    return {ok:true};
+  });
+
+function localDateTimeToUtc(local: string, timezone: string): string {
+  const match=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(local);
+  if(!match) throw new Error("Data e hora inválidas.");
+  const [,y,m,d,h,minute]=match;
+  const desired=Date.UTC(Number(y),Number(m)-1,Number(d),Number(h),Number(minute));
+  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(desired));
+  const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+  const represented=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute));
+  return new Date(desired-(represented-desired)).toISOString();
+}
+
+export const createDashboardBooking = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    organizationId:z.string().uuid(),contactId:z.string().uuid().nullable(),serviceId:z.string().uuid(),
+    staffId:z.string().uuid().nullable(),resourceId:z.string().uuid().nullable(),startsAtLocal:z.string(),
+    customerNotes:z.string().max(2000).optional(),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const { actor, admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN","SUPERVISOR"]);
+    const [{data:org,error:orgError},{data:service,error:serviceError}] = await Promise.all([
+      admin.from("organizations").select("timezone").eq("id",data.organizationId).single(),
+      admin.from("booking_services").select("id,is_active").eq("organization_id",data.organizationId).eq("id",data.serviceId).single(),
+    ]);
+    if(orgError||!org) throw new Error("Não foi possível identificar o fuso horário da organização.");
+    if(serviceError||!service?.is_active) throw new Error("Serviço indisponível.");
+    const startsAt=localDateTimeToUtc(data.startsAtLocal,org.timezone||"Africa/Luanda");
+    const {data:result,error}=await admin.rpc("create_booking_v1",{
+      p_organization_id:data.organizationId,p_contact_id:data.contactId,p_conversation_id:null,p_service_id:data.serviceId,
+      p_staff_id:data.staffId,p_resource_id:data.resourceId,p_starts_at:startsAt,p_source:"dashboard",
+      p_customer_notes:data.customerNotes??null,p_idempotency_key:crypto.randomUUID(),p_actor_user_id:actor.userId,
+    });
+    if(error) throw new Error(error.message);
+    return result;
+  });
+
+export const updateDashboardBookingStatus = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    organizationId:z.string().uuid(),bookingId:z.string().uuid(),
+    status:z.enum(["confirmed","in_progress","completed","cancelled","no_show"]),reason:z.string().max(1000).optional(),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const {actor,admin}=await bookingContext(data.organizationId,["OWNER","ADMIN","SUPERVISOR"]);
+    const {data:result,error}=await admin.rpc("update_booking_status_v1",{
+      p_organization_id:data.organizationId,p_booking_id:data.bookingId,p_status:data.status,
+      p_actor_type:"dashboard",p_actor_user_id:actor.userId,p_reason:data.reason??null,
+    });
+    if(error) throw new Error(error.message);
+    return result;
+  });
