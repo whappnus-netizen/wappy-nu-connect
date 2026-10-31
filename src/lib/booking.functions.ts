@@ -11,7 +11,9 @@ export const getBookingWorkspace = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ organizationId: z.string().uuid(), from: z.string().datetime().optional(), to: z.string().datetime().optional() }).parse(input))
   .handler(async ({ data }) => {
     const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN","SUPERVISOR","AGENT"]);
-    const { error: expiryError } = await admin.rpc("expire_pending_bookings_v1", { p_organization_id: data.organizationId });\n    if (expiryError) throw new Error(expiryError.message);\n    const from = data.from ?? new Date(Date.now() - 7 * 86400000).toISOString();
+    const { error: expiryError } = await admin.rpc("expire_pending_bookings_v1", { p_organization_id: data.organizationId });
+    if (expiryError) throw new Error(expiryError.message);
+    const from = data.from ?? new Date(Date.now() - 7 * 86400000).toISOString();
     const to = data.to ?? new Date(Date.now() + 45 * 86400000).toISOString();
     const [org, settings, services, staff, resources, rules, bookings, contacts] = await Promise.all([
       admin.from("organizations").select("id,name,timezone,currency").eq("id", data.organizationId).single(),
