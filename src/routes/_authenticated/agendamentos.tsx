@@ -91,7 +91,8 @@ function BookingsPage() {
   const confirmedCount = bookings.filter(b=>b.status==="confirmed").length;
   const timezone=data?.organization?.timezone??"Africa/Luanda";
   const today = new Date().toLocaleDateString("en-CA",{timeZone:timezone});
-  const [year,month,day]=today.split("-").map(Number);
+  const [yearPart="2026",monthPart="1",dayPart="1"]=today.split("-");
+  const year=Number(yearPart),month=Number(monthPart),day=Number(dayPart);
   const weekStart=new Date(Date.UTC(year,month-1,day));
   weekStart.setUTCDate(weekStart.getUTCDate()-((weekStart.getUTCDay()+6)%7)+weekOffset*7);
   const weekDays=Array.from({length:7},(_,index)=>{
@@ -172,6 +173,7 @@ function BookingsPage() {
       actions={<Button size="sm" variant="outline" onClick={()=>void refresh()} disabled={workspace.isFetching}><RefreshCw className={workspace.isFetching?"size-4 animate-spin":"size-4"}/> Actualizar</Button>}>
       {workspace.isLoading ? <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin"/>A carregar agendamentos…</div> :
       workspace.error ? <Card><CardContent className="p-6 text-sm text-destructive">{(workspace.error as Error).message}</CardContent></Card> :
+      !data ? <div className="py-16 text-sm text-muted-foreground">Não foi possível carregar os dados dos agendamentos.</div> :
       <>
         <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric icon={CalendarDays} label="Marcações de hoje" value={todayCount}/>
@@ -199,8 +201,8 @@ function BookingsPage() {
                 {weekDays.map(day=><div key={day.key} className="min-h-44 p-2">
                   <div className={`mb-2 rounded-lg px-2 py-1 text-center text-xs font-semibold uppercase ${day.key===today?"bg-primary/10 text-primary":"bg-secondary text-muted-foreground"}`}>{day.label}</div>
                   <div className="space-y-2">
-                    {orderedBookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone})===day.key&&b.status!=="cancelled"&&b.status!=="expired").map(b=><div key={b.id} className="rounded-lg border border-border bg-card p-2">
-                      <p className="text-xs font-semibold">{new Date(b.starts_at).toLocaleTimeString("pt-AO",{hour:"2-digit",minute:"2-digit",timeZone})}</p>
+                    {orderedBookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:timezone})===day.key&&b.status!=="cancelled"&&b.status!=="expired").map(b=><div key={b.id} className="rounded-lg border border-border bg-card p-2">
+                      <p className="text-xs font-semibold">{new Date(b.starts_at).toLocaleTimeString("pt-AO",{hour:"2-digit",minute:"2-digit",timeZone:timezone})}</p>
                       <p className="mt-0.5 line-clamp-2 text-xs">{serviceNameFor(b.service_id)}</p>
                       <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{contactNameFor(b.contact_id)}</p>
                       <Badge className="mt-1 max-w-full" variant={statusVariants[b.status]??"outline"}>{statusLabels[b.status]??b.status}</Badge>
