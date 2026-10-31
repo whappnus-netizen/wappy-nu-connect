@@ -638,7 +638,11 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
   const organizeFn = useServerFn(organizeAgentInstructions);
   const [form, setForm] = useState<Record<string, string>>({});
   const [readDelaySeconds, setReadDelaySeconds] = useState(1.5);
-  const [responseDelaySeconds, setResponseDelaySeconds] = useState(2);\n  const [bookingEnabled, setBookingEnabled] = useState(false);\n  const [bookingCanCreate, setBookingCanCreate] = useState(false);\n  const [bookingCanCancel, setBookingCanCancel] = useState(false);\n  const [bookingCanReschedule, setBookingCanReschedule] = useState(false);
+  const [responseDelaySeconds, setResponseDelaySeconds] = useState(2);
+  const [bookingEnabled, setBookingEnabled] = useState(false);
+  const [bookingCanCreate, setBookingCanCreate] = useState(false);
+  const [bookingCanCancel, setBookingCanCancel] = useState(false);
+  const [bookingCanReschedule, setBookingCanReschedule] = useState(false);
   const [recordingField, setRecordingField] = useState<string | null>(null);
   const [transcriptPreview, setTranscriptPreview] = useState("");
   const [organizingField, setOrganizingField] = useState<string | null>(null);
@@ -649,7 +653,12 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
     const next: Record<string, string> = {};
     for (const f of CONFIG_FIELDS) next[f.key] = ((agent[f.key] as string | null) ?? "") as string;
     setForm(next);
-    const storedConfig = agent.config && typeof agent.config === "object" ? agent.config : {};\n    const booking = storedConfig["booking"] && typeof storedConfig["booking"] === "object" ? storedConfig["booking"] as Record<string, unknown> : {};\n    setBookingEnabled(booking["enabled"] === true);\n    setBookingCanCreate(booking["canCreate"] === true);\n    setBookingCanCancel(booking["canCancel"] === true);\n    setBookingCanReschedule(booking["canReschedule"] === true);
+    const storedConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
+    const booking = storedConfig["booking"] && typeof storedConfig["booking"] === "object" ? storedConfig["booking"] as Record<string, unknown> : {};
+    setBookingEnabled(booking["enabled"] === true);
+    setBookingCanCreate(booking["canCreate"] === true);
+    setBookingCanCancel(booking["canCancel"] === true);
+    setBookingCanReschedule(booking["canReschedule"] === true);
     const readDelay = Number(storedConfig["readDelaySeconds"]);
     const responseDelay = Number(storedConfig["responseDelaySeconds"]);
     const legacyMin = Number(storedConfig["responseDelayMinSeconds"]);
@@ -696,7 +705,8 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
         config: {
           ...existingConfig,
           readDelaySeconds: safeReadDelay,
-          responseDelaySeconds: safeResponseDelay,\n          booking: { enabled: bookingEnabled, canCreate: bookingCanCreate, canCancel: bookingCanCancel, canReschedule: bookingCanReschedule },
+          responseDelaySeconds: safeResponseDelay,
+          booking: { enabled: bookingEnabled, canCreate: bookingCanCreate, canCancel: bookingCanCancel, canReschedule: bookingCanReschedule },
         },
         ...(autoActivate ? { is_active: true } : {}),
       };
@@ -798,7 +808,8 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
       if (finalText) {
         setForm((current) => ({
           ...current,
-          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("\n"),
+          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("
+"),
         }));
       }
       setTranscriptPreview(interimText);
@@ -1161,7 +1172,9 @@ function PdfUploadPanel({ orgId, agentId, canManage }: { orgId: string; agentId:
       } finally {
         await pdf.destroy();
       }
-      const extracted = pageTexts.join("\n\n").replace(/[ \t]+/g, " ").trim().slice(0, 150000);
+      const extracted = pageTexts.join("
+
+").replace(/[ \t]+/g, " ").trim().slice(0, 150000);
       if (extracted.length < 20) throw new Error("Este PDF não contém texto extraível. PDFs digitalizados como imagens precisam de OCR, que ainda não está incluído.");
 
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "documento.pdf";
