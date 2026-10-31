@@ -50,6 +50,7 @@ function BookingsPage() {
   const [serviceDescription,setServiceDescription] = useState("");
   const [serviceDuration,setServiceDuration] = useState("60");
   const [servicePrice,setServicePrice] = useState("");
+  const [serviceConfirmationMode,setServiceConfirmationMode] = useState<""|"automatic"|"manual">("");
   const [staffName,setStaffName] = useState("");
   const [resourceName,setResourceName] = useState("");
   const [resourceType,setResourceType] = useState<"room"|"table"|"equipment"|"vehicle"|"space"|"other">("room");
@@ -103,8 +104,8 @@ function BookingsPage() {
 
   const refresh=()=>queryClient.invalidateQueries({queryKey:["booking-workspace",organizationId]});
   const serviceMutation=useMutation({
-    mutationFn:()=>saveBookingService({data:{organizationId:organizationId!,name:serviceName,description:serviceDescription,durationMinutes:Number(serviceDuration),bufferBeforeMinutes:0,bufferAfterMinutes:0,priceAmount:servicePrice?Number(servicePrice):null,capacity:1,isActive:true}}),
-    onSuccess:()=>{toast.success("Serviço criado.");setServiceName("");setServiceDescription("");setServiceDuration("60");setServicePrice("");void refresh();},
+    mutationFn:()=>saveBookingService({data:{organizationId:organizationId!,name:serviceName,description:serviceDescription,durationMinutes:Number(serviceDuration),bufferBeforeMinutes:0,bufferAfterMinutes:0,priceAmount:servicePrice?Number(servicePrice):null,capacity:1,confirmationMode:serviceConfirmationMode||null,isActive:true}}),
+    onSuccess:()=>{toast.success("Serviço criado.");setServiceName("");setServiceDescription("");setServiceDuration("60");setServicePrice("");setServiceConfirmationMode("");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
   const staffMutation=useMutation({
@@ -190,7 +191,8 @@ function BookingsPage() {
             {canManage&&<Card><CardHeader><CardTitle className="text-base">Adicionar serviço</CardTitle></CardHeader><CardContent><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <Field label="Nome"><Input value={serviceName} onChange={e=>setServiceName(e.target.value)} placeholder="Ex.: Consulta de avaliação"/></Field>
               <Field label="Duração (minutos)"><Input type="number" min="5" value={serviceDuration} onChange={e=>setServiceDuration(e.target.value)}/></Field>
-              <Field label="Preço (opcional)"><Input type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)} placeholder="Kz"/></Field>
+              <Field label="Preço informativo (opcional)"><Input type="number" min="0" value={servicePrice} onChange={e=>setServicePrice(e.target.value)} placeholder="Valor na moeda da empresa"/></Field>
+              <Field label="Confirmação"><Select value={serviceConfirmationMode||"inherit"} onValueChange={v=>setServiceConfirmationMode(v==="inherit"?"":v as "automatic"|"manual")}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="inherit">Usar regra geral</SelectItem><SelectItem value="automatic">Automática</SelectItem><SelectItem value="manual">Aprovação da equipa</SelectItem></SelectContent></Select></Field>
               <div className="flex items-end"><Button className="w-full" disabled={!serviceName.trim()||serviceMutation.isPending} onClick={()=>serviceMutation.mutate()}><Plus className="size-4"/>Adicionar serviço</Button></div>
               <div className="md:col-span-2 xl:col-span-4"><Field label="Descrição"><Textarea value={serviceDescription} onChange={e=>setServiceDescription(e.target.value)} placeholder="Descreve o serviço e o que o cliente deve saber."/></Field></div>
             </div></CardContent></Card>}
