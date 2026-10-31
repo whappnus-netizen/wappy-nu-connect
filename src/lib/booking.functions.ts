@@ -140,15 +140,10 @@ export const saveBookingSchedule = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data }) => {
     const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN"]);
-    const days=data.days.filter(d=>d.enabled);
-    if(days.some(d=>d.endsAt<=d.startsAt)) throw new Error("O horário de fecho deve ser posterior à abertura.");
-    const {error:delError}=await admin.from("booking_availability_rules").delete().eq("organization_id",data.organizationId).eq("scope_type","organization");
-    if(delError) throw new Error(delError.message);
-    if(days.length){
-      const {error}=await admin.from("booking_availability_rules").insert(days.map(d=>({organization_id:data.organizationId,scope_type:"organization",scope_id:null,
-        weekday:d.weekday,starts_at:d.startsAt+":00",ends_at:d.endsAt+":00",is_available:true})));
-      if(error) throw new Error(error.message);
-    }
+    const days=data.days.map(d=>({weekday:d.weekday,enabled:d.enabled,starts_at:d.enabled?d.startsAt:null,ends_at:d.enabled?d.endsAt:null}));
+    if(data.days.filter(d=>d.enabled).some(d=>d.endsAt<=d.startsAt)) throw new Error("O horário de fecho deve ser posterior à abertura.");
+    const {error}=await admin.rpc("save_booking_schedule_v1",{p_organization_id:data.organizationId,p_days:days});
+    if(error) throw new Error(error.message);
     return {ok:true};
   });
 
