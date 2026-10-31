@@ -19,6 +19,7 @@ import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
+import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -87,6 +88,11 @@ const TermsRoute = TermsRouteImport.update({
 const AuthenticatedAutomacoesRoute = AuthenticatedAutomacoesRouteImport.update({
   id: '/automacoes',
   path: '/automacoes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAgendamentosRoute = AuthenticatedAgendamentosRouteImport.update({
+  id: '/agendamentos',
+  path: '/agendamentos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedContactosRoute = AuthenticatedContactosRouteImport.update({
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
+  '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/automacoes'
+    | '/agendamentos'
     | '/contactos'
     | '/crm'
     | '/dashboard'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/automacoes'
+    | '/agendamentos'
     | '/contactos'
     | '/crm'
     | '/dashboard'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/_authenticated/automacoes'
+    | '/_authenticated/agendamentos'
     | '/_authenticated/contactos'
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
@@ -469,6 +481,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/agendamentos': {
+      id: '/_authenticated/agendamentos'
+      path: '/agendamentos'
+      fullPath: '/agendamentos'
+      preLoaderRoute: typeof AuthenticatedAgendamentosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/automacoes': {
       id: '/_authenticated/automacoes'
@@ -622,6 +641,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAutomacoesRoute: typeof AuthenticatedAutomacoesRoute
+  AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
   AuthenticatedContactosRoute: typeof AuthenticatedContactosRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -638,6 +658,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAutomacoesRoute: AuthenticatedAutomacoesRoute,
+  AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
   AuthenticatedContactosRoute: AuthenticatedContactosRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
