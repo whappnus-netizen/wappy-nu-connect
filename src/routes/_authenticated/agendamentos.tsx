@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import {
-  getBookingWorkspace, saveBookingSettings, saveBookingService, saveBookingStaff,
+  getBookingWorkspace, saveBookingSettings, saveBookingService, saveBookingStaff, saveBookingResource,
   saveBookingSchedule, createDashboardBooking, updateDashboardBookingStatus,
 } from "@/lib/booking.functions";
 
@@ -167,7 +167,7 @@ function BookingsPage() {
           <TabsList className="h-auto w-full flex-wrap justify-start">
             <TabsTrigger value="agenda">Agenda</TabsTrigger><TabsTrigger value="reservas">Reservas</TabsTrigger>
             <TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="equipa">Equipa</TabsTrigger>
-            <TabsTrigger value="horarios">Horários</TabsTrigger><TabsTrigger value="configuracoes">Configurações</TabsTrigger>
+            <TabsTrigger value="recursos">Recursos</TabsTrigger><TabsTrigger value="horarios">Horários</TabsTrigger><TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
           <TabsContent value="agenda" className="space-y-3">
             <SectionHeading title="Próximos compromissos" description="Acompanhe as reservas e o estado de cada atendimento."/>
