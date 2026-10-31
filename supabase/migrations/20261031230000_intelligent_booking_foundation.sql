@@ -436,7 +436,7 @@ begin
     pg_catalog.jsonb_build_object('starts_at',p_starts_at,'ends_at',v_ends_at));
   return pg_catalog.jsonb_build_object('booking',pg_catalog.to_jsonb(v_booking));
 end;
-$;
+$$;
 
 revoke all on function public.reschedule_booking_v1(uuid,uuid,timestamptz,uuid,uuid,text,uuid) from public, anon, authenticated;
 grant execute on function public.reschedule_booking_v1(uuid,uuid,timestamptz,uuid,uuid,text,uuid) to service_role;
