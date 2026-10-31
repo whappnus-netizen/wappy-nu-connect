@@ -377,6 +377,70 @@ begin
 end;
 $$;
 
+
+create or replace function public.reschedule_booking_v1(
+  p_organization_id uuid,
+  p_booking_id uuid,
+  p_starts_at timestamptz,
+  p_staff_id uuid,
+  p_resource_id uuid,
+  p_actor_type text,
+  p_actor_user_id uuid default null
+) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_booking public.bookings%rowtype;
+  v_service public.booking_services%rowtype;
+  v_settings public.booking_settings%rowtype;
+  v_timezone text;
+  v_ends_at timestamptz;
+  v_local_start timestamp;
+  v_local_end timestamp;
+  v_weekday integer;
+begin
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_organization_id::text,0));
+  select * into v_booking from public.bookings where id=p_booking_id and organization_id=p_organization_id for update;
+  if not found then raise exception 'BOOKING_NOT_FOUND' using errcode='P0002'; end if;
+  if v_booking.status not in ('confirmed','pending_confirmation') then raise exception 'BOOKING_CANNOT_BE_RESCHEDULED' using errcode='22023'; end if;
+  select * into v_service from public.booking_services where id=v_booking.service_id and organization_id=p_organization_id and is_active;
+  if not found then raise exception 'BOOKING_SERVICE_NOT_AVAILABLE' using errcode='P0002'; end if;
+  select * into v_settings from public.booking_settings where organization_id=p_organization_id and enabled;
+  if not found then raise exception 'BOOKING_FEATURE_DISABLED' using errcode='42501'; end if;
+  if p_starts_at < pg_catalog.now()+pg_catalog.make_interval(mins=>v_settings.min_notice_minutes)
+    or p_starts_at > pg_catalog.now()+pg_catalog.make_interval(days=>v_settings.max_days_ahead) then
+    raise exception 'BOOKING_OUTSIDE_ALLOWED_WINDOW' using errcode='22023';
+  end if;
+  v_ends_at:=p_starts_at+pg_catalog.make_interval(mins=>v_service.duration_minutes);
+  select coalesce(timezone,'Africa/Luanda') into v_timezone from public.organizations where id=p_organization_id;
+  v_local_start:=p_starts_at at time zone v_timezone;
+  v_local_end:=v_ends_at at time zone v_timezone;
+  v_weekday:=extract(dow from v_local_start)::integer;
+  if not exists(select 1 from public.booking_availability_rules r where r.organization_id=p_organization_id and r.scope_type='organization' and r.scope_id is null and r.weekday=v_weekday and r.is_available and r.starts_at<=v_local_start::time and r.ends_at>=v_local_end::time) then
+    raise exception 'BOOKING_OUTSIDE_BUSINESS_HOURS' using errcode='22023';
+  end if;
+  if p_staff_id is not null and exists(select 1 from public.bookings b where b.organization_id=p_organization_id and b.staff_id=p_staff_id and b.id<>p_booking_id and b.status in ('pending_confirmation','confirmed','in_progress') and tstzrange(b.starts_at,b.ends_at,'[)') && tstzrange(p_starts_at-v_service.buffer_before_minutes*interval '1 minute',v_ends_at+v_service.buffer_after_minutes*interval '1 minute','[)')) then
+    raise exception 'BOOKING_STAFF_SLOT_TAKEN' using errcode='23P01';
+  end if;
+  if p_resource_id is not null and exists(select 1 from public.bookings b where b.organization_id=p_organization_id and b.resource_id=p_resource_id and b.id<>p_booking_id and b.status in ('pending_confirmation','confirmed','in_progress') and tstzrange(b.starts_at,b.ends_at,'[)') && tstzrange(p_starts_at,v_ends_at,'[)')) then
+    raise exception 'BOOKING_RESOURCE_SLOT_TAKEN' using errcode='23P01';
+  end if;
+  update public.bookings set starts_at=p_starts_at,ends_at=v_ends_at,staff_id=p_staff_id,resource_id=p_resource_id,
+    status=case when status='pending_confirmation' then status else 'confirmed' end,
+    expires_at=case when status='pending_confirmation' then expires_at else null end,updated_at=pg_catalog.now()
+  where id=p_booking_id and organization_id=p_organization_id returning * into v_booking;
+  insert into public.booking_events(organization_id,booking_id,event_type,actor_type,actor_user_id,details)
+  values(p_organization_id,p_booking_id,'rescheduled',p_actor_type,p_actor_user_id,
+    pg_catalog.jsonb_build_object('starts_at',p_starts_at,'ends_at',v_ends_at));
+  return pg_catalog.jsonb_build_object('booking',pg_catalog.to_jsonb(v_booking));
+end;
+$;
+
+revoke all on function public.reschedule_booking_v1(uuid,uuid,timestamptz,uuid,uuid,text,uuid) from public, anon, authenticated;
+grant execute on function public.reschedule_booking_v1(uuid,uuid,timestamptz,uuid,uuid,text,uuid) to service_role;
+
 revoke all on function public.create_booking_v1(uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,text,text,text,uuid) from public, anon, authenticated;
 revoke all on function public.update_booking_status_v1(uuid,uuid,text,text,uuid,text) from public, anon, authenticated;
 grant execute on function public.create_booking_v1(uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,text,text,text,uuid) to service_role;
