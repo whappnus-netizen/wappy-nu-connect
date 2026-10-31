@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
@@ -47,6 +47,7 @@ function BookingsPage() {
   const canManage = role === "OWNER" || role === "ADMIN";
   const canOperate = canManage || role === "SUPERVISOR";
   const queryClient = useQueryClient();
+  const initializedSettingsFor = useRef<string | null>(null);
   const [weekOffset,setWeekOffset] = useState(0);
   const [serviceName,setServiceName] = useState("");
   const [serviceDescription,setServiceDescription] = useState("");
@@ -101,7 +102,8 @@ function BookingsPage() {
   const todayCount = bookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:data?.organization?.timezone??"Africa/Luanda"})===today).length;
 
   useEffect(()=>{
-    if(!data) return;
+    if(!data || initializedSettingsFor.current===organizationId) return;
+    initializedSettingsFor.current=organizationId;
     setEnabled(Boolean(data.settings.enabled));
     setConfirmationMode(data.settings.confirmation_mode==="manual"?"manual":"automatic");
     setMinNotice(String(data.settings.min_notice_minutes??60));
@@ -114,7 +116,7 @@ function BookingsPage() {
       const rule=orgRules.find(r=>r.weekday===weekday);
       return {weekday,enabled:Boolean(rule),startsAt:rule?.starts_at?.slice(0,5)??"09:00",endsAt:rule?.ends_at?.slice(0,5)??"18:00"};
     }));
-  },[data?.settings,data?.rules]);
+  },[data,organizationId]);
 
   useEffect(()=>{
     if(!staffServicesInitialized&&services.length){
