@@ -808,8 +808,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
       if (finalText) {
         setForm((current) => ({
           ...current,
-          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("\n"), finalText].filter(Boolean).join("
-"),
+          [key]: [current[key]?.trim(), finalText].filter(Boolean).join("\n"),
         }));
       }
       setTranscriptPreview(interimText);
