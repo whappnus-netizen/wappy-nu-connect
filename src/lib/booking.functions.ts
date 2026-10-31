@@ -45,6 +45,14 @@ export const saveBookingSettings = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data }) => {
     const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN"]);
+    if (data.enabled) {
+      const [{ count: serviceCount, error: serviceError }, { count: ruleCount, error: ruleError }] = await Promise.all([
+        admin.from("booking_services").select("id", { count: "exact", head: true }).eq("organization_id", data.organizationId).eq("is_active", true),
+        admin.from("booking_availability_rules").select("id", { count: "exact", head: true }).eq("organization_id", data.organizationId).eq("scope_type", "organization").eq("is_available", true),
+      ]);
+      if (serviceError || ruleError) throw new Error("Não foi possível validar os serviços e horários.");
+      if (!serviceCount || !ruleCount) throw new Error("Antes de activar, cadastra pelo menos um serviço activo e define os horários de funcionamento.");
+    }
     const { error } = await admin.from("booking_settings").upsert({
       organization_id:data.organizationId,enabled:data.enabled,confirmation_mode:data.confirmationMode,
       min_notice_minutes:data.minNoticeMinutes,max_days_ahead:data.maxDaysAhead,pending_expiry_minutes:data.pendingExpiryMinutes,
