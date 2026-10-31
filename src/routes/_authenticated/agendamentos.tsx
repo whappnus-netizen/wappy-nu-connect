@@ -153,7 +153,7 @@ function BookingsPage() {
     onError:(e:Error)=>toast.error(e.message),
   });
   const statusMutation=useMutation({
-    mutationFn:({bookingId,status}:{bookingId:string;status:"confirmed"|"completed"|"cancelled"|"no_show"})=>updateDashboardBookingStatus({data:{organizationId:organizationId!,bookingId,status}}),
+    mutationFn:({bookingId,status}:{bookingId:string;status:"confirmed"|"in_progress"|"completed"|"cancelled"|"no_show"})=>updateDashboardBookingStatus({data:{organizationId:organizationId!,bookingId,status}}),
     onSuccess:()=>{toast.success("Estado do agendamento actualizado.");void refresh();},
     onError:(e:Error)=>toast.error(e.message),
   });
@@ -297,7 +297,7 @@ function Field({label,children}:{label:string;children:ReactNode}) { return <div
 function SectionHeading({title,description}:{title:string;description:string}) { return <div><h2 className="font-display text-lg font-semibold">{title}</h2><p className="text-sm text-muted-foreground">{description}</p></div>; }
 function SettingRow({title,description,children}:{title:string;description:string;children:React.ReactNode}) { return <div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>{children}</div>; }
 function EmptyPanel({title,text}:{title:string;text:string}) { return <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center"><CalendarDays className="mx-auto mb-2 size-7 text-muted-foreground"/><p className="font-medium">{title}</p><p className="mt-1 text-sm text-muted-foreground">{text}</p></div>; }
-function BookingRow({booking,fmt,serviceName,contactName,canOperate,busy,onStatus}:{booking:any;fmt:(value:string)=>string;serviceName:string;contactName:string;canOperate:boolean;busy:boolean;onStatus:(status:"confirmed"|"completed"|"cancelled"|"no_show")=>void}) {
+function BookingRow({booking,fmt,serviceName,contactName,canOperate,busy,onStatus}:{booking:any;fmt:(value:string)=>string;serviceName:string;contactName:string;canOperate:boolean;busy:boolean;onStatus:(status:"confirmed"|"in_progress"|"completed"|"cancelled"|"no_show")=>void}) {
   return <Card><CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarClock className="size-5"/></div>
     <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{serviceName}</p><Badge variant={statusVariants[booking.status]??"outline"}>{statusLabels[booking.status]??booking.status}</Badge></div>
@@ -306,7 +306,7 @@ function BookingRow({booking,fmt,serviceName,contactName,canOperate,busy,onStatu
     </div>
     {canOperate&&<div className="flex flex-wrap gap-2">
       {booking.status==="pending_confirmation"&&<Button size="sm" disabled={busy} onClick={()=>onStatus("confirmed")}><CheckCircle2 className="size-3.5"/>Aprovar</Button>}
-      {booking.status==="confirmed"&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>onStatus("completed")}>Concluir</Button>}
+      {booking.status==="confirmed"&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>onStatus("in_progress")}>Iniciar</Button>}{booking.status==="in_progress"&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>onStatus("completed")}>Concluir</Button>}
       {["pending_confirmation","confirmed","in_progress"].includes(booking.status)&&<Button size="sm" variant="ghost" className="text-destructive" disabled={busy} onClick={()=>onStatus("cancelled")}><XCircle className="size-3.5"/>Cancelar</Button>}
     </div>}
   </CardContent></Card>;
