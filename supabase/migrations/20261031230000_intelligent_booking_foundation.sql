@@ -271,10 +271,12 @@ begin
 
   v_ends_at := p_starts_at + pg_catalog.make_interval(mins => v_service.duration_minutes);
   if p_staff_id is not null and exists (
-    select 1 from public.bookings b where b.organization_id = p_organization_id
+    select 1 from public.bookings b
+      join public.booking_services prior_service on prior_service.id = b.service_id and prior_service.organization_id = b.organization_id
+    where b.organization_id = p_organization_id
       and b.staff_id = p_staff_id and b.status in ('pending_confirmation','confirmed','in_progress')
-      and tstzrange(b.starts_at - pg_catalog.make_interval(mins => v_service.buffer_before_minutes),
-                    b.ends_at + pg_catalog.make_interval(mins => v_service.buffer_after_minutes), '[)')
+      and tstzrange(b.starts_at - pg_catalog.make_interval(mins => prior_service.buffer_before_minutes),
+                    b.ends_at + pg_catalog.make_interval(mins => prior_service.buffer_after_minutes), '[)')
           && tstzrange(p_starts_at - pg_catalog.make_interval(mins => v_service.buffer_before_minutes),
                        v_ends_at + pg_catalog.make_interval(mins => v_service.buffer_after_minutes), '[)')
   ) then raise exception 'BOOKING_STAFF_SLOT_TAKEN' using errcode = '23P01'; end if;
