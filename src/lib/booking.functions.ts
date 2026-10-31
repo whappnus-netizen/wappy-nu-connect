@@ -154,7 +154,7 @@ function localDateTimeToUtc(local: string, timezone: string): string {
   const desired=Date.UTC(Number(y),Number(m)-1,Number(d),Number(h),Number(minute));
   const parts=new Intl.DateTimeFormat("en-GB",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(desired));
   const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-  const represented=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute));
+  const represented=Date.UTC(Number(p["year"]),Number(p["month"])-1,Number(p["day"]),Number(p["hour"]),Number(p["minute"]));
   return new Date(desired-(represented-desired)).toISOString();
 }
 
