@@ -207,7 +207,7 @@ function BookingsPage() {
                 </div>)}
               </div>
             </div>
-            <SectionHeading title="Próximos compromissos" description="Acompanhe as reservas e o estado de cada atendimento."/>;
+            <SectionHeading title="Próximos compromissos" description="Acompanhe as reservas e o estado de cada atendimento."/>
 
             {orderedBookings.filter(b=>new Date(b.starts_at)>=new Date()&&b.status!=="cancelled").slice(0,12).map(b=><BookingRow key={b.id} booking={b} fmt={fmt} serviceName={serviceNameFor(b.service_id)} contactName={contactNameFor(b.contact_id)} canOperate={canOperate} busy={statusMutation.isPending} onStatus={(status)=>statusMutation.mutate({bookingId:b.id,status})}/>)}
             {!orderedBookings.some(b=>new Date(b.starts_at)>=new Date()&&b.status!=="cancelled")&&<EmptyPanel title="Ainda não existem agendamentos" text="Quando a IA ou a equipa criar uma marcação, ela aparecerá aqui."/>}
