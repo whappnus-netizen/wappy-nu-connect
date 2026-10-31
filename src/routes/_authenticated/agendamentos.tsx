@@ -67,8 +67,6 @@ function BookingsPage() {
   const [pendingExpiry,setPendingExpiry] = useState("30");
   const [allowCancel,setAllowCancel] = useState(true);
   const [allowReschedule,setAllowReschedule] = useState(true);
-  const [reminder24h,setReminder24h] = useState(true);
-  const [reminder2h,setReminder2h] = useState(true);
 
   const workspace = useQuery({
     queryKey:["booking-workspace",organizationId],
@@ -95,8 +93,6 @@ function BookingsPage() {
     setPendingExpiry(String(data.settings.pending_expiry_minutes??30));
     setAllowCancel(Boolean(data.settings.allow_customer_cancel));
     setAllowReschedule(Boolean(data.settings.allow_customer_reschedule));
-    setReminder24h(Boolean(data.settings.reminder_24h));
-    setReminder2h(Boolean(data.settings.reminder_2h));
     const orgRules=data.rules.filter(r=>r.scope_type==="organization");
     if(orgRules.length) setDays(weekdays.map((_,weekday)=>{
       const rule=orgRules.find(r=>r.weekday===weekday);
@@ -237,8 +233,7 @@ function BookingsPage() {
                 <div className="space-y-3 rounded-lg border border-border p-3">
                   <SettingRow title="Permitir cancelamento pelo cliente" description="A IA poderá processar pedidos de cancelamento."><Switch checked={allowCancel} onCheckedChange={setAllowCancel} disabled={!canManage}/></SettingRow>
                   <SettingRow title="Permitir remarcação pelo cliente" description="A IA poderá procurar uma nova data e hora."><Switch checked={allowReschedule} onCheckedChange={setAllowReschedule} disabled={!canManage}/></SettingRow>
-                  <SettingRow title="Lembrete 24 horas antes" description="Preparado para o envio automático pelo WhatsApp."><Switch checked={reminder24h} onCheckedChange={setReminder24h} disabled={!canManage}/></SettingRow>
-                  <SettingRow title="Lembrete 2 horas antes" description="Preparado para o envio automático pelo WhatsApp."><Switch checked={reminder2h} onCheckedChange={setReminder2h} disabled={!canManage}/></SettingRow>
+                  <p className="text-xs text-muted-foreground">Os lembretes automáticos por WhatsApp serão activados numa fase seguinte, depois de instalado e validado o serviço de envio programado.</p>
                 </div>
                 {canManage&&<div className="flex justify-end"><Button disabled={settingsMutation.isPending} onClick={()=>settingsMutation.mutate()}>{settingsMutation.isPending?<Loader2 className="size-4 animate-spin"/>:null}Guardar configurações</Button></div>}
               </CardContent>
