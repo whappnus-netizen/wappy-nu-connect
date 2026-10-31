@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
   CalendarDays, CalendarClock, CalendarCheck, Clock, Package, Settings2,
-  Plus, CheckCircle2, XCircle, CircleAlert, Loader2, RefreshCw, UserRound,
+  Plus, CheckCircle2, XCircle, CircleAlert, Loader2, RefreshCw, UserRound, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ function BookingsPage() {
   const canManage = role === "OWNER" || role === "ADMIN";
   const canOperate = canManage || role === "SUPERVISOR";
   const queryClient = useQueryClient();
+  const [weekOffset,setWeekOffset] = useState(0);
   const [serviceName,setServiceName] = useState("");
   const [serviceDescription,setServiceDescription] = useState("");
   const [serviceDuration,setServiceDuration] = useState("60");
@@ -86,7 +87,16 @@ function BookingsPage() {
   const activeBookings = bookings.filter(b=>["pending_confirmation","confirmed","in_progress"].includes(b.status));
   const pendingCount = bookings.filter(b=>b.status==="pending_confirmation").length;
   const confirmedCount = bookings.filter(b=>b.status==="confirmed").length;
-  const today = new Date().toLocaleDateString("en-CA",{timeZone:data?.organization?.timezone??"Africa/Luanda"});
+  const timezone=data?.organization?.timezone??"Africa/Luanda";
+  const today = new Date().toLocaleDateString("en-CA",{timeZone:timezone});
+  const [year,month,day]=today.split("-").map(Number);
+  const weekStart=new Date(Date.UTC(year,month-1,day));
+  weekStart.setUTCDate(weekStart.getUTCDate()-((weekStart.getUTCDay()+6)%7)+weekOffset*7);
+  const weekDays=Array.from({length:7},(_,index)=>{
+    const date=new Date(weekStart);date.setUTCDate(weekStart.getUTCDate()+index);
+    const key=date.toISOString().slice(0,10);
+    return {key,label:new Intl.DateTimeFormat("pt-AO",{weekday:"short",day:"2-digit",month:"short",timeZone:timezone}).format(new Date(key+"T12:00:00Z"))};
+  });
   const todayCount = bookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:data?.organization?.timezone??"Africa/Luanda"})===today).length;
 
   useEffect(()=>{
@@ -176,8 +186,29 @@ function BookingsPage() {
             <TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="equipa">Equipa</TabsTrigger>
             <TabsTrigger value="recursos">Recursos</TabsTrigger><TabsTrigger value="horarios">Horários</TabsTrigger><TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
-          <TabsContent value="agenda" className="space-y-3">
-            <SectionHeading title="Próximos compromissos" description="Acompanhe as reservas e o estado de cada atendimento."/>
+          <TabsContent value="agenda" className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionHeading title="Calendário semanal" description="Visualiza os compromissos por dia, no fuso horário da organização."/>
+              <div className="flex items-center gap-2"><Button size="icon" variant="outline" onClick={()=>setWeekOffset(v=>v-1)} aria-label="Semana anterior"><ChevronLeft className="size-4"/></Button><Button size="sm" variant="outline" onClick={()=>setWeekOffset(0)}>Hoje</Button><Button size="icon" variant="outline" onClick={()=>setWeekOffset(v=>v+1)} aria-label="Próxima semana"><ChevronRight className="size-4"/></Button></div>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <div className="grid min-w-[840px] grid-cols-7 divide-x divide-border">
+                {weekDays.map(day=><div key={day.key} className="min-h-44 p-2">
+                  <div className={`mb-2 rounded-lg px-2 py-1 text-center text-xs font-semibold uppercase ${day.key===today?"bg-primary/10 text-primary":"bg-secondary text-muted-foreground"}`}>{day.label}</div>
+                  <div className="space-y-2">
+                    {orderedBookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone})===day.key&&b.status!=="cancelled"&&b.status!=="expired").map(b=><div key={b.id} className="rounded-lg border border-border bg-card p-2">
+                      <p className="text-xs font-semibold">{new Date(b.starts_at).toLocaleTimeString("pt-AO",{hour:"2-digit",minute:"2-digit",timeZone})}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs">{serviceNameFor(b.service_id)}</p>
+                      <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{contactNameFor(b.contact_id)}</p>
+                      <Badge className="mt-1 max-w-full" variant={statusVariants[b.status]??"outline"}>{statusLabels[b.status]??b.status}</Badge>
+                    </div>)}
+                    {!orderedBookings.some(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone})===day.key&&b.status!=="cancelled"&&b.status!=="expired")&&<p className="px-1 py-4 text-center text-[10px] text-muted-foreground">Sem reservas</p>}
+                  </div>
+                </div>)}
+              </div>
+            </div>
+            <SectionHeading title="Próximos compromissos" description="Acompanhe as reservas e o estado de cada atendimento."/>;
+
             {orderedBookings.filter(b=>new Date(b.starts_at)>=new Date()&&b.status!=="cancelled").slice(0,12).map(b=><BookingRow key={b.id} booking={b} fmt={fmt} serviceName={serviceNameFor(b.service_id)} contactName={contactNameFor(b.contact_id)} canOperate={canOperate} busy={statusMutation.isPending} onStatus={(status)=>statusMutation.mutate({bookingId:b.id,status})}/>)}
             {!orderedBookings.some(b=>new Date(b.starts_at)>=new Date()&&b.status!=="cancelled")&&<EmptyPanel title="Ainda não existem agendamentos" text="Quando a IA ou a equipa criar uma marcação, ela aparecerá aqui."/>}
           </TabsContent>
