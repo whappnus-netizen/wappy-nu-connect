@@ -1,1 +1,1 @@
-// WHAPPNUS booking server functions.
+export const bookingModule = true;
