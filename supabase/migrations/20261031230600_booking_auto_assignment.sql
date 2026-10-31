@@ -28,9 +28,10 @@ begin
   where ss.organization_id=p_organization_id and ss.service_id=p_service_id and st.is_active
    and (not exists(select 1 from public.booking_availability_rules r where r.organization_id=p_organization_id and r.scope_type='staff' and r.scope_id=ss.staff_id)
      or exists(select 1 from public.booking_availability_rules r where r.organization_id=p_organization_id and r.scope_type='staff' and r.scope_id=ss.staff_id and r.weekday=v_weekday and r.is_available and r.starts_at<=v_local_start::time and r.ends_at>=v_local_end::time))
-   and not exists(select 1 from public.bookings b where b.organization_id=p_organization_id and b.staff_id=ss.staff_id
+   and not exists(select 1 from public.bookings b join public.booking_services prior_service on prior_service.id=b.service_id and prior_service.organization_id=b.organization_id
+     where b.organization_id=p_organization_id and b.staff_id=ss.staff_id
      and b.status in ('pending_confirmation','confirmed','in_progress')
-     and tstzrange(b.starts_at-v_service.buffer_before_minutes*interval '1 minute',b.ends_at+v_service.buffer_after_minutes*interval '1 minute','[)')
+     and tstzrange(b.starts_at-prior_service.buffer_before_minutes*interval '1 minute',b.ends_at+prior_service.buffer_after_minutes*interval '1 minute','[)')
        && tstzrange(p_starts_at-v_service.buffer_before_minutes*interval '1 minute',v_ends_at+v_service.buffer_after_minutes*interval '1 minute','[)'))
   order by (select count(*) from public.bookings b where b.organization_id=p_organization_id and b.staff_id=ss.staff_id
     and b.starts_at::date=v_local_start::date and b.status in ('pending_confirmation','confirmed','in_progress')),ss.staff_id limit 1;
