@@ -696,7 +696,7 @@ function ConfigForm({ agent, orgId, canManage }: { agent: Agent; orgId: string; 
       // A primeira configuração válida activa o agente automaticamente.
       // Não reactivar agentes já configurados que o cliente tenha pausado manualmente.
       const autoActivate = !agent.is_active && !agent.personality?.trim()
-        && Boolean(payload["personality"]?.trim());
+        && typeof payload["personality"] === "string" && Boolean(payload["personality"].trim());
       const safeReadDelay = Math.round(Math.min(25, Math.max(0, readDelaySeconds)) * 2) / 2;
       const safeResponseDelay = Math.round(Math.min(15, Math.max(0, responseDelaySeconds)) * 2) / 2;
       const existingConfig = agent.config && typeof agent.config === "object" ? agent.config : {};
