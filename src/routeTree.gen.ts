@@ -18,8 +18,8 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
-import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
+import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -29,9 +29,9 @@ import { Route as AuthenticatedIaRouteImport } from './routes/_authenticated/ia'
 import { Route as AuthenticatedInboxRouteImport } from './routes/_authenticated/inbox'
 import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authenticated/notificacoes'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedPagamentosRouteImport } from './routes/_authenticated/pagamentos'
 import { Route as AuthenticatedParceriasRouteImport } from './routes/_authenticated/parcerias'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
-import { Route as AuthenticatedPagamentosRouteImport } from './routes/_authenticated/pagamentos'
 import { Route as AuthConfirmRouteImport } from './routes/auth.confirm'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
@@ -85,14 +85,15 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAgendamentosRoute =
+  AuthenticatedAgendamentosRouteImport.update({
+    id: '/agendamentos',
+    path: '/agendamentos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAutomacoesRoute = AuthenticatedAutomacoesRouteImport.update({
   id: '/automacoes',
   path: '/automacoes',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAgendamentosRoute = AuthenticatedAgendamentosRouteImport.update({
-  id: '/agendamentos',
-  path: '/agendamentos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedContactosRoute = AuthenticatedContactosRouteImport.update({
@@ -141,6 +142,11 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPagamentosRoute = AuthenticatedPagamentosRouteImport.update({
+  id: '/pagamentos',
+  path: '/pagamentos',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedParceriasRoute = AuthenticatedParceriasRouteImport.update({
   id: '/parcerias',
   path: '/parcerias',
@@ -149,11 +155,6 @@ const AuthenticatedParceriasRoute = AuthenticatedParceriasRouteImport.update({
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPagamentosRoute = AuthenticatedPagamentosRouteImport.update({
-  id: '/pagamentos',
-  path: '/pagamentos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthConfirmRoute = AuthConfirmRouteImport.update({
@@ -208,8 +209,8 @@ export interface FileRoutesByFullPath {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
-  '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -219,9 +220,9 @@ export interface FileRoutesByFullPath {
   '/inbox': typeof AuthenticatedInboxRoute
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/parcerias': typeof AuthenticatedParceriasRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
-  '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -240,8 +241,8 @@ export interface FileRoutesByTo {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
-  '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -251,9 +252,9 @@ export interface FileRoutesByTo {
   '/inbox': typeof AuthenticatedInboxRoute
   '/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/parcerias': typeof AuthenticatedParceriasRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
-  '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -274,8 +275,8 @@ export interface FileRoutesById {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
-  '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -285,9 +286,9 @@ export interface FileRoutesById {
   '/_authenticated/inbox': typeof AuthenticatedInboxRoute
   '/_authenticated/notificacoes': typeof AuthenticatedNotificacoesRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/pagamentos': typeof AuthenticatedPagamentosRoute
   '/_authenticated/parcerias': typeof AuthenticatedParceriasRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
-  '/_authenticated/pagamentos': typeof AuthenticatedPagamentosRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
@@ -308,8 +309,8 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
-    | '/automacoes'
     | '/agendamentos'
+    | '/automacoes'
     | '/contactos'
     | '/crm'
     | '/dashboard'
@@ -319,9 +320,9 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/notificacoes'
     | '/onboarding'
+    | '/pagamentos'
     | '/parcerias'
     | '/whatsapp'
-    | '/pagamentos'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -340,8 +341,8 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
-    | '/automacoes'
     | '/agendamentos'
+    | '/automacoes'
     | '/contactos'
     | '/crm'
     | '/dashboard'
@@ -351,9 +352,9 @@ export interface FileRouteTypes {
     | '/inbox'
     | '/notificacoes'
     | '/onboarding'
+    | '/pagamentos'
     | '/parcerias'
     | '/whatsapp'
-    | '/pagamentos'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -373,8 +374,8 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
-    | '/_authenticated/automacoes'
     | '/_authenticated/agendamentos'
+    | '/_authenticated/automacoes'
     | '/_authenticated/contactos'
     | '/_authenticated/crm'
     | '/_authenticated/dashboard'
@@ -384,9 +385,9 @@ export interface FileRouteTypes {
     | '/_authenticated/inbox'
     | '/_authenticated/notificacoes'
     | '/_authenticated/onboarding'
+    | '/_authenticated/pagamentos'
     | '/_authenticated/parcerias'
     | '/_authenticated/whatsapp'
-    | '/_authenticated/pagamentos'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
@@ -559,18 +560,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/parcerias': {
-      id: '/_authenticated/parcerias'
-      path: '/parcerias'
-      fullPath: '/parcerias'
-      preLoaderRoute: typeof AuthenticatedParceriasRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/pagamentos': {
       id: '/_authenticated/pagamentos'
       path: '/pagamentos'
       fullPath: '/pagamentos'
       preLoaderRoute: typeof AuthenticatedPagamentosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/parcerias': {
+      id: '/_authenticated/parcerias'
+      path: '/parcerias'
+      fullPath: '/parcerias'
+      preLoaderRoute: typeof AuthenticatedParceriasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/whatsapp': {
@@ -640,8 +641,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAutomacoesRoute: typeof AuthenticatedAutomacoesRoute
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
+  AuthenticatedAutomacoesRoute: typeof AuthenticatedAutomacoesRoute
   AuthenticatedContactosRoute: typeof AuthenticatedContactosRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -651,14 +652,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedInboxRoute: typeof AuthenticatedInboxRoute
   AuthenticatedNotificacoesRoute: typeof AuthenticatedNotificacoesRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedPagamentosRoute: typeof AuthenticatedPagamentosRoute
   AuthenticatedParceriasRoute: typeof AuthenticatedParceriasRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
-  AuthenticatedPagamentosRoute: typeof AuthenticatedPagamentosRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAutomacoesRoute: AuthenticatedAutomacoesRoute,
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
+  AuthenticatedAutomacoesRoute: AuthenticatedAutomacoesRoute,
   AuthenticatedContactosRoute: AuthenticatedContactosRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -668,9 +669,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedInboxRoute: AuthenticatedInboxRoute,
   AuthenticatedNotificacoesRoute: AuthenticatedNotificacoesRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedPagamentosRoute: AuthenticatedPagamentosRoute,
   AuthenticatedParceriasRoute: AuthenticatedParceriasRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
-  AuthenticatedPagamentosRoute: AuthenticatedPagamentosRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
