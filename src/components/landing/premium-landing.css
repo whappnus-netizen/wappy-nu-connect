@@ -7,7 +7,7 @@
 @media(min-width:768px){.wn-wrap{padding:0 32px}}
 
 .wn-topbar{background:var(--gd);color:#e7f5ec;font-size:12.5px}
-.wn-topbar-in{display:flex;justify-content:space-between;align-items:center;height:36px;gap:12px}
+.wn-topbar-in{display:flex;justify-content:space-between;align-items:center;min-height:36px;padding-top:6px;padding-bottom:6px;gap:12px}
 .wn-topbar-in span{display:inline-flex;align-items:center;gap:6px}
 .wn-topbar svg{color:#facc15}
 
@@ -28,13 +28,13 @@
 
 .wn-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:9px;font-weight:700;font-size:14px;transition:transform .2s,background .2s,box-shadow .2s;border:1px solid transparent;cursor:pointer}
 .wn-btn-lg{height:52px;padding:0 24px}
-.wn-btn-primary{background:var(--g);color:#fff}
+.wn .wn-btn-primary{background:var(--g);color:#fff}
 .wn-btn-primary:hover{background:var(--g2);transform:translateY(-1px);box-shadow:0 10px 24px -10px rgba(11,77,51,.6)}
-.wn-btn-outline{border-color:#cfd8d3;background:#fff;color:var(--tx)}
+.wn .wn-btn-outline{border-color:#cfd8d3;background:#fff;color:var(--tx)}
 .wn-btn-outline:hover{border-color:var(--g)}
-.wn-btn-light{background:#fff;color:var(--g)}
+.wn .wn-btn-light{background:#fff;color:var(--g)}
 .wn-btn-light:hover{background:#e8f5ee}
-.wn-btn-ghost{border-color:rgba(255,255,255,.35);color:#fff}
+.wn .wn-btn-ghost{border-color:rgba(255,255,255,.35);color:#fff}
 .wn-btn-ghost:hover{background:rgba(255,255,255,.1)}
 
 .wn-hero{display:grid;gap:40px;padding-top:48px;padding-bottom:40px;align-items:center}
@@ -132,7 +132,7 @@
 .wn-foot-brand p{margin-top:12px;max-width:260px;line-height:1.6;color:#b9cfc2}
 .wn-footer-bottom{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:16px 24px 24px;background:var(--gd);color:#8fab9b;font-size:12.5px;border-top:1px solid rgba(255,255,255,.08);border-radius:0 0 26px 26px;margin-bottom:32px}
 @media(min-width:900px){.wn-footer-bottom{padding:16px 40px 24px}}
-.wn-hide-sm{display:none}
-@media(min-width:640px){.wn-hide-sm{display:inline-flex}}
+.wn .wn-hide-sm{display:none}
+@media(min-width:640px){.wn .wn-hide-sm{display:inline-flex}}
 @media(max-width:639px){.wn-hero-visual{min-height:360px}.wn-hero-img{width:82%}}
 @media(prefers-reduced-motion:reduce){.wn *{transition:none!important}}
