@@ -1,91 +1,245 @@
-import { ArrowRight, ArrowUpRight, Bot, Check, ChevronDown, CircleCheck, MessagesSquare, ShieldCheck, Smartphone, Sparkles, Users, Workflow, KanbanSquare, Clock3, Menu, MoveUpRight, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/app/app-shell";
+import {
+  ArrowRight, Bot, Check, ChevronDown, KanbanSquare, Lock, Menu, MessagesSquare, QrCode,
+  ShieldCheck, Smartphone, Sparkles, UserPlus, X, Zap, Store, GraduationCap, Stethoscope,
+} from "lucide-react";
+import "./premium-landing.css";
+import heroPerson from "@/assets/hero-person.jpg";
+import featTeam from "@/assets/feature-team.jpg";
+import featAi from "@/assets/feature-ai.jpg";
+import featCrm from "@/assets/feature-crm.jpg";
+
+const nav = [
+  ["Recursos", "#recursos"],
+  ["Como funciona", "#como-funciona"],
+  ["Para quem é", "#para-quem"],
+  ["Preços", "#planos"],
+] as const;
 
 const features = [
-  { icon: MessagesSquare, n: "01", title: "Todas as conversas, num só lugar", text: "Centralize os WhatsApps da operação, distribua atendimentos e acompanhe cada cliente sem perder o contexto." },
-  { icon: Bot, n: "02", title: "Um assistente que conhece o negócio", text: "Configure o tom, as instruções e as informações para dar respostas consistentes, alinhadas com a sua empresa." },
-  { icon: KanbanSquare, n: "03", title: "Conversa que vira oportunidade", text: "Organize contactos e acompanhe o próximo passo comercial com um CRM simples e sempre acessível." },
-  { icon: Workflow, n: "04", title: "Menos tarefas repetitivas", text: "Automatize partes do atendimento e crie processos mais consistentes sem complicar o dia a dia." },
-  { icon: Users, n: "05", title: "Uma equipa em sintonia", text: "Veja responsáveis, histórico e andamento para que cada cliente tenha continuidade no atendimento." },
-  { icon: ShieldCheck, n: "06", title: "Controlo para crescer com confiança", text: "Espaços de trabalho e permissões ajudam a manter a operação organizada à medida que cresce." },
+  { icon: MessagesSquare, title: "Atendimento centralizado", text: "Todas as conversas do WhatsApp da empresa num só lugar, com responsável e histórico.", img: featTeam },
+  { icon: Bot, title: "IA treinada com o seu negócio", text: "Defina produtos, serviços, regras e tom. A IA responde com base no que a sua empresa ensinar.", img: featAi },
+  { icon: KanbanSquare, title: "Contactos e CRM", text: "Organize clientes e acompanhe cada oportunidade até ao próximo passo comercial.", img: featCrm },
 ];
+
+const steps = [
+  { icon: UserPlus, title: "Crie a sua conta", text: "Registe-se em poucos minutos e crie o espaço da sua empresa." },
+  { icon: QrCode, title: "Ligue o WhatsApp", text: "Conecte o número da empresa por QR Code ou pela API oficial." },
+  { icon: Sparkles, title: "Treine a sua IA", text: "Adicione as informações do negócio e comece a atender." },
+];
+
+const audiences = [
+  { icon: Store, title: "Lojas e comércio", text: "Responda sobre produtos, preços e disponibilidade sem deixar clientes à espera." },
+  { icon: Stethoscope, title: "Clínicas e serviços", text: "Organize marcações, dúvidas frequentes e acompanhamento de pacientes ou clientes." },
+  { icon: GraduationCap, title: "Escolas e formações", text: "Esclareça inscrições, horários e propinas com informação sempre consistente." },
+];
+
 const plans = [
   { name: "Start", price: "10.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
   { name: "Pro", price: "25.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
   { name: "Premium", price: "45.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
 ];
 
-export function PremiumLanding() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  return <main className="whappnus-landing min-h-screen overflow-hidden bg-[#050b09] text-white">
-    <header className="landing-header sticky top-0 z-50 border-b border-white/[.07] bg-[#050b09]/75 backdrop-blur-2xl">
-      <div className="mx-auto flex h-[76px] max-w-[1320px] items-center justify-between px-5 sm:px-8 xl:px-10">
-        <Link to="/" aria-label="WhappNus — início" className="landing-logo"><Logo /></Link>
-        <nav aria-label="Navegação principal" className="hidden items-center gap-7 text-[13px] font-medium text-slate-300 lg:flex"><a href="#plataforma" className="transition hover:text-emerald-300">Produto</a><a href="#recursos" className="transition hover:text-emerald-300">Recursos</a><a href="#planos" className="transition hover:text-emerald-300">Preços</a><a href="#angola" className="transition hover:text-emerald-300">Soluções</a></nav>
-        <div className="hidden items-center gap-3 lg:flex"><Button asChild variant="ghost" className="text-slate-200 hover:bg-white/5 hover:text-white"><Link to="/auth/login">Entrar</Link></Button><Button asChild className="rounded-xl bg-gradient-to-r from-emerald-400 to-green-300 px-5 font-bold text-emerald-950 shadow-[0_0_28px_rgba(16,185,129,.18)] transition hover:-translate-y-0.5 hover:shadow-[0_0_38px_rgba(16,185,129,.3)]"><Link to="/auth/registo">Começar grátis <ArrowRight className="ml-2 size-4"/></Link></Button></div>
-        <button type="button" aria-label={mobileOpen?"Fechar menu":"Abrir menu"} aria-expanded={mobileOpen} onClick={()=>setMobileOpen(!mobileOpen)} className="inline-flex size-10 items-center justify-center rounded-xl border border-white/15 text-white lg:hidden"><Menu className="size-5"/></button>
-      </div>
-      {mobileOpen && <nav aria-label="Navegação móvel" className="grid gap-1 border-t border-white/10 bg-[#07100d] px-5 py-4 lg:hidden">{[["Produto","#plataforma"],["Recursos","#recursos"],["Preços","#planos"],["Soluções","#angola"]].map(([label,href])=><a key={href} href={href} onClick={()=>setMobileOpen(false)} className="rounded-lg px-3 py-3 text-sm text-slate-200 hover:bg-white/5">{label}</a>)}<Button asChild className="mt-2 rounded-xl bg-emerald-400 text-emerald-950"><Link to="/auth/registo">Começar grátis</Link></Button><Button asChild variant="outline" className="rounded-xl border-white/15 bg-transparent text-white"><Link to="/auth/login">Entrar</Link></Button></nav>}
-    </header>
+function Brand({ light = false }: { light?: boolean }) {
+  return (
+    <span className={`wn-brand ${light ? "wn-brand-light" : ""}`}>
+      <img src="/favicon.png" alt="" width={32} height={32} />
+      WhappNus
+    </span>
+  );
+}
 
-    <section className="hero-stage relative isolate">
-      <div className="hero-aurora pointer-events-none absolute inset-0 -z-10"/>
-      <div className="hero-orbit hero-orbit-one pointer-events-none absolute -right-48 top-[-12%] -z-10 size-[650px] rounded-full"/>
-      <div className="hero-orbit hero-orbit-two pointer-events-none absolute right-[5%] top-[12%] -z-10 size-[450px] rounded-full"/>
-      <div className="mx-auto grid min-h-[690px] max-w-[1320px] items-center gap-5 px-5 pb-14 pt-12 sm:px-8 sm:pb-20 sm:pt-16 lg:grid-cols-[.94fr_1.06fr] lg:gap-0 lg:px-10 lg:py-16 xl:min-h-[760px]">
-        <div className="hero-copy relative z-20 max-w-[650px]">
-          <h1 className="mt-7 max-w-[700px] text-[clamp(2.8rem,6.1vw,5.7rem)] font-semibold leading-[.99] tracking-[-.065em]">O seu WhatsApp pode fazer <span className="hero-green-text">muito mais pelo seu negócio.</span></h1>
-          <p className="mt-6 max-w-[540px] text-[15px] leading-7 text-slate-300 sm:text-[17px] sm:leading-8">Ligue o WhatsApp da sua empresa, prepare uma IA com os seus produtos, serviços e regras de atendimento. Responda com mais consistência, organize conversas e acompanhe oportunidades — sem perder o toque do seu negócio.</p>
-          <div className="mt-8 flex flex-col gap-3 min-[420px]:flex-row"><Button asChild size="lg" className="hero-primary-btn h-[54px] rounded-xl px-6 text-sm font-bold"><Link to="/auth/registo">Criar conta grátis <ArrowRight className="ml-2 size-4"/></Link></Button><Button asChild size="lg" variant="outline" className="h-[54px] rounded-xl border-white/15 bg-white/[.035] px-6 text-sm text-white transition hover:border-emerald-300/40 hover:bg-white/[.07] hover:text-white"><a href="#plataforma">Ver como funciona <ChevronDown className="ml-2 size-4"/></a></Button></div>
-
-        </div>
-        <div className="hero-visual relative mx-auto mt-2 w-full max-w-[660px] lg:mt-0 lg:min-h-[560px]">
-          <div className="hero-media-frame relative z-10 mx-auto aspect-[4/5] w-full overflow-hidden bg-[#07100d] sm:aspect-[5/4]">
-            <iframe
-              className="hero-demo-video absolute inset-0 z-0 h-full w-full border-0"
-              src="https://preview--vidlink.base44.app/embed/dBjZXDzWUcRW?autoplay=1&muted=1&loop=1&controls=0"
-              title="Apresentação da plataforma WHAPPNUS"
-              allow="autoplay; fullscreen; picture-in-picture"
-              allowFullScreen
-              loading="eager"
-            />
-            <div className="hero-video-fallback pointer-events-none absolute inset-0 z-10 flex flex-col justify-end p-6 sm:p-8">
-              <div className="hero-video-orbit absolute inset-[12%] rounded-full"/>
-              <div className="relative z-10 max-w-sm">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-[#04100b]/70 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-emerald-100 backdrop-blur-md"><span className="size-1.5 rounded-full bg-emerald-300"/> WHAPPNUS</span>
-                <p className="mt-4 text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl">Conversas que aproximam. <span className="text-emerald-300">Atendimento que evolui.</span></p>
-                <p className="mt-3 text-sm leading-6 text-slate-100">O seu negócio, o seu conhecimento e uma IA preparada para atender melhor.</p>
-              </div>
-            </div>
-            <div className="pointer-events-none absolute inset-0 z-20 bg-gradient-to-br from-[#04100b]/20 via-transparent to-[#04100b]/75"/>
+function PhoneMock() {
+  return (
+    <div className="wn-phone" aria-hidden="true">
+      <div className="wn-phone-screen">
+        <div className="wn-phone-top">
+          <p className="wn-phone-hi">Olá, Loja Kianda 👋</p>
+          <p className="wn-phone-sub">Resumo de hoje</p>
+          <div className="wn-phone-card">
+            <span>Conversas abertas</span>
+            <strong>Inbox</strong>
+            <small>IA activa · equipa online</small>
           </div>
         </div>
+        <div className="wn-phone-list">
+          <p className="wn-phone-title">Conversas recentes</p>
+          {[
+            ["Cliente", "Têm este modelo em stock?", "IA"],
+            ["Cliente", "Qual é o horário de hoje?", "IA"],
+            ["Cliente", "Quero falar com alguém", "Equipa"],
+          ].map(([n, m, t], i) => (
+            <div key={i} className="wn-phone-row">
+              <span className="wn-phone-ico"><MessagesSquare size={12} /></span>
+              <div><b>{n}</b><small>{m}</small></div>
+              <em className={t === "IA" ? "ai" : ""}>{t}</em>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="hero-bottom-line mx-auto h-px max-w-[1320px]"/>
-    </section>
+    </div>
+  );
+}
 
-    <section className="relative border-b border-white/[.06] bg-[#07100d]">
-      <div className="mx-auto grid max-w-[1320px] gap-7 px-5 py-8 sm:grid-cols-3 sm:px-8 lg:px-10 lg:py-10">{[["01","Atendimento organizado","Cada conversa tem contexto e responsável."],["02","Mais continuidade","A equipa sabe onde o cliente ficou."],["03","Mais controlo comercial","O próximo passo deixa de depender da memória."]].map(([n,t,d])=><div key={n} className="flex gap-4"><span className="pt-1 text-xs font-bold tracking-[.18em] text-emerald-300">{n}</span><div><h2 className="text-sm font-semibold text-white">{t}</h2><p className="mt-1.5 text-sm leading-6 text-slate-400">{d}</p></div></div>)}</div>
-    </section>
+export function PremiumLanding() {
+  const [open, setOpen] = useState(false);
+  return (
+    <main className="wn">
+      <div className="wn-topbar">
+        <div className="wn-wrap wn-topbar-in">
+          <span><Zap size={14} /> WhappNus: atendimento inteligente no WhatsApp da sua empresa.</span>
+          <span className="wn-hide-sm">Feito para negócios angolanos 🇦🇴</span>
+        </div>
+      </div>
 
-    <section id="plataforma" className="relative mx-auto max-w-[1320px] px-5 py-20 sm:px-8 sm:py-28 lg:px-10 lg:py-32"><div className="section-glow pointer-events-none absolute right-0 top-20 -z-10 size-72 rounded-full blur-3xl"/><div className="grid items-center gap-10 lg:grid-cols-[.9fr_1.1fr] lg:gap-14"><div className="max-w-2xl"><p className="text-[11px] font-bold uppercase tracking-[.22em] text-emerald-300">Cada conversa conta</p><h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-.04em] sm:text-5xl">Não é só responder mensagens. É construir relações melhores.</h2><p className="mt-5 max-w-xl text-base leading-7 text-slate-400 sm:text-lg sm:leading-8">Quando a informação certa está ligada à conversa, o cliente recebe respostas mais claras e a sua equipa ganha contexto para dar o próximo passo.</p><ul className="mt-6 space-y-3 text-sm text-slate-300"><li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-emerald-300"/> Respostas alinhadas com o seu negócio</li><li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-emerald-300"/> Histórico e contexto num só fluxo</li><li className="flex gap-3"><Check className="mt-0.5 size-4 shrink-0 text-emerald-300"/> Mais clareza para acompanhar oportunidades</li></ul></div><div className="connection-image-frame relative min-h-[320px] overflow-hidden"><img className="connection-photo" src="/media/conexao-whappnus.webp" alt="Conexões digitais em torno de uma cliente a utilizar o smartphone" loading="lazy" onError={(event)=>{event.currentTarget.style.display="none";}}/><div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07100d]/20 via-transparent to-[#07100d]/25"/><div className="absolute bottom-4 left-4 rounded-xl border border-white/15 bg-[#07100d]/85 px-4 py-3 backdrop-blur-xl"><p className="text-[10px] uppercase tracking-[.18em] text-emerald-300">Ligação inteligente</p><p className="mt-1 text-sm font-semibold text-white">Mensagem · Contexto · Resposta</p></div></div></div>
-      <div id="recursos" className="mt-12 grid gap-4 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3">{features.map(f=><article key={f.n} className="feature-panel group rounded-2xl border border-white/[.09] bg-white/[.025] p-6 transition duration-300 hover:-translate-y-1 hover:border-emerald-300/30 hover:bg-emerald-300/[.035] sm:p-7"><div className="flex items-center justify-between"><span className="flex size-12 items-center justify-center rounded-xl border border-emerald-300/15 bg-emerald-300/[.08] text-emerald-300 transition group-hover:bg-emerald-300 group-hover:text-emerald-950"><f.icon className="size-5"/></span><span className="text-xs tracking-[.2em] text-slate-600">{f.n}</span></div><h3 className="mt-6 text-lg font-semibold tracking-tight text-white">{f.title}</h3><p className="mt-3 text-sm leading-6 text-slate-400">{f.text}</p><MoveUpRight className="mt-5 size-4 text-emerald-300/60 transition group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:text-emerald-300"/></article>)}</div>
-    </section>
+      <header className="wn-header">
+        <div className="wn-wrap wn-header-in">
+          <Link to="/" aria-label="WhappNus — início"><Brand /></Link>
+          <nav aria-label="Navegação principal" className="wn-nav">
+            {nav.map(([l, h]) => <a key={h} href={h}>{l}</a>)}
+          </nav>
+          <div className="wn-header-cta">
+            <Link to="/auth/login" className="wn-link">Entrar</Link>
+            <Link to="/auth/registo" className="wn-btn wn-btn-primary">Criar conta grátis</Link>
+          </div>
+          <button type="button" className="wn-burger" aria-label={open ? "Fechar menu" : "Abrir menu"} aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+        {open && (
+          <nav aria-label="Navegação móvel" className="wn-mobile">
+            {nav.map(([l, h]) => <a key={h} href={h} onClick={() => setOpen(false)}>{l}</a>)}
+            <Link to="/auth/login" className="wn-btn wn-btn-outline">Entrar</Link>
+            <Link to="/auth/registo" className="wn-btn wn-btn-primary">Criar conta grátis</Link>
+          </nav>
+        )}
+      </header>
 
-    <section id="angola" className="global-section relative isolate overflow-hidden border-y border-emerald-200/10 bg-[#06100d]"><div className="global-backdrop pointer-events-none absolute inset-0 -z-10"/><div className="mx-auto grid max-w-[1320px] items-center gap-7 px-5 py-20 sm:px-8 sm:py-24 lg:grid-cols-[.84fr_1.16fr] lg:gap-0 lg:px-10 lg:py-28">
-      <div className="relative z-10 max-w-[570px]"><p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.22em] text-emerald-300"><Workflow className="size-4"/> Atendimento ligado ao seu negócio</p><h2 className="mt-5 text-4xl font-semibold leading-[1.04] tracking-[-.055em] sm:text-6xl">A sua forma de atender, <span className="global-green-text">com inteligência.</span></h2><p className="mt-6 max-w-lg text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">Ensine à IA como a sua empresa trabalha: partilhe informações, produtos, serviços e orientações. A WhappNus ajuda a transformar esse conhecimento em conversas mais úteis e consistentes com os seus clientes.</p><div className="mt-8 flex flex-col gap-3 min-[430px]:flex-row"><Button asChild size="lg" className="hero-primary-btn h-[52px] rounded-xl px-6 font-bold"><Link to="/auth/registo">Levar o negócio mais longe <ArrowRight className="ml-2 size-4"/></Link></Button><span className="inline-flex items-center gap-2 self-start rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300"><span className="size-2 rounded-full bg-amber-300"/><span>Feita para o seu negócio</span></span></div><div className="mt-9 flex gap-6 border-t border-white/10 pt-5"><div><p className="text-sm font-semibold text-white">WhatsApp</p><p className="mt-1 text-xs text-slate-500">Canal de conversa</p></div><div><p className="text-sm font-semibold text-white">Inteligência</p><p className="mt-1 text-xs text-slate-500">Atendimento com contexto</p></div><div><p className="text-sm font-semibold text-white">Crescimento</p><p className="mt-1 text-xs text-slate-500">Relações duradouras</p></div></div></div>
-      <div className="business-flow-visual relative mx-auto w-full max-w-[590px] rounded-[28px] border border-emerald-200/15 bg-gradient-to-br from-[#0c2118] to-[#050b09] p-5 shadow-[0_30px_90px_-35px_rgba(16,185,129,.3)] sm:p-8"><div className="mb-6 flex items-center justify-between"><span className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-300">O seu conhecimento em ação</span><span className="flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/[.07] px-3 py-1.5 text-[10px] text-emerald-100"><span className="size-1.5 rounded-full bg-emerald-300"/> Fluxo inteligente</span></div><div className="grid gap-3"><div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[.035] p-4"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-300/10 text-emerald-300"><MessageCircle className="size-5"/></span><div><p className="text-sm font-semibold text-white">Mensagem do cliente</p><p className="mt-1 text-xs leading-5 text-slate-400">Uma dúvida sobre produto, serviço ou horário</p></div></div><div className="ml-5 h-5 border-l border-dashed border-emerald-300/50"/></div><div className="flex items-center gap-4 rounded-2xl border border-emerald-300/20 bg-emerald-300/[.07] p-4"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200"><Bot className="size-5"/></span><div><p className="text-sm font-semibold text-white">IA preparada pela sua empresa</p><p className="mt-1 text-xs leading-5 text-slate-300">Usa as informações e orientações que definiu</p></div></div><div className="ml-5 h-5 border-l border-dashed border-emerald-300/50"/><div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[.035] p-4"><span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-200/10 text-amber-200"><MessagesSquare className="size-5"/></span><div><p className="text-sm font-semibold text-white">Resposta com contexto</p><p className="mt-1 text-xs leading-5 text-slate-400">Mais clareza para continuar a conversa</p></div></div></div>
-    </div></section>
+      <section className="wn-wrap wn-hero">
+        <div className="wn-hero-copy">
+          <span className="wn-pill"><i /> Atendimento que acompanha o seu negócio</span>
+          <h1>Ligue. Treine. Atenda. Tudo no <span>WhappNus.</span></h1>
+          <p>Conecte o WhatsApp da sua empresa, ensine a IA sobre os seus produtos, serviços e regras, e responda aos clientes com mais rapidez e consistência.</p>
+          <div className="wn-hero-ctas">
+            <Link to="/auth/registo" className="wn-btn wn-btn-primary wn-btn-lg">Começar grátis <ArrowRight size={16} /></Link>
+            <a href="#como-funciona" className="wn-btn wn-btn-outline wn-btn-lg">Ver como funciona <ChevronDown size={16} /></a>
+          </div>
+          <ul className="wn-trust">
+            <li><ShieldCheck size={16} /> Dados isolados por empresa</li>
+            <li><Zap size={16} /> Respostas em tempo real</li>
+            <li><Lock size={16} /> Acesso por permissões</li>
+          </ul>
+        </div>
+        <div className="wn-hero-visual">
+          <div className="wn-hero-blob" />
+          <img src={heroPerson} alt="Empresário angolano a usar o WhatsApp no telemóvel" width={1024} height={1152} className="wn-hero-img" />
+          <PhoneMock />
+        </div>
+      </section>
 
-    <section id="como-funciona" className="relative overflow-hidden border-b border-white/[.06] bg-[#08130f]"><div className="mx-auto grid max-w-[1320px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center lg:px-10 lg:py-28"><div className="flex flex-col gap-6"><div><p className="text-[11px] font-bold uppercase tracking-[.22em] text-emerald-300">Pronto para começar</p><h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-.04em] sm:text-5xl">Comece com o essencial. Evolua com confiança.</h2><p className="mt-5 max-w-xl text-base leading-7 text-slate-400 sm:text-lg">Ligue o WhatsApp, ensine à IA o que ela precisa de saber sobre o seu negócio e acompanhe as conversas num só lugar. Comece de forma simples; ajuste o atendimento à medida que aprende com os seus clientes.</p><Button asChild size="lg" className="mt-8 h-12 rounded-xl bg-emerald-300 px-6 font-bold text-emerald-950 hover:bg-emerald-200"><Link to="/auth/registo">Criar conta grátis <ArrowRight className="ml-2 size-4"/></Link></Button></div><div className="getting-started-visual relative min-h-[360px] overflow-hidden"><img className="getting-started-photo" src="/media/ganhe-tempo-whappnus.webp" alt="Profissional negra a apresentar a identidade visual da WHAPPNUS" loading="lazy" onError={(event)=>{event.currentTarget.style.display="none";}}/></div></div><div className="grid gap-3 sm:grid-cols-2">{[{n:"01",icon:Smartphone,title:"Ligue o WhatsApp",text:"Siga o fluxo de ligação disponível na sua conta."},{n:"02",icon:Sparkles,title:"Prepare o assistente",text:"Defina o nome, o tom e as instruções do negócio."},{n:"03",icon:Users,title:"Organize a equipa",text:"Distribua conversas e mantenha o histórico acessível."},{n:"04",icon:Clock3,title:"Melhore com o tempo",text:"Observe o atendimento e ajuste o processo."}].map(s=><div key={s.n} className="rounded-2xl border border-white/[.09] bg-white/[.025] p-5 sm:p-6"><div className="flex items-center justify-between"><s.icon className="size-5 text-emerald-300"/><span className="text-xs tracking-[.2em] text-slate-600">{s.n}</span></div><h3 className="mt-5 text-base font-semibold">{s.title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{s.text}</p></div>)}</div></div></section>
+      <section id="recursos" className="wn-wrap">
+        <div className="wn-panel">
+          <div className="wn-head">
+            <p className="wn-eyebrow">Recursos</p>
+            <h2>Tudo o que precisa numa só plataforma</h2>
+          </div>
+          <div className="wn-features">
+            {features.map((f) => (
+              <article key={f.title} className="wn-feature">
+                <div className="wn-feature-txt">
+                  <span className="wn-ico"><f.icon size={20} /></span>
+                  <div><h3>{f.title}</h3><p>{f.text}</p></div>
+                </div>
+                <img src={f.img} alt="" loading="lazy" width={1024} height={768} />
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
 
-    <section id="planos" className="mx-auto max-w-[1320px] px-5 py-20 sm:px-8 sm:py-28 lg:px-10"><div className="mx-auto max-w-2xl text-center"><p className="text-[11px] font-bold uppercase tracking-[.22em] text-emerald-300">Preços claros, em Kwanza</p><h2 className="mt-4 text-3xl font-semibold tracking-[-.04em] sm:text-5xl">Escolha a estrutura certa para crescer.</h2><p className="mt-5 text-base leading-7 text-slate-400">Comece com um teste de 7 dias, conheça o fluxo de atendimento e escolha o plano adequado à sua operação. Sem cartão bancário para começar.</p></div><div className="mx-auto mt-12 grid max-w-5xl gap-4 lg:grid-cols-3 lg:gap-5">{plans.map(p=><article key={p.name} className={`relative flex flex-col rounded-3xl border p-6 sm:p-8 ${p.featured?"plan-featured border-emerald-300/60 bg-emerald-300/[.055] shadow-[0_20px_80px_-35px_rgba(16,185,129,.28)]":"border-white/10 bg-white/[.025]"}`}>{p.featured&&<span className="absolute -top-3 left-6 rounded-full bg-emerald-300 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-950">Mais escolhido</span>}<h3 className="text-lg font-semibold">WhappNus {p.name}</h3><p className="mt-2 min-h-12 text-sm leading-6 text-slate-400">{p.description}</p><div className="mt-5 flex items-baseline gap-1"><span className="text-4xl font-semibold tracking-tight">{p.price}</span><span className="text-sm text-slate-500">Kz / mês</span></div><div className="my-6 h-px bg-white/10"/><ul className="flex-1 space-y-3">{p.features.map(f=><li key={f} className="flex gap-2.5 text-sm text-slate-300"><Check className="mt-0.5 size-4 shrink-0 text-emerald-300"/><span>{f}</span></li>)}</ul><Button asChild className="mt-8 h-12 w-full rounded-xl" variant={p.featured?"default":"outline"}><Link to="/auth/registo">{p.name==="Start"?"Começar com Start":`Escolher ${p.name}`} <ArrowRight className="ml-2 size-4"/></Link></Button></article>)}</div><p className="mt-7 text-center text-xs leading-5 text-slate-500">Os limites e funcionalidades disponíveis dependem da assinatura activa na sua conta.</p></section>
+      <section id="como-funciona" className="wn-wrap wn-section">
+        <div className="wn-head">
+          <p className="wn-eyebrow">Como funciona</p>
+          <h2>Comece em 3 passos simples</h2>
+        </div>
+        <div className="wn-steps">
+          {steps.map((s, i) => (
+            <div key={s.title} className="wn-step">
+              <span className="wn-step-ico"><s.icon size={26} /></span>
+              <div className="wn-step-txt">
+                <b className="wn-step-n">{i + 1}</b>
+                <div><h3>{s.title}</h3><p>{s.text}</p></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-    <section className="final-cta relative isolate overflow-hidden border-y border-emerald-200/10 px-5 py-20 text-center sm:px-8 sm:py-24"><div className="pointer-events-none absolute inset-0 -z-10"/><div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300"><MessageCircle className="size-7"/></div><h2 className="mx-auto mt-6 max-w-3xl text-3xl font-semibold leading-tight tracking-[-.04em] sm:text-5xl">O próximo cliente pode já estar a escrever-lhe.</h2><p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">Prepare o seu atendimento para responder com clareza, acompanhar oportunidades e criar uma experiência mais consistente.</p><Button asChild size="lg" className="hero-primary-btn mt-8 h-[54px] rounded-xl px-7 font-bold"><Link to="/auth/registo">Experimentar a WhappNus <ArrowRight className="ml-2 size-4"/></Link></Button></section>
+      <section id="para-quem" className="wn-wrap wn-section wn-section-tight">
+        <div className="wn-head">
+          <p className="wn-eyebrow">Para quem é</p>
+          <h2>Pensado para negócios que vivem do WhatsApp</h2>
+        </div>
+        <div className="wn-audience">
+          {audiences.map((a) => (
+            <article key={a.title} className="wn-aud-card">
+              <span className="wn-ico"><a.icon size={20} /></span>
+              <div><h3>{a.title}</h3><p>{a.text}</p></div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-    <footer className="border-t border-white/[.07] bg-[#040907]"><div className="mx-auto grid max-w-[1320px] gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.4fr_.8fr_.8fr] lg:px-10"><div><Logo className="text-base"/><p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Ligue o WhatsApp, prepare a sua IA e organize o atendimento numa plataforma pensada para transformar conversas em relações comerciais mais fortes.</p><p className="mt-4 text-xs text-slate-500">Feita para negócios angolanos · Preços em Kwanza</p></div><div><h2 className="text-sm font-semibold">Plataforma</h2><nav aria-label="Links da plataforma" className="mt-4 flex flex-col gap-3 text-sm text-slate-400"><a href="#recursos" className="hover:text-emerald-300">Funcionalidades</a><a href="#como-funciona" className="hover:text-emerald-300">Como funciona</a><a href="#planos" className="hover:text-emerald-300">Planos</a></nav></div><div><h2 className="text-sm font-semibold">Informação</h2><nav aria-label="Informação legal" className="mt-4 flex flex-col gap-3 text-sm text-slate-400"><Link to="/privacy" className="hover:text-emerald-300">Política de Privacidade</Link><Link to="/terms" className="hover:text-emerald-300">Termos de Serviço</Link><Link to="/deletion" className="hover:text-emerald-300">Eliminar dados</Link><Link to="/auth/login" className="hover:text-emerald-300">Entrar na conta <ArrowUpRight className="ml-1 inline size-3.5"/></Link></nav></div></div><div className="border-t border-white/[.07]"><div className="mx-auto flex max-w-[1320px] flex-col gap-2 px-5 py-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10"><span>© {new Date().getFullYear()} WhappNus. Todos os direitos reservados.</span><span>Atendimento com contexto. Conversas com propósito.</span></div></div></footer>
-  </main>;
+      <section id="planos" className="wn-wrap wn-section">
+        <div className="wn-head">
+          <p className="wn-eyebrow">Preços em Kwanza</p>
+          <h2>Escolha o plano certo para crescer</h2>
+        </div>
+        <div className="wn-plans">
+          {plans.map((p) => (
+            <article key={p.name} className={`wn-plan ${p.featured ? "wn-plan-featured" : ""}`}>
+              {p.featured && <span className="wn-plan-tag">Mais escolhido</span>}
+              <h3>{p.name}</h3>
+              <p className="wn-plan-desc">{p.description}</p>
+              <p className="wn-price"><strong>{p.price}</strong> Kz<span>/mês</span></p>
+              <ul>{p.features.map((f) => <li key={f}><Check size={16} /> {f}</li>)}</ul>
+              <Link to="/auth/registo" className={`wn-btn ${p.featured ? "wn-btn-light" : "wn-btn-primary"}`}>Começar com {p.name}</Link>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="wn-wrap">
+        <div className="wn-cta">
+          <img src={featAi} alt="" loading="lazy" width={1024} height={768} className="wn-cta-img" />
+          <div className="wn-cta-copy">
+            <h2>Pronto para atender melhor no WhatsApp?</h2>
+            <p>Crie a sua conta, ligue o número da empresa e prepare a sua IA hoje mesmo.</p>
+          </div>
+          <div className="wn-cta-btns">
+            <Link to="/auth/registo" className="wn-btn wn-btn-light wn-btn-lg">Criar conta grátis <ArrowRight size={16} /></Link>
+            <Link to="/auth/login" className="wn-btn wn-btn-ghost wn-btn-lg"><Smartphone size={16} /> Entrar</Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="wn-wrap">
+        <div className="wn-footer">
+          <div className="wn-foot-brand">
+            <Brand light />
+            <p>Atendimento, IA e CRM no WhatsApp da sua empresa, numa plataforma feita para Angola.</p>
+          </div>
+          <div><h4>Plataforma</h4><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#planos">Preços</a></div>
+          <div><h4>Conta</h4><Link to="/auth/registo">Criar conta</Link><Link to="/auth/login">Entrar</Link></div>
+          <div><h4>Legal</h4><Link to="/privacy">Privacidade</Link><Link to="/terms">Termos</Link><Link to="/deletion">Eliminação de dados</Link></div>
+          <div><h4>Contacto</h4><a href="mailto:privacidade@whappnus.online">privacidade@whappnus.online</a><a href="https://whappnus.online">whappnus.online</a></div>
+        </div>
+        <div className="wn-footer-bottom">
+          <span>© {new Date().getFullYear()} WhappNus. Todos os direitos reservados.</span>
+          <span>Feito em Angola 🇦🇴</span>
+        </div>
+      </footer>
+    </main>
+  );
 }
