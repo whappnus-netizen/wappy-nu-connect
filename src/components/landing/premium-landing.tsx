@@ -41,6 +41,15 @@ const plans = [
   { name: "Premium", price: "45.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
 ];
 
+const businessScenes = [
+  { name: "Imobiliária", line: "Encontre o imóvel certo", image: featCrm, message: "Temos T3 disponíveis em Talatona.", reply: "Pode enviar fotos e valores?" },
+  { name: "Loja de vendas", line: "O próximo cliente está à espera", image: featTeam, message: "Este modelo está disponível?", reply: "Sim! Quer ver as cores?" },
+  { name: "Salão de beleza", line: "Agenda cheia. Atendimento organizado.", image: heroPerson, message: "Quero marcar para sábado.", reply: "Temos vaga às 10h ou 14h." },
+  { name: "Clínica médica", line: "Mais cuidado. Menos espera.", image: featAi, message: "Como posso marcar uma consulta?", reply: "Temos disponibilidade amanhã." },
+  { name: "Pastelaria", line: "Cada encomenda no momento certo", image: featTeam, message: "Fazem bolos por encomenda?", reply: "Sim! Para quantas pessoas?" },
+  { name: "Restaurante", line: "Pedidos sem perder conversas", image: featCrm, message: "Quero consultar o menu.", reply: "Claro! Já envio o nosso menu." },
+];
+
 function Brand({ light = false }: { light?: boolean }) {
   return (
     <span className={`wn-brand ${light ? "wn-brand-light" : ""}`}>
@@ -118,7 +127,6 @@ export function PremiumLanding() {
 
       <section className="wn-wrap wn-hero">
         <div className="wn-hero-copy">
-          <span className="wn-pill"><i /> Atendimento que acompanha o seu negócio</span>
           <h1>Ligue. Treine. Atenda. Tudo no <span>WhappNus.</span></h1>
           <p>Conecte o WhatsApp da sua empresa, ensine a IA sobre os seus produtos, serviços e regras, e responda aos clientes com mais rapidez e consistência.</p>
           <div className="wn-hero-ctas">
@@ -220,6 +228,32 @@ export function PremiumLanding() {
           <div className="wn-cta-btns">
             <Link to="/auth/registo" className="wn-btn wn-btn-light wn-btn-lg">Criar conta grátis <ArrowRight size={16} /></Link>
             <Link to="/auth/login" className="wn-btn wn-btn-ghost wn-btn-lg"><Smartphone size={16} /> Entrar</Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="wn-showcase" aria-labelledby="wn-showcase-title">
+        <div className="wn-showcase-head">
+          <p className="wn-eyebrow">WHAPPNUS EM ACÇÃO</p>
+          <h2 id="wn-showcase-title">O seu negócio. Uma experiência de atendimento extraordinária.</h2>
+          <p>De uma primeira pergunta a uma venda ou marcação, cada conversa pode ser uma oportunidade bem atendida.</p>
+        </div>
+        <div className="wn-marquee" aria-label="Exemplos de negócios que podem utilizar a WhappNus">
+          <div className="wn-marquee-track">
+            {[...businessScenes, ...businessScenes].map((scene, index) => (
+              <article className="wn-poster" key={scene.name + "-" + index} aria-label={scene.name + ": " + scene.line}>
+                <img src={scene.image} alt="" loading="lazy" />
+                <div className="wn-poster-shade" />
+                <div className="wn-poster-copy"><span>WHAPPNUS <i /> {scene.name}</span><h3>{scene.line}</h3></div>
+                <div className="wn-chat-window" aria-hidden="true">
+                  <div className="wn-chat-top"><span className="wn-chat-avatar">W</span><span><b>{scene.name}</b><small>online agora</small></span><i>● ● ●</i></div>
+                  <div className="wn-chat-feed"><div className="wn-chat-track">
+                    <p className="wn-chat-in">{scene.message}</p><p className="wn-chat-out">{scene.reply}<small>✓✓</small></p>
+                    <p className="wn-chat-in">Obrigado! Podemos avançar.</p><p className="wn-chat-out">Com todo o gosto. Estamos aqui para ajudar.<small>✓✓</small></p>
+                  </div></div>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
