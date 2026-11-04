@@ -10,3 +10,5 @@
 <!-- LOVABLE:END -->
  
 Landing media is selected from an explicit public-file inventory with safe fallbacks; absent optional uploads must never produce broken requests.
+
+The dev server's config extraction crashes on Node 22 because `@netlify/serverless-functions-api` (nested inside `@netlify/zip-it-and-ship-it`) assigns `globalThis.caches`, a getter-only property in the config-extraction sandbox. A guarded `try{Tg()}catch(e){}` patch is applied in node_modules; re-apply it after any dependency reinstall or the preview fails to start.
