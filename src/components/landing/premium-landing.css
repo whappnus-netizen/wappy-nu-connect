@@ -169,3 +169,14 @@
 @keyframes wn-chat-rise{0%,12%{transform:translateY(0)}24%,38%{transform:translateY(-22px)}50%,64%{transform:translateY(-44px)}76%,90%,100%{transform:translateY(-66px)}}
 @media(max-width:639px){.wn-showcase{padding:60px 0 64px}.wn-marquee-track{gap:12px;animation-duration:46s}.wn-poster{flex-basis:82vw;height:220px}.wn-chat-window{left:10px;right:10px;bottom:9px}.wn-poster-copy{top:14px;left:15px}}
 @media(prefers-reduced-motion:reduce){.wn-marquee-track,.wn-chat-track{animation:none!important}.wn-marquee{overflow-x:auto}.wn-marquee-track{transform:none}}
+
+/* Full-bleed section surfaces with a consistent inner reading width */
+.wn-hero{max-width:none}
+section#recursos.wn-wrap,section#como-funciona.wn-wrap,section#para-quem.wn-wrap,section#planos.wn-wrap{max-width:none;padding-left:max(20px,calc((100vw - 1136px)/2));padding-right:max(20px,calc((100vw - 1136px)/2))}
+section.wn-wrap:has(.wn-cta){max-width:none;padding:0}
+footer.wn-wrap{max-width:none;padding:0}
+.wn-panel{max-width:1136px;margin-left:auto;margin-right:auto}
+.wn-feature img{border-radius:0}
+@media(max-width:899px){.wn-plan{padding:22px 0;border-right:0;border-bottom:1px solid var(--line)}.wn-plan:last-child{border-bottom:0}.wn-plans{gap:0}}
+@media(min-width:900px){.wn-plan{padding-left:24px}.wn-plan:first-child{padding-left:0}}
+@media(min-width:900px){.wn-cta{padding:0 40px 0 0}}
