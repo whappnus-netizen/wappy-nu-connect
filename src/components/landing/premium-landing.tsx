@@ -95,13 +95,6 @@ export function PremiumLanding() {
   const [open, setOpen] = useState(false);
   return (
     <main className="wn">
-      <div className="wn-topbar">
-        <div className="wn-wrap wn-topbar-in">
-          <span><Zap size={14} /> WhappNus: atendimento inteligente no WhatsApp da sua empresa.</span>
-          <span className="wn-hide-sm">Feito para negócios angolanos 🇦🇴</span>
-        </div>
-      </div>
-
       <header className="wn-header">
         <div className="wn-wrap wn-header-in">
           <Link to="/" aria-label="WhappNus — início"><Brand /></Link>
@@ -133,11 +126,6 @@ export function PremiumLanding() {
             <Link to="/auth/registo" className="wn-btn wn-btn-primary wn-btn-lg">Começar grátis <ArrowRight size={16} /></Link>
             <a href="#como-funciona" className="wn-btn wn-btn-outline wn-btn-lg">Ver como funciona <ChevronDown size={16} /></a>
           </div>
-          <ul className="wn-trust">
-            <li><ShieldCheck size={16} /> Dados isolados por empresa</li>
-            <li><Zap size={16} /> Respostas em tempo real</li>
-            <li><Lock size={16} /> Acesso por permissões</li>
-          </ul>
         </div>
         <div className="wn-hero-visual">
           <div className="wn-hero-blob" />
@@ -173,13 +161,13 @@ export function PremiumLanding() {
         </div>
         <div className="wn-steps">
           {steps.map((s, i) => (
-            <div key={s.title} className="wn-step">
+            <article key={s.title} className={`wn-step wn-step-${i + 1}`} tabIndex={0} aria-label={`Passo ${i + 1}: ${s.title}`}>
               <span className="wn-step-ico"><s.icon size={26} /></span>
               <div className="wn-step-txt">
                 <b className="wn-step-n">{i + 1}</b>
                 <div><h3>{s.title}</h3><p>{s.text}</p></div>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       </section>
