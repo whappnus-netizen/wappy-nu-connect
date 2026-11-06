@@ -151,7 +151,7 @@ Deno.serve(async(req:Request)=>{
  }
  let body:Record<string,any>;try{const j=await req.json();if(!obj(j))return reply({ok:false,error:"Pedido inválido."},400);body=j;}catch{return reply({ok:false,error:"JSON inválido."},400);}
  if(body.action!=="claim_pending_sales")return reply({ok:false,error:"Ação não autorizada."},400);
- const token=(req.headers.get("Authorization")??"").replace(/^Bearer\\s+/i,"").trim();if(!token)return reply({ok:false,error:"Sessão necessária."},401);
+ const token=(req.headers.get("Authorization")??"").replace(/^Bearer\s+/i,"").trim();if(!token)return reply({ok:false,error:"Sessão necessária."},401);
  const authClient=createClient(url,anon,{auth:{persistSession:false,autoRefreshToken:false}}),auth=await authClient.auth.getUser(token),u=auth.data.user;
  if(auth.error||!u||!u.email_confirmed_at||!u.email)return reply({ok:false,error:"Confirma o email antes de associar o pagamento."},401);
  const planCode=str(body.plan_code,80);
