@@ -18,6 +18,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AssinarRouteImport } from './routes/assinar'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
@@ -83,6 +84,11 @@ const TermosRoute = TermosRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssinarRoute = AssinarRouteImport.update({
+  id: '/assinar',
+  path: '/assinar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAgendamentosRoute =
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
+  '/assinar': typeof AssinarRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
@@ -309,6 +316,7 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
+    | '/assinar'
     | '/agendamentos'
     | '/automacoes'
     | '/contactos'
@@ -408,6 +416,7 @@ export interface RootRouteChildren {
   SuperadminRoute: typeof SuperadminRoute
   TermosRoute: typeof TermosRoute
   TermsRoute: typeof TermsRoute
+  AssinarRoute: typeof AssinarRoute
   AuthConfirmRoute: typeof AuthConfirmRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecuperarRoute: typeof AuthRecuperarRoute
@@ -481,6 +490,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assinar': {
+      id: '/assinar'
+      path: '/assinar'
+      fullPath: '/assinar'
+      preLoaderRoute: typeof AssinarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/agendamentos': {
@@ -687,6 +703,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuperadminRoute: SuperadminRoute,
   TermosRoute: TermosRoute,
   TermsRoute: TermsRoute,
+  AssinarRoute: AssinarRoute,
   AuthConfirmRoute: AuthConfirmRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRecuperarRoute: AuthRecuperarRoute,
