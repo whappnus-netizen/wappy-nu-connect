@@ -136,7 +136,7 @@ export const saveBookingSchedule = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({
     organizationId:z.string().uuid(),
     days:z.array(z.object({weekday:z.number().int().min(0).max(6),enabled:z.boolean(),
-      startsAt:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/),endsAt:z.string().regex(/^([01]\\d|2[0-3]):[0-5]\\d$/)})).length(7),
+      startsAt:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),endsAt:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)})).length(7),
   }).parse(input))
   .handler(async ({ data }) => {
     const { admin } = await bookingContext(data.organizationId, ["OWNER","ADMIN"]);
@@ -148,7 +148,7 @@ export const saveBookingSchedule = createServerFn({ method: "POST" })
   });
 
 function localDateTimeToUtc(local: string, timezone: string): string {
-  const match=/^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$/.exec(local);
+  const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
   if(!match) throw new Error("Data e hora inválidas.");
   const [,y,m,d,h,minute]=match;
   const desired=Date.UTC(Number(y),Number(m)-1,Number(d),Number(h),Number(minute));
