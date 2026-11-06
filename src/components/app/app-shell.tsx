@@ -88,7 +88,10 @@ export function AppShell({
         .update({ read_at: new Date().toISOString() }).eq("id", id).eq("organization_id", organizationId!);
       if (error) throw new Error(error.message);
     },
-    onSuccess: () => {\n      void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] });\n      void queryClient.invalidateQueries({ queryKey: ["organization-notifications-all", organizationId] });\n    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] });
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications-all", organizationId] });
+    },
   });
   const dismissNotification = useMutation({
     mutationFn: async (id: string) => {
