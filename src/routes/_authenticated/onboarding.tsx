@@ -41,8 +41,8 @@ function OnboardingPage() {
     : "";
   const selectedPlanCode = ["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan)
     ? requestedPlan
-    : (["start-monthly", "pro-monthly", "premium-monthly"].includes(String(user?.user_metadata?.["selected_plan_code"] ?? ""))
-      ? String(user?.user_metadata?.["selected_plan_code"])
+    : (["start-monthly", "pro-monthly", "premium-monthly"].includes(String(user?.user_metadata["selected_plan_code"] ?? ""))
+      ? String(user?.user_metadata["selected_plan_code"])
       : "");
 
   async function claimPendingPayments(planCode: string): Promise<boolean> {
@@ -112,7 +112,7 @@ function OnboardingPage() {
 
     // Persist the selected paid plan in Auth metadata before the organization trigger runs.
     // This prevents a paid customer from receiving a free trial while payment is being reconciled.
-    if (selectedPlanCode && authenticatedUser.user_metadata?.["selected_plan_code"] !== selectedPlanCode) {
+    if (selectedPlanCode && authenticatedUser.user_metadata["selected_plan_code"] !== selectedPlanCode) {
       const { error: intentError } = await supabase.auth.updateUser({ data: { selected_plan_code: selectedPlanCode } });
       if (intentError) {
         setLoading(false);
