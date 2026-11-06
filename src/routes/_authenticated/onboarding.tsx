@@ -35,18 +35,38 @@ function OnboardingPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [technicalError, setTechnicalError] = useState<string | null>(null);
+  const [paymentPending, setPaymentPending] = useState(false);
+  const requestedPlan = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("plan") ?? ""
+    : "";
+  const selectedPlanCode = ["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan)
+    ? requestedPlan
+    : (["start-monthly", "pro-monthly", "premium-monthly"].includes(String(user?.user_metadata?.selected_plan_code ?? ""))
+      ? String(user?.user_metadata?.selected_plan_code)
+      : "");
 
-  async function claimPendingPayments() {
+  async function claimPendingPayments(planCode: string): Promise<boolean> {
     const { data, error } = await supabase.functions.invoke("kursinha-webhook", {
-      body: { action: "claim_pending_sales" },
+      body: { action: "claim_pending_sales", plan_code: planCode },
     });
     if (error) {
-      console.warn("[WhappNus] Não foi possível associar pagamentos pendentes agora.", error.message);
-      return;
+      console.warn("[WhappNus] Não foi possível confirmar a compra agora.", error.message);
+      toast.error("Não conseguimos verificar o pagamento neste momento. Tente novamente.");
+      return false;
     }
-    if (Number(data?.applied ?? 0) > 0) {
-      toast.success("Pagamento confirmado e plano activado.");
+    if (data?.ok === true && (data?.applied === true || data?.already_applied === true)) {
+      setPaymentPending(false);
+      toast.success("Pagamento confirmado. O seu plano está activo.");
+      return true;
     }
+    if (data?.pending === true || data?.reason === "PAYMENT_NOT_CONFIRMED") {
+      setPaymentPending(true);
+      toast.info("Ainda estamos à espera da confirmação da Kursinha. Pode verificar novamente em instantes.");
+      return false;
+    }
+    console.error("[WhappNus] A compra não pôde ser associada com segurança.", data);
+    toast.error(data?.error ?? "Não foi possível associar esta compra. Contacte o suporte.");
+    return false;
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -162,9 +182,17 @@ function OnboardingPage() {
       if (contactError) console.warn("[WhappNus] Não foi possível guardar o WhatsApp de contacto da organização.", contactError.message);
     }
 
-    await claimPendingPayments();
-    setLoading(false);
-    toast.success("Organização criada.");
+    if (selectedPlanCode) {
+      const activated = await claimPendingPayments(selectedPlanCode);
+      setLoading(false);
+      if (!activated) {
+        setPaymentPending(true);
+        return;
+      }
+    } else {
+      setLoading(false);
+      toast.success("Organização criada.");
+    }
     navigate({ to: "/dashboard" });
   }
 
@@ -177,13 +205,25 @@ function OnboardingPage() {
               Já pertence a {membership.organizations?.name ?? "uma organização"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Pode seguir directamente para o painel de atendimento.
+              {selectedPlanCode
+                ? "A sua organização está pronta. Vamos validar a compra antes de libertar o acesso ao plano."
+                : "Pode seguir directamente para o painel de atendimento."}
             </p>
-            <Button className="mt-4" onClick={async () => {
-              await claimPendingPayments();
+            {paymentPending ? (
+              <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                O pagamento ainda não foi confirmado pela Kursinha. Não precisa de criar outra conta nem outra organização. Assim que a confirmação chegar, carregue em verificar novamente.
+              </div>
+            ) : null}
+            <Button className="mt-4" disabled={loading} onClick={async () => {
+              if (selectedPlanCode) {
+                setLoading(true);
+                const activated = await claimPendingPayments(selectedPlanCode);
+                setLoading(false);
+                if (!activated) return;
+              }
               navigate({ to: "/dashboard" });
             }}>
-              Ir para o Dashboard
+              {loading ? "A verificar pagamento..." : selectedPlanCode ? "Verificar pagamento e activar plano" : "Ir para o Dashboard"}
             </Button>
           </>
         ) : (
@@ -194,6 +234,11 @@ function OnboardingPage() {
               <p className="text-xs text-muted-foreground">
                 Identificador: {name ? slugify(name) : "—"}
               </p>
+              {selectedPlanCode ? (
+                <p className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-primary">
+                  Plano seleccionado: <strong>{selectedPlanCode.replace("-monthly", "").toUpperCase()}</strong>. Use o mesmo e-mail informado no checkout da Kursinha. A activação será validada automaticamente depois de criar a organização.
+                </p>
+              ) : null}
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "A criar..." : "Criar organização"}
