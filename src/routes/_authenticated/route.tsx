@@ -33,10 +33,9 @@ export const Route = createFileRoute("/_authenticated")({
 
       const activePlan = await supabase
         .from("organization_subscriptions")
-        .select("id,current_period_end,subscription_plans!inner(code)")
+        .select("id,current_period_end")
         .eq("organization_id", organizationIds[0])
-        .eq("status", "active")
-        .eq("subscription_plans.code", planIntent)
+        .in("status", ["active", "trialing"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
