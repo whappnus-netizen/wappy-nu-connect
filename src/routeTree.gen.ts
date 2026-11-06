@@ -248,6 +248,7 @@ export interface FileRoutesByTo {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
+  '/assinar': typeof AssinarRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
@@ -282,6 +283,7 @@ export interface FileRoutesById {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
+  '/assinar': typeof AssinarRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
@@ -349,6 +351,7 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
+    | '/assinar'
     | '/agendamentos'
     | '/automacoes'
     | '/contactos'
@@ -382,6 +385,7 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
+    | '/assinar'
     | '/_authenticated/agendamentos'
     | '/_authenticated/automacoes'
     | '/_authenticated/contactos'
