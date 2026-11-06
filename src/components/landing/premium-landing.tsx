@@ -36,9 +36,9 @@ const audiences = [
 ];
 
 const plans = [
-  { name: "Start", price: "10.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
-  { name: "Pro", price: "25.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
-  { name: "Premium", price: "45.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
+  { code: "start-monthly", name: "Start", price: "5.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
+  { code: "pro-monthly", name: "Pro", price: "10.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
+  { code: "premium-monthly", name: "Premium", price: "20.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
 ];
 
 const businessScenes = [
@@ -205,7 +205,7 @@ export function PremiumLanding() {
               <p className="wn-plan-desc">{p.description}</p>
               <p className="wn-price"><strong>{p.price}</strong> Kz<span>/mês</span></p>
               <ul>{p.features.map((f) => <li key={f}><Check size={16} /> {f}</li>)}</ul>
-              <Link to="/auth/registo" className={`wn-btn ${p.featured ? "wn-btn-light" : "wn-btn-primary"}`}>Começar com {p.name}</Link>
+              <Link to="/assinar" search={{ plan: p.code }} className={`wn-btn ${p.featured ? "wn-btn-light" : "wn-btn-primary"}`}>Assinar {p.name}</Link>
             </article>
           ))}
         </div>
