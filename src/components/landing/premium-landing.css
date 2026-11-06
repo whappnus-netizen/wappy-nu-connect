@@ -50,7 +50,6 @@
 .wn-hero-blob{position:absolute;inset:6% 4% 0 10%;background:#e6efe9;border-radius:48% 52% 30% 30%/40% 40% 20% 20%}
 .wn-hero-img{position:relative;width:78%;max-height:560px;object-fit:cover;border-radius:28px;margin-left:4%;aspect-ratio:8/9}
 .wn-phone{position:absolute;right:0;bottom:-6%;width:44%;max-width:250px;min-width:170px;padding:8px;border-radius:34px;background:#1d1f1e;box-shadow:0 30px 60px -20px rgba(0,0,0,.45)}
-.wn-phone-screen{border-radius:27px;overflow:hidden;background:#fff}
 .wn-phone-top{background:var(--g);color:#fff;padding:22px 14px 16px}
 .wn-phone-hi{font-weight:700;font-size:13px}
 .wn-phone-sub{font-size:10px;opacity:.75}
@@ -267,53 +266,24 @@ section#planos .wn-head{margin-bottom:44px}
 
 /* Hero phone hardware frame and real Inbox screenshot */
 .wn-hero-visual{min-height:clamp(500px,48vw,650px);display:flex;align-items:center}
-.wn-phone{position:absolute;z-index:3;right:1%;bottom:-2%;width:clamp(190px,25vw,285px);max-width:285px;min-width:0;
-  padding:18px 8px 9px;border:1px solid rgba(255,255,255,.34);border-radius:36px;
+.wn-phone{position:absolute;z-index:3;right:1%;bottom:-2%;width:clamp(205px,25vw,285px);max-width:285px;min-width:0;
+  padding:15px 7px 7px;border:1px solid rgba(255,255,255,.42);border-radius:38px;
   background:linear-gradient(145deg,#343a37 0%,#080b09 24%,#171d19 70%,#050706 100%);
   box-shadow:0 38px 72px -24px rgba(0,0,0,.55),0 0 0 2px rgba(6,35,20,.42),inset 0 1px 1px rgba(255,255,255,.22)}
-.wn-phone-camera{position:absolute;top:7px;left:50%;z-index:2;width:54px;height:5px;transform:translateX(-50%);
+.wn-phone-camera{position:absolute;top:7px;left:50%;z-index:2;width:48px;height:4px;transform:translateX(-50%);
   border-radius:10px;background:#030504;box-shadow:0 0 0 1px rgba(255,255,255,.07)}
-.wn-phone-screen{width:100%;overflow:hidden;border-radius:25px;background:#edf7f5;line-height:0;
-  box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
-.wn-phone-screen img{display:block;width:100%;height:auto;aspect-ratio:240/455;object-fit:cover;object-position:center}
+.wn-phone-screen{width:100%;overflow:hidden;border-radius:25px;background:#edf7f5;line-height:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
 @media(min-width:1024px){
   .wn-phone{right:0;bottom:-1%;width:clamp(225px,22vw,285px)}
   .wn-hero-visual{min-height:590px}
 }
 @media(max-width:639px){
   .wn-hero-visual{min-height:490px}
-  .wn-phone{right:0;bottom:-1%;width:min(53%,235px);padding:16px 7px 8px;border-radius:30px}
-  .wn-phone-screen{border-radius:22px}
+  .wn-phone{right:0;bottom:-1%;width:min(53%,235px);padding:14px 6px 6px;border-radius:32px}
+  .wn-phone-screen{border-radius:25px}
   .wn-phone-camera{top:6px;width:46px;height:4px}
 }
 
 
-/* Inbox UI faithfully recreates the supplied screen inside the phone */
-.wn-phone-screen{position:relative;aspect-ratio:240/455;display:flex;flex-direction:column;border-radius:25px;overflow:hidden;background:#f0f8f7;color:#142d2b;line-height:normal}
-.wn-inbox-head{height:14%;min-height:48px;display:flex;align-items:center;gap:13px;padding:8px 11px;background:#fbfefd;border-bottom:1px solid #d5e1df}
-.wn-inbox-head>svg{flex-shrink:0}
-.wn-inbox-head>div{min-width:0;display:grid;gap:3px}
-.wn-inbox-head strong{font-size:clamp(12px,1.25vw,17px);font-weight:750;letter-spacing:-.03em}
-.wn-inbox-head span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#687b79;font-size:clamp(7px,.75vw,10px)}
-.wn-inbox-body{flex:1;min-height:0;padding:10px 9px 8px;display:flex;flex-direction:column;gap:9px}
-.wn-inbox-search{height:38px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 11px;border:1px solid #d7e1df;border-radius:12px;background:#fff;color:#74817f;box-shadow:0 2px 5px rgba(15,48,43,.12);font-size:clamp(10px,1vw,13px)}
-.wn-inbox-filters{display:grid;grid-template-columns:1fr 1fr;gap:3px 7px;flex-shrink:0;color:#687b79;font-size:clamp(9px,.95vw,12px);text-align:center}
-.wn-inbox-filters span{padding:7px 2px;border-radius:12px;white-space:nowrap}
-.wn-inbox-filters .active{background:#e2f2ef;color:#07866f;font-weight:650}
-.wn-inbox-list{flex:1;min-height:0;margin:0 -9px -8px;background:#fff;border-top:1px solid #d6e0de;overflow:hidden}
-.wn-inbox-contact{min-height:14.1%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;column-gap:7px;padding:5px 12px;border-bottom:1px solid rgba(220,230,227,.5)}
-.wn-inbox-contact>div{min-width:0;display:grid;gap:3px}
-.wn-inbox-contact strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,1.08vw,14px);font-weight:600;color:#142d2b}
-.wn-inbox-contact span{font-size:clamp(8px,.83vw,11px);color:#71807e;white-space:nowrap}
-.wn-inbox-contact>b{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#078c78;color:#fff;font-size:10px;box-shadow:0 2px 5px rgba(0,0,0,.12)}
-.wn-inbox-contact>small{padding:5px 10px;border-radius:20px;background:#e7f3f2;color:#193d39;font-size:9px}
-@media(max-width:639px){
-  .wn-inbox-head{gap:10px;padding:7px 9px}
-  .wn-inbox-body{padding:8px 7px 6px;gap:7px}
-  .wn-inbox-search{height:34px}
-  .wn-inbox-filters span{padding:6px 1px}
-  .wn-inbox-list{margin:0 -7px -6px}
-  .wn-inbox-contact{padding:4px 9px;column-gap:5px}
-  .wn-inbox-contact>b{width:22px;height:22px;font-size:9px}
-  .wn-inbox-contact>small{padding:4px 8px;font-size:8px}
-}
+.wn-phone-screen{position:relative;aspect-ratio:401/760;overflow:hidden;border-radius:27px;background:#f0f8f7;line-height:0}
+.wn-phone-screen img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
