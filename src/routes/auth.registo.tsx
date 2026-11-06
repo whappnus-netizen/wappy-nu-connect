@@ -51,14 +51,19 @@ function SignupPage() {
     setLoading(true);
     const params = new URLSearchParams(window.location.search);
     const referralCode = (params.get("ref") ?? "").trim().toLowerCase();
+    const requestedPlan = (params.get("plan") ?? "").trim();
+    const selectedPlan = ["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan) ? requestedPlan : "";
     const metadata: Record<string, string> = { full_name: fullName.trim(), phone: normalizedPhone };
+    if (selectedPlan) metadata["selected_plan_code"] = selectedPlan;
     if (/^[a-f0-9]{6,32}$/.test(referralCode)) metadata["affiliate_referral_code"] = referralCode;
     const { data, error } = await supabase.auth.signUp({
       email: normalizedEmail,
       password,
       options: {
         data: metadata,
-        emailRedirectTo: "https://whappnus.online/auth/confirm",
+        emailRedirectTo: selectedPlan
+          ? `https://whappnus.online/auth/confirm?plan=${encodeURIComponent(selectedPlan)}`
+          : "https://whappnus.online/auth/confirm",
       },
     });
     setLoading(false);
@@ -74,16 +79,22 @@ function SignupPage() {
     if (data.session) {
       navigate({ to: "/onboarding" });
     } else {
-      toast.success("Conta criada. Enviámos um link para confirmar o seu email.");
-      // Muda imediatamente para Entrar; não guarda nem transporta a palavra-passe.
-      window.location.assign(`/auth/login?registered=1&email=${encodeURIComponent(normalizedEmail)}`);
+      toast.success(selectedPlan
+        ? "Conta criada. Confirme o e-mail; depois entraremos na etapa de activação do plano."
+        : "Conta criada. Enviámos um link para confirmar o seu email.");
+      // A intenção de compra segue apenas como identificador do plano; a activação continua dependente do webhook.
+      const next = new URLSearchParams({ registered: "1", email: normalizedEmail });
+      if (selectedPlan) next.set("plan", selectedPlan);
+      window.location.assign(`/auth/login?${next.toString()}`);
     }
   }
 
   return (
     <AuthCard
       title="Criar conta"
-      subtitle="Depois do registo vai criar a sua organização."
+      subtitle={new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").has("plan")
+        ? "A sua compra será associada depois da confirmação do pagamento e do e-mail."
+        : "Depois do registo vai criar a sua organização."}
       footer={
         <>
           Já tem conta? <Link to="/auth/login" className="font-medium text-primary">Entrar</Link>
