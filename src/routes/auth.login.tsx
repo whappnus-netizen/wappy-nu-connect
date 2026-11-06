@@ -106,7 +106,7 @@ function LoginPage() {
     }
     setLoading(false);
     const queryPlan = new URLSearchParams(window.location.search).get("plan") ?? "";
-    const metadataPlan = String(authData.user.user_metadata?.["selected_plan_code"] ?? "");
+    const metadataPlan = String(authData.user.user_metadata["selected_plan_code"] ?? "");
     const requestedPlan = ["start-monthly", "pro-monthly", "premium-monthly"].includes(queryPlan)
       ? queryPlan
       : metadataPlan;
