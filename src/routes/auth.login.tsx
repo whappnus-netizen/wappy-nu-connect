@@ -105,6 +105,21 @@ function LoginPage() {
       }
     }
     setLoading(false);
+    const queryPlan = new URLSearchParams(window.location.search).get("plan") ?? "";
+    const metadataPlan = String(authData.user.user_metadata["selected_plan_code"] ?? "");
+    const requestedPlan = ["start-monthly", "pro-monthly", "premium-monthly"].includes(queryPlan)
+      ? queryPlan
+      : metadataPlan;
+    if (["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan)) {
+      const { error: intentError } = await supabase.auth.updateUser({ data: { selected_plan_code: requestedPlan } });
+      if (intentError) {
+        setLoading(false);
+        toast.error("Não foi possível guardar o plano escolhido. Tente novamente.");
+        return;
+      }
+      window.location.assign(`/onboarding?plan=${encodeURIComponent(requestedPlan)}`);
+      return;
+    }
     navigate({ to: "/dashboard" });
   }
 

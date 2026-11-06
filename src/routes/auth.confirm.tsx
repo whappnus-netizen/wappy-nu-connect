@@ -9,12 +9,13 @@ export const Route = createFileRoute("/auth/confirm")({
     type: typeof search["type"] === "string" ? (search["type"] as string) : "",
     code: typeof search["code"] === "string" ? (search["code"] as string) : "",
     error_description: typeof search["error_description"] === "string" ? (search["error_description"] as string) : "",
+    plan: typeof search["plan"] === "string" ? (search["plan"] as string) : "",
   }),
   component: ConfirmEmailPage,
 });
 
 function ConfirmEmailPage() {
-  const { token_hash, type, code, error_description } = Route.useSearch();
+  const { token_hash, type, code, error_description, plan } = Route.useSearch();
   const [status, setStatus] = useState<"checking" | "success" | "error">("checking");
   const [confirmedEmail, setConfirmedEmail] = useState("");
   const [message, setMessage] = useState("Estamos a confirmar o teu endereço de e-mail…");
@@ -123,7 +124,7 @@ function ConfirmEmailPage() {
               {status === "success" ? (
                 <Link
                   to="/auth/login"
-                  search={{ confirmed: "1", email: confirmedEmail } as never}
+                  search={{ confirmed: "1", email: confirmedEmail, ...( ["start-monthly", "pro-monthly", "premium-monthly"].includes(plan) ? { plan } : {}) } as never}
                   className="inline-flex items-center justify-center rounded-lg bg-[#167a43] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#126537]"
                 >
                   Entrar na WhappNus

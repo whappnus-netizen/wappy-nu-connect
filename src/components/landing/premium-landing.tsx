@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowRight, Bot, Check, ChevronDown, KanbanSquare, Lock, Menu, MessagesSquare, QrCode,
-  ShieldCheck, Smartphone, Sparkles, UserPlus, X, Zap, Store, GraduationCap, Stethoscope,
+  ArrowRight, Bot, Check, ChevronDown, KanbanSquare, Menu, MessagesSquare, QrCode,
+  Smartphone, Sparkles, UserPlus, X, Store, GraduationCap, Stethoscope, Search,
 } from "lucide-react";
 import "./premium-landing.css";
 import heroPerson from "@/assets/hero-person.jpg";
@@ -36,9 +36,9 @@ const audiences = [
 ];
 
 const plans = [
-  { name: "Start", price: "10.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
-  { name: "Pro", price: "25.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
-  { name: "Premium", price: "45.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
+  { code: "start-monthly", name: "Start", price: "5.000", description: "Para começar a atender com método.", features: ["1 número WhatsApp", "1 agente IA", "1.500 mensagens com IA/mês", "2 automações activas", "Inbox, contactos e CRM"] },
+  { code: "pro-monthly", name: "Pro", price: "10.000", description: "Para equipas em crescimento.", features: ["2 números WhatsApp", "2 agentes IA", "4.000 mensagens com IA/mês", "5 automações activas", "Até 3 membros adicionais"], featured: true },
+  { code: "premium-monthly", name: "Premium", price: "20.000", description: "Para operações com maior volume.", features: ["4 números WhatsApp", "4 agentes IA", "10.000 mensagens com IA/mês", "15 automações activas", "Até 9 membros adicionais"] },
 ];
 
 const businessScenes = [
@@ -61,30 +61,35 @@ function Brand({ light = false }: { light?: boolean }) {
 
 function PhoneMock() {
   return (
-    <div className="wn-phone" aria-hidden="true">
-      <div className="wn-phone-screen">
-        <div className="wn-phone-top">
-          <p className="wn-phone-hi">Olá, Loja Kianda 👋</p>
-          <p className="wn-phone-sub">Resumo de hoje</p>
-          <div className="wn-phone-card">
-            <span>Conversas abertas</span>
-            <strong>Inbox</strong>
-            <small>IA activa · equipa online</small>
-          </div>
+    <div className="wn-phone" aria-label="Pré-visualização do Inbox da WhappNus">
+      <div className="wn-phone-camera" aria-hidden="true" />
+      <div className="wn-phone-screen" role="img" aria-label="Pré-visualização do Inbox da WhappNus: pesquisa, filtros e conversas abertas">
+        <div className="wn-inbox-head">
+          <Menu size={17} strokeWidth={2.2} />
+          <div><strong>Inbox</strong><span>Multiatendimento em tempo real — receba, responda e organize</span></div>
         </div>
-        <div className="wn-phone-list">
-          <p className="wn-phone-title">Conversas recentes</p>
-          {[
-            ["Cliente", "Têm este modelo em stock?", "IA"],
-            ["Cliente", "Qual é o horário de hoje?", "IA"],
-            ["Cliente", "Quero falar com alguém", "Equipa"],
-          ].map(([n, m, t], i) => (
-            <div key={i} className="wn-phone-row">
-              <span className="wn-phone-ico"><MessagesSquare size={12} /></span>
-              <div><b>{n}</b><small>{m}</small></div>
-              <em className={t === "IA" ? "ai" : ""}>{t}</em>
-            </div>
-          ))}
+        <div className="wn-inbox-body">
+          <div className="wn-inbox-search"><Search size={16} /><span>Pesquisar conversas</span></div>
+          <div className="wn-inbox-filters">
+            <span>Todas</span><span className="active">Abertas</span>
+            <span>Pendentes</span><span>Em atendimento</span><span>Encerradas</span>
+          </div>
+          <div className="wn-inbox-list">
+            {[
+              ["~Mostro", "28/10/2026, 20:23:20", "2"],
+              ["Celso Queiroz", "28/10/2026, 11:36:09", "20"],
+              ["Isaac .M", "27/10/2026, 23:51:02", "12"],
+              ["F.Miguel", "27/10/2026, 22:21:22", "18"],
+              ["Irene Reis", "27/10/2026, 21:39:14", "17"],
+              ["Bruno Tavares", "27/10/2026, 11:25:11", "4"],
+              ["VNVDIGITAL", "27/10/2026, 10:48:03", "6"],
+            ].map(([name, date, count]) => (
+              <div className="wn-inbox-contact" key={name}>
+                <div><strong>{name}</strong><span>{date}</span></div>
+                <b>{count}</b><small>open</small>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -95,13 +100,6 @@ export function PremiumLanding() {
   const [open, setOpen] = useState(false);
   return (
     <main className="wn">
-      <div className="wn-topbar">
-        <div className="wn-wrap wn-topbar-in">
-          <span><Zap size={14} /> WhappNus: atendimento inteligente no WhatsApp da sua empresa.</span>
-          <span className="wn-hide-sm">Feito para negócios angolanos 🇦🇴</span>
-        </div>
-      </div>
-
       <header className="wn-header">
         <div className="wn-wrap wn-header-in">
           <Link to="/" aria-label="WhappNus — início"><Brand /></Link>
@@ -133,11 +131,6 @@ export function PremiumLanding() {
             <Link to="/auth/registo" className="wn-btn wn-btn-primary wn-btn-lg">Começar grátis <ArrowRight size={16} /></Link>
             <a href="#como-funciona" className="wn-btn wn-btn-outline wn-btn-lg">Ver como funciona <ChevronDown size={16} /></a>
           </div>
-          <ul className="wn-trust">
-            <li><ShieldCheck size={16} /> Dados isolados por empresa</li>
-            <li><Zap size={16} /> Respostas em tempo real</li>
-            <li><Lock size={16} /> Acesso por permissões</li>
-          </ul>
         </div>
         <div className="wn-hero-visual">
           <div className="wn-hero-blob" />
@@ -173,13 +166,13 @@ export function PremiumLanding() {
         </div>
         <div className="wn-steps">
           {steps.map((s, i) => (
-            <div key={s.title} className="wn-step">
+            <article key={s.title} className={`wn-step wn-step-${i + 1}`} tabIndex={0} aria-label={`Passo ${i + 1}: ${s.title}`}>
               <span className="wn-step-ico"><s.icon size={26} /></span>
               <div className="wn-step-txt">
                 <b className="wn-step-n">{i + 1}</b>
                 <div><h3>{s.title}</h3><p>{s.text}</p></div>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       </section>
@@ -212,7 +205,7 @@ export function PremiumLanding() {
               <p className="wn-plan-desc">{p.description}</p>
               <p className="wn-price"><strong>{p.price}</strong> Kz<span>/mês</span></p>
               <ul>{p.features.map((f) => <li key={f}><Check size={16} /> {f}</li>)}</ul>
-              <Link to="/auth/registo" className={`wn-btn ${p.featured ? "wn-btn-light" : "wn-btn-primary"}`}>Começar com {p.name}</Link>
+              <Link to="/assinar" search={{ plan: p.code }} className={`wn-btn ${p.featured ? "wn-btn-light" : "wn-btn-primary"}`}>Assinar {p.name}</Link>
             </article>
           ))}
         </div>

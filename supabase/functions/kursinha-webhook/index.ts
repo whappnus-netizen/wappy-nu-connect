@@ -154,33 +154,55 @@ Deno.serve(async(req:Request)=>{
  const token=(req.headers.get("Authorization")??"").replace(/^Bearer\s+/i,"").trim();if(!token)return reply({ok:false,error:"Sessão necessária."},401);
  const authClient=createClient(url,anon,{auth:{persistSession:false,autoRefreshToken:false}}),auth=await authClient.auth.getUser(token),u=auth.data.user;
  if(auth.error||!u||!u.email_confirmed_at||!u.email)return reply({ok:false,error:"Confirma o email antes de associar o pagamento."},401);
+ const planCode=str(body.plan_code,80);
+ if(!["start-monthly","pro-monthly","premium-monthly"].includes(planCode))return reply({ok:false,error:"Plano seleccionado inválido."},400);
+ const plan=await db.from("subscription_plans").select("id,code,name,price_aoa").eq("code",planCode).eq("is_active",true).maybeSingle();
+ if(plan.error)return reply({ok:false,error:"Não foi possível validar o plano seleccionado."},500);
+ if(!plan.data||Number(plan.data.price_aoa)<=0)return reply({ok:false,error:"Plano indisponível."},404);
  const ms=await db.from("memberships").select("organization_id").eq("user_id",u.id).eq("role","OWNER");if(ms.error)return reply({ok:false,error:"Não foi possível confirmar a organização."},500);
- const ids=[...new Set((ms.data??[]).map((x:any)=>x.organization_id))];if(ids.length!==1)return reply({ok:false,error:"É necessária exatamente uma organização com papel OWNER."},409);
- const sales=await db.from("kursinha_sales").select("sale_id,organization_id").eq("buyer_email",email(u.email)).eq("status","approved").is("applied_at",null).order("created_at",{ascending:true}).limit(20);if(sales.error)return reply({ok:false,error:"Não foi possível localizar pagamentos pendentes."},500);
- let applied=0,skipped=0;
- for(const sale of sales.data??[]){
-  if(sale.organization_id&&sale.organization_id!==ids[0]){skipped++;continue;}
-  const link=await db.from("kursinha_sales").update({organization_id:ids[0],updated_at:new Date().toISOString()}).eq("sale_id",sale.sale_id).is("applied_at",null);if(link.error)return reply({ok:false,error:"Não foi possível associar a compra."},500);
-  const a=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:sale.sale_id});if(a.error)return reply({ok:false,error:"A associação foi feita, mas a ativação falhou; tenta novamente."},500);
-  if(a.data?.applied||a.data?.already_applied){
-   applied++;
-   // A conta pode ter sido criada depois do evento aprovado; enviar confirmação após ativação real.
-   const saleInfo=await db.from("kursinha_sales").select("buyer_email,buyer_name,product_name,amount_aoa,order_id,organization_id,subscription_id,approved_at,plan_id").eq("sale_id",sale.sale_id).maybeSingle();
-   if(saleInfo.error)console.warn("[kursinha-webhook] detalhes da venda para e-mail",saleInfo.error.message);
-   else if(saleInfo.data){
-    const si:any=saleInfo.data;
-    try {
-     await recordAffiliateCommission(db,u.id,sale.sale_id,si.plan_id,Number(si.amount_aoa),new Date().toISOString());
-    } catch (affiliateError) {
-     console.error("[affiliate-commission] Falha ao reconciliar comissão durante a associação da venda " + sale.sale_id + ":", affiliateError instanceof Error ? affiliateError.message : "erro desconhecido");
-     await db.from("affiliate_audit_logs").insert({affiliate_user_id:null,action:"commission.claim_reconciliation_failed",details:{sale_id:sale.sale_id,reason:affiliateError instanceof Error?affiliateError.message.slice(0,200):"unknown"}});
-    }
-    const subInfo=si.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",si.subscription_id).maybeSingle():{data:null,error:null};
-    if(subInfo.error)console.warn("[kursinha-webhook] dados da assinatura para e-mail",subInfo.error.message);
-    const ss:any=subInfo.data;
-    await sendEmail(db,{template:"payment_approved",to:si.buyer_email,name:si.buyer_name,event:"sale.approved",organizationId:si.organization_id,idempotencyKey:"payment_approved:"+sale.sale_id,vars:{plan:ss?.subscription_plans?.name||si.product_name,organization:ss?.organizations?.name,amount:si.amount_aoa,approved_at:si.approved_at||new Date().toISOString(),period_start:ss?.current_period_start,period_end:ss?.current_period_end,reference:si.order_id||sale.sale_id}});
-   }
-  }else skipped++;
+ const ids=[...new Set((ms.data??[]).map((x:any)=>x.organization_id))];if(ids.length!==1)return reply({ok:false,error:"É necessária exactamente uma organização com papel OWNER."},409);
+ const orgId=ids[0],buyer=email(u.email),expected=Number(plan.data.price_aoa),now=new Date().toISOString();
+ // If the webhook already applied this exact purchase after the organization was created, report success.
+ const already=await db.from("kursinha_sales").select("sale_id,subscription_id,amount_aoa,currency").eq("buyer_email",buyer).eq("plan_id",plan.data.id).eq("organization_id",orgId).eq("status","approved").not("applied_at","is",null).order("applied_at",{ascending:false}).limit(1).maybeSingle();
+ if(already.error)return reply({ok:false,error:"Não foi possível consultar a compra associada."},500);
+ if(already.data){
+  const sub=already.data.subscription_id?await db.from("organization_subscriptions").select("status,amount_aoa,plan_id").eq("id",already.data.subscription_id).maybeSingle():{data:null,error:null};
+  if(sub.error)return reply({ok:false,error:"Não foi possível confirmar a assinatura."},500);
+  if(sub.data?.status==="active"&&sub.data.plan_id===plan.data.id&&Number(sub.data.amount_aoa)===expected&&Number(already.data.amount_aoa)===expected&&already.data.currency==="AOA"){
+   return reply({ok:true,applied:true,already_applied:true,plan_code:planCode,organization_id:orgId});
+  }
  }
- return reply({ok:true,applied,skipped});
+ const candidates=await db.from("kursinha_sales").select("sale_id,organization_id,amount_aoa,currency,plan_id").eq("buyer_email",buyer).eq("plan_id",plan.data.id).eq("status","approved").is("applied_at",null).order("approved_at",{ascending:true}).limit(5);
+ if(candidates.error)return reply({ok:false,error:"Não foi possível localizar a compra aprovada."},500);
+ const eligible=(candidates.data??[]).filter((sale:any)=>Number(sale.amount_aoa)===expected&&sale.currency==="AOA"&&(!sale.organization_id||sale.organization_id===orgId));
+ const conflicts=(candidates.data??[]).filter((sale:any)=>sale.organization_id&&sale.organization_id!==orgId);
+ if(eligible.length>1)return reply({ok:false,error:"Encontrámos mais de uma compra aprovada deste plano para este e-mail. Contacte o suporte para associarmos a transacção correcta.",reason:"MULTIPLE_MATCHING_SALES"},409);
+ if(eligible.length===0){
+  const pending=await db.from("kursinha_sales").select("sale_id,status,amount_aoa,currency").eq("buyer_email",buyer).eq("plan_id",plan.data.id).eq("status","pending").limit(1);
+  if(pending.error)return reply({ok:false,error:"Não foi possível consultar o estado do pagamento."},500);
+  if(conflicts.length)return reply({ok:false,error:"Existe uma compra já associada a outra organização. Contacte o suporte.",reason:"SALE_ALREADY_LINKED"},409);
+  if(pending.data?.length)return reply({ok:true,applied:false,pending:true,reason:"PAYMENT_NOT_CONFIRMED",message:"A Kursinha ainda não confirmou o pagamento."},202);
+  const terminal=await db.from("kursinha_sales").select("status").eq("buyer_email",buyer).eq("plan_id",plan.data.id).in("status",["cancelled","refunded","invalid"]).order("updated_at",{ascending:false}).limit(1).maybeSingle();
+  if(terminal.error)return reply({ok:false,error:"Não foi possível consultar o estado da compra."},500);
+  if(terminal.data?.status==="cancelled"||terminal.data?.status==="refunded")return reply({ok:false,error:"Esta compra foi cancelada ou reembolsada. Se pretende continuar, faça um novo pagamento.",reason:"PAYMENT_CANCELLED"},409);
+  if(terminal.data?.status==="invalid")return reply({ok:false,error:"O valor ou produto recebido não corresponde ao catálogo actual. Contacte o suporte antes de efectuar outro pagamento.",reason:"PAYMENT_CATALOG_MISMATCH"},409);
+  return reply({ok:true,applied:false,pending:true,reason:"PAYMENT_NOT_CONFIRMED",message:"Ainda não recebemos uma compra aprovada para este plano e e-mail. Confirme que usou o mesmo e-mail no checkout."},202);
+ }
+ const sale=eligible[0];
+ const link=await db.from("kursinha_sales").update({organization_id:orgId,updated_at:now}).eq("sale_id",sale.sale_id).is("organization_id",null).is("applied_at",null);
+ if(link.error)return reply({ok:false,error:"Não foi possível associar a compra à organização."},500);
+ const applied=await db.rpc("apply_kursinha_approved_sale",{p_sale_id:sale.sale_id});
+ if(applied.error)return reply({ok:false,error:"A compra foi identificada, mas a activação falhou. Tente novamente ou contacte o suporte."},500);
+ if(!(applied.data?.applied||applied.data?.already_applied))return reply({ok:false,error:"A activação não foi confirmada.",reason:String(applied.data?.reason??"ACTIVATION_NOT_CONFIRMED")},409);
+ const saleInfo=await db.from("kursinha_sales").select("buyer_email,buyer_name,product_name,amount_aoa,order_id,organization_id,subscription_id,approved_at,plan_id").eq("sale_id",sale.sale_id).maybeSingle();
+ if(saleInfo.error)console.warn("[kursinha-webhook] detalhes da venda para confirmação",saleInfo.error.message);
+ else if(saleInfo.data){
+  const si:any=saleInfo.data;
+  try{await recordAffiliateCommission(db,u.id,sale.sale_id,si.plan_id,Number(si.amount_aoa),now);}
+  catch(e){console.error("[affiliate-commission] claim",e instanceof Error?e.message:e);}
+  const subInfo=si.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",si.subscription_id).maybeSingle():{data:null,error:null};
+  const ss:any=subInfo.data;
+  await sendEmail(db,{template:"payment_approved",to:si.buyer_email,name:si.buyer_name,event:"sale.approved",organizationId:si.organization_id,idempotencyKey:"payment_approved:"+sale.sale_id,vars:{plan:ss?.subscription_plans?.name||plan.data.name,organization:ss?.organizations?.name,amount:si.amount_aoa,approved_at:si.approved_at||now,period_start:ss?.current_period_start,period_end:ss?.current_period_end,reference:si.order_id||sale.sale_id}});
+ }
+ return reply({ok:true,applied:true,plan_code:planCode,organization_id:orgId});
 });
