@@ -56,6 +56,9 @@ function OnboardingPage() {
     }
     if (data?.ok === true && (data?.applied === true || data?.already_applied === true)) {
       setPaymentPending(false);
+      // Remove the one-time intent so it cannot suppress a future free-trial flow.
+      const { error: clearIntentError } = await supabase.auth.updateUser({ data: { selected_plan_code: null } });
+      if (clearIntentError) console.warn("[WhappNus] Não foi possível limpar a intenção de compra.", clearIntentError.message);
       toast.success("Pagamento confirmado. O seu plano está activo.");
       return true;
     }
@@ -105,6 +108,19 @@ function OnboardingPage() {
       setTechnicalError(message);
       toast.error(message);
       return;
+    }
+
+    // Persist the selected paid plan in Auth metadata before the organization trigger runs.
+    // This prevents a paid customer from receiving a free trial while payment is being reconciled.
+    if (selectedPlanCode && authenticatedUser.user_metadata?.selected_plan_code !== selectedPlanCode) {
+      const { error: intentError } = await supabase.auth.updateUser({ data: { selected_plan_code: selectedPlanCode } });
+      if (intentError) {
+        setLoading(false);
+        const message = "Não foi possível guardar o plano seleccionado. Actualize a página e tente novamente.";
+        setTechnicalError(message);
+        toast.error(message);
+        return;
+      }
     }
 
     // Auto-reparação do profile (idempotente, apenas para o próprio utilizador).
