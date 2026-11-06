@@ -105,6 +105,11 @@ function LoginPage() {
       }
     }
     setLoading(false);
+    const requestedPlan = new URLSearchParams(window.location.search).get("plan") ?? "";
+    if (["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan)) {
+      window.location.assign(`/onboarding?plan=${encodeURIComponent(requestedPlan)}`);
+      return;
+    }
     navigate({ to: "/dashboard" });
   }
 
