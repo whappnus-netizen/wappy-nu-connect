@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated")({
 
     // A paid-first account must stay in onboarding until its exact plan is active.
     // This also blocks manual navigation to /dashboard while Kursinha confirmation is pending.
-    const planIntent = String(data.user.user_metadata?["selected_plan_code"] ?? "");
+    const planIntent = String(data.user.user_metadata?.["selected_plan_code"] ?? "");
     if (
       location.pathname !== "/onboarding" &&
       ["start-monthly", "pro-monthly", "premium-monthly"].includes(planIntent)
