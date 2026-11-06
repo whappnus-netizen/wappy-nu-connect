@@ -107,6 +107,12 @@ function LoginPage() {
     setLoading(false);
     const requestedPlan = new URLSearchParams(window.location.search).get("plan") ?? "";
     if (["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan)) {
+      const { error: intentError } = await supabase.auth.updateUser({ data: { selected_plan_code: requestedPlan } });
+      if (intentError) {
+        setLoading(false);
+        toast.error("Não foi possível guardar o plano escolhido. Tente novamente.");
+        return;
+      }
       window.location.assign(`/onboarding?plan=${encodeURIComponent(requestedPlan)}`);
       return;
     }
