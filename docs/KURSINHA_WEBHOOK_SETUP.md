@@ -21,10 +21,11 @@ If the secret is missing, the endpoint returns HTTP 503 and does not process the
 
 | Kursinha product ID | WhappNus plan | Expected price |
 | --- | --- | ---: |
-| `6aca37f7bad1248c97213091` | `start-monthly` | 10,000 AOA |
-| `6aca8c46e62b25eb5a5f9df3` | `pro-monthly` | 25,000 AOA |
+| `6aca37f7bad1248c97213091` | `start-monthly` | 5,000 AOA |
+| `6aca8c46e62b25eb5a5f9df3` | `pro-monthly` | 10,000 AOA |
+| `6acc80e79db7fbd07069b6e0` | `premium-monthly` | 20,000 AOA |
 
-The 45,000 AOA product is intentionally unmapped until its real Kursinha product ID and checkout URL are confirmed. Never map it based on price alone.
+All three product IDs remain unchanged; the expected prices were updated to match the seller's current Kursinha checkout prices. The database catalog and webhook validation amounts must remain synchronized.
 
 ## Processing rules
 
@@ -32,7 +33,9 @@ The 45,000 AOA product is intentionally unmapped until its real Kursinha product
 - `sale.approved`: require a valid signature, known active product ID, exact expected price, and currency `AOA`; activate only after account/organization association is verified.
 - `sale.cancelled`: mark a pending sale cancelled. If the sale had already been applied, treat the later cancellation as a refund and cancel only the subscription linked to that sale; preserve access if another valid subscription exists.
 - A sale ID is the idempotency key. Duplicate deliveries must not extend the subscription twice.
-- Approved sales for a buyer without an associated verified account remain pending association. After sign-up and organization onboarding, the app calls the authenticated `claim_pending_sales` action.
+- Approved sales for a buyer without an associated verified account remain pending association. The paid-first journey is: select one of the three plans → pay on the matching Kursinha product checkout → return to WHAPPNUS → create account and confirm the same e-mail → create organization → claim exactly one approved sale matching that e-mail, selected plan and current expected amount → enter the dashboard.
+- The authenticated `claim_pending_sales` action requires the selected plan code and refuses ambiguous/multiple matching purchases; it never claims every approved sale for an e-mail.
+- Paid-plan intent is stored in Supabase Auth user metadata. The organization trial trigger skips the automatic free trial for these paid-intent accounts; free signups without a selected paid plan retain the seven-day trial.
 - A successful payment grants 30 days. A purchase during an active paid period switches to the purchased plan immediately and adds 30 days to the current end date. Trial time is not converted into extra paid time.
 - A manual/admin block is not automatically removed by a payment.
 
