@@ -62,11 +62,13 @@ function CheckoutHandoffPage() {
   }
 
   function openCheckout() {
-    const opened = window.open(plan.checkoutUrl, "_blank", "noopener,noreferrer");
+    const opened = window.open(plan.checkoutUrl, "_blank");
     if (!opened) {
       window.location.assign(plan.checkoutUrl);
       return;
     }
+    // Keep the checkout in a separate tab without exposing the opener window.
+    opened.opener = null;
     setCheckoutOpened(true);
   }
 
