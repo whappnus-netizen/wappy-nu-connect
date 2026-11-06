@@ -286,3 +286,34 @@ section#planos .wn-head{margin-bottom:44px}
   .wn-phone-screen{border-radius:22px}
   .wn-phone-camera{top:6px;width:46px;height:4px}
 }
+
+
+/* Inbox UI faithfully recreates the supplied screen inside the phone */
+.wn-phone-screen{position:relative;aspect-ratio:240/455;display:flex;flex-direction:column;border-radius:25px;overflow:hidden;background:#f0f8f7;color:#142d2b;line-height:normal}
+.wn-inbox-head{height:14%;min-height:48px;display:flex;align-items:center;gap:13px;padding:8px 11px;background:#fbfefd;border-bottom:1px solid #d5e1df}
+.wn-inbox-head>svg{flex-shrink:0}
+.wn-inbox-head>div{min-width:0;display:grid;gap:3px}
+.wn-inbox-head strong{font-size:clamp(12px,1.25vw,17px);font-weight:750;letter-spacing:-.03em}
+.wn-inbox-head span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#687b79;font-size:clamp(7px,.75vw,10px)}
+.wn-inbox-body{flex:1;min-height:0;padding:10px 9px 8px;display:flex;flex-direction:column;gap:9px}
+.wn-inbox-search{height:38px;flex-shrink:0;display:flex;align-items:center;gap:9px;padding:0 11px;border:1px solid #d7e1df;border-radius:12px;background:#fff;color:#74817f;box-shadow:0 2px 5px rgba(15,48,43,.12);font-size:clamp(10px,1vw,13px)}
+.wn-inbox-filters{display:grid;grid-template-columns:1fr 1fr;gap:3px 7px;flex-shrink:0;color:#687b79;font-size:clamp(9px,.95vw,12px);text-align:center}
+.wn-inbox-filters span{padding:7px 2px;border-radius:12px;white-space:nowrap}
+.wn-inbox-filters .active{background:#e2f2ef;color:#07866f;font-weight:650}
+.wn-inbox-list{flex:1;min-height:0;margin:0 -9px -8px;background:#fff;border-top:1px solid #d6e0de;overflow:hidden}
+.wn-inbox-contact{min-height:14.1%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;column-gap:7px;padding:5px 12px;border-bottom:1px solid rgba(220,230,227,.5)}
+.wn-inbox-contact>div{min-width:0;display:grid;gap:3px}
+.wn-inbox-contact strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(10px,1.08vw,14px);font-weight:600;color:#142d2b}
+.wn-inbox-contact span{font-size:clamp(8px,.83vw,11px);color:#71807e;white-space:nowrap}
+.wn-inbox-contact>b{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:#078c78;color:#fff;font-size:10px;box-shadow:0 2px 5px rgba(0,0,0,.12)}
+.wn-inbox-contact>small{padding:5px 10px;border-radius:20px;background:#e7f3f2;color:#193d39;font-size:9px}
+@media(max-width:639px){
+  .wn-inbox-head{gap:10px;padding:7px 9px}
+  .wn-inbox-body{padding:8px 7px 6px;gap:7px}
+  .wn-inbox-search{height:34px}
+  .wn-inbox-filters span{padding:6px 1px}
+  .wn-inbox-list{margin:0 -7px -6px}
+  .wn-inbox-contact{padding:4px 9px;column-gap:5px}
+  .wn-inbox-contact>b{width:22px;height:22px;font-size:9px}
+  .wn-inbox-contact>small{padding:4px 8px;font-size:8px}
+}
