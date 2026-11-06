@@ -183,7 +183,8 @@ function BookingsPage() {
           <Metric icon={CalendarDays} label="Marcações de hoje" value={todayCount}/>
           <Metric icon={CalendarCheck} label="Confirmados" value={confirmedCount}/>
           <Metric icon={CircleAlert} label="Aguardam aprovação" value={pendingCount}/>
-          <Metric icon={Clock} label="Reservas activas" value={activeBookings.length}/>\n          <Metric icon={CheckCircle2} label="Concluídas hoje" value={completedTodayCount}/>
+          <Metric icon={Clock} label="Reservas activas" value={activeBookings.length}/>
+          <Metric icon={CheckCircle2} label="Concluídas hoje" value={completedTodayCount}/>
         </div>
         {!data?.settings.enabled && <div className="mb-5 flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-sm font-semibold">Agendamentos ainda não estão activos</p><p className="text-xs text-muted-foreground">Configura os serviços e horários, depois activa a funcionalidade nas definições.</p></div>
