@@ -20,7 +20,7 @@ const nav = [
 
 const features = [
   { icon: MessagesSquare, title: "Atendimento centralizado e sem falhas", text: "Adeus às mensagens esquecidas. Organize todas as conversas do WhatsApp da sua empresa num só lugar e acompanhe cada oportunidade antes que o cliente procure a concorrência.", img: featTeam },
-  { icon: Bot, title: "IA que interpreta áudios, imagens e documentos", text: "Treinada com o seu negócio, a WhappNus compreende mensagens de voz, analisa imagens e consulta as informações que disponibiliza para responder com mais contexto e precisão.", img: featAi },
+  { icon: Bot, title: "IA que compreende áudios, imagens e PDFs", text: "Treinada com o teu negócio, a WhappNus compreende mensagens de voz, interpreta fotos de produtos e consulta PDFs com informações da tua empresa para responder com contexto e precisão.", img: featAi },
   { icon: KanbanSquare, title: "Contactos, CRM e controlo total", text: "Acompanhe cada oportunidade, saiba quem precisa de atenção e organize o processo comercial sem ficar 24 horas agarrado ao telemóvel.", img: featCrm },
 ];
 
