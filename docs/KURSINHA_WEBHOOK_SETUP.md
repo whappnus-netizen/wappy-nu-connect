@@ -37,6 +37,7 @@ All three product IDs remain unchanged; the expected prices were updated to matc
 - The authenticated `claim_pending_sales` action requires the selected plan code and refuses ambiguous/multiple matching purchases; it never claims every approved sale for an e-mail.
 - Paid-plan intent is stored in Supabase Auth user metadata. The organization trial trigger skips the automatic free trial for these paid-intent accounts; free signups without a selected paid plan retain the seven-day trial.
 - A successful payment grants 30 days. A purchase during an active paid period switches to the purchased plan immediately and adds 30 days to the current end date. Trial time is not converted into extra paid time.
+- On activation, the RPC also initializes or resets `ai_credit_accounts` to the selected plan's `ai_messages_monthly` allowance. Paid-first organizations do not depend on the free-trial trigger to receive their AI message quota.
 - A manual/admin block is not automatically removed by a payment.
 
 ## Go-live checklist
