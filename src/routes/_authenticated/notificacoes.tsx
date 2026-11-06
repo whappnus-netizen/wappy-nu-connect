@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CheckCheck, Circle, LoaderCircle } from "lucide-react";
+import { Bell, Check, CheckCheck, Circle, LoaderCircle, MailOpen, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,31 @@ function NotificationsPage() {
     },
     onError: (error: Error) => toast.error(error.message),
   });
+  const markUnread = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("organization_notifications")
+        .update({ read_at: null }).eq("id", id).eq("organization_id", organizationId!);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications-all", organizationId] });
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const deleteNotification = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("organization_notifications")
+        .delete().eq("id", id).eq("organization_id", organizationId!);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Notificação apagada.");
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications-all", organizationId] });
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
   const markAllRead = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("organization_notifications")
@@ -84,7 +109,7 @@ function NotificationsPage() {
         ) : notifications.error ? (
           <Card><CardContent className="p-5 text-sm text-destructive">{(notifications.error as Error).message}</CardContent></Card>
         ) : !(notifications.data ?? []).length ? (
-          <Card><CardContent className="flex flex-col items-center gap-2 p-10 text-center"><Bell className="size-8 text-muted-foreground" /><p className="font-medium">Ainda não há notificações</p><p className="text-sm text-muted-foreground">Os avisos importantes da equipa WhappNus aparecerão aqui.</p></CardContent></Card>
+          <Card><CardContent className="flex flex-col items-center gap-2 p-10 text-center"><Bell className="size-8 text-muted-foreground" /><p className="font-medium">Ainda não há notificações</p><p className="text-sm text-muted-foreground">Os avisos da sua organização ficam guardados aqui. Pode marcar como lidos, voltar a marcar como não lidos ou apagar os que já não precisa.</p></CardContent></Card>
         ) : (
           <div className="space-y-3">
             {(notifications.data ?? []).map((item) => (
@@ -96,7 +121,12 @@ function NotificationsPage() {
                       <CardTitle className="text-base">{item.title}</CardTitle>
                       <p className="mt-1 text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString("pt-AO")} · {item.notification_type === "subscription" ? "Assinatura" : "Comunicado WhappNus"}</p>
                     </div>
-                    {!item.read_at && <Button variant="ghost" size="sm" disabled={markRead.isPending} onClick={() => markRead.mutate(item.id)}>Marcar como lida</Button>}
+                    <div className="flex shrink-0 items-center gap-1">
+                      {item.read_at
+                        ? <Button variant="ghost" size="icon" title="Marcar como não lida" aria-label="Marcar como não lida" disabled={markUnread.isPending} onClick={() => markUnread.mutate(item.id)}><MailOpen className="size-4"/></Button>
+                        : <Button variant="ghost" size="icon" title="Marcar como lida" aria-label="Marcar como lida" disabled={markRead.isPending} onClick={() => markRead.mutate(item.id)}><Check className="size-4"/></Button>}
+                      <Button variant="ghost" size="icon" title="Apagar notificação" aria-label="Apagar notificação" disabled={deleteNotification.isPending} onClick={() => deleteNotification.mutate(item.id)}><Trash2 className="size-4"/></Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pl-10"><p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.body}</p></CardContent>
