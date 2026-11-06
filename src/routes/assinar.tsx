@@ -33,7 +33,7 @@ type PlanCode = keyof typeof plans;
 
 export const Route = createFileRoute("/assinar")({
   validateSearch: (search: Record<string, unknown>) => ({
-    plan: typeof search.plan === "string" ? search.plan : "",
+    plan: typeof search["plan"] === "string" ? search["plan"] : "",
   }),
   head: () => ({
     meta: [
