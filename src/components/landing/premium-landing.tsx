@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, Bot, Check, ChevronDown, KanbanSquare, Menu, MessagesSquare, QrCode,
-  Smartphone, Sparkles, UserPlus, X, Store, GraduationCap, Stethoscope, Search,
+  Smartphone, Sparkles, UserPlus, X, Store, GraduationCap, Stethoscope,
 } from "lucide-react";
 import "./premium-landing.css";
 import heroPerson from "@/assets/hero-person.jpg";
