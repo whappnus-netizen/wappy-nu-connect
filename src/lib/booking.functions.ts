@@ -15,7 +15,7 @@ export const getBookingWorkspace = createServerFn({ method: "POST" })
     if (expiryError) throw new Error(expiryError.message);
     const from = data.from ?? new Date(Date.now() - 7 * 86400000).toISOString();
     const to = data.to ?? new Date(Date.now() + 45 * 86400000).toISOString();
-    const [org, settings, services, staff, resources, rules, bookings, contacts] = await Promise.all([
+    const [org, settings, services, staff, resources, rules, bookings, historyBookings, contacts] = await Promise.all([
       admin.from("organizations").select("id,name,timezone,currency").eq("id", data.organizationId).single(),
       admin.from("booking_settings").select("*").eq("organization_id", data.organizationId).maybeSingle(),
       admin.from("booking_services").select("*").eq("organization_id", data.organizationId).order("name"),
@@ -23,9 +23,11 @@ export const getBookingWorkspace = createServerFn({ method: "POST" })
       admin.from("booking_resources").select("*").eq("organization_id", data.organizationId).order("name"),
       admin.from("booking_availability_rules").select("*").eq("organization_id", data.organizationId).order("weekday"),
       admin.from("bookings").select("*").eq("organization_id", data.organizationId).gte("starts_at", from).lt("starts_at", to).order("starts_at"),
+      admin.from("bookings").select("*").eq("organization_id", data.organizationId).lt("starts_at", from)
+        .order("starts_at", { ascending: false }).limit(1000),
       admin.from("contacts").select("id,full_name,phone_e164").eq("organization_id", data.organizationId).order("full_name").limit(500),
     ]);
-    for (const q of [org,settings,services,staff,resources,rules,bookings,contacts]) if (q.error) throw new Error(q.error.message);
+    for (const q of [org,settings,services,staff,resources,rules,bookings,historyBookings,contacts]) if (q.error) throw new Error(q.error.message);
     const sm = new Map((services.data ?? []).map(x => [x.id,x]));
     const tm = new Map((staff.data ?? []).map(x => [x.id,x]));
     const rm = new Map((resources.data ?? []).map(x => [x.id,x]));
@@ -35,6 +37,7 @@ export const getBookingWorkspace = createServerFn({ method: "POST" })
       settings: settings.data ?? { organization_id:data.organizationId,enabled:false,confirmation_mode:"automatic",min_notice_minutes:60,max_days_ahead:60,pending_expiry_minutes:30,allow_customer_cancel:true,allow_customer_reschedule:true,reminder_24h:true,reminder_2h:true },
       services: services.data ?? [], staff: staff.data ?? [], resources: resources.data ?? [], rules: rules.data ?? [], contacts: contacts.data ?? [],
       bookings: (bookings.data ?? []).map(b => ({...b,service:sm.get(b.service_id)??null,staff:b.staff_id?tm.get(b.staff_id)??null:null,resource:b.resource_id?rm.get(b.resource_id)??null:null,contact:b.contact_id?cm.get(b.contact_id)??null:null})),
+      historyBookings: (historyBookings.data ?? []).map(b => ({...b,service:sm.get(b.service_id)??null,staff:b.staff_id?tm.get(b.staff_id)??null:null,resource:b.resource_id?rm.get(b.resource_id)??null:null,contact:b.contact_id?cm.get(b.contact_id)??null:null})),
     };
   });
 

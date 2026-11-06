@@ -59,6 +59,12 @@ type Message = {
 };
 
 const statuses = ["all", "open", "pending", "in_progress", "closed"] as const;
+const conversationStatusLabels: Record<string, string> = {
+  open: "Aberto",
+  pending: "Pendente",
+  in_progress: "Em processo",
+  closed: "Encerrado",
+};
 
 function InboxPage() {
   const { user, membership } = useAuth();
@@ -327,7 +333,7 @@ function InboxPage() {
                     <span className="truncate text-sm font-medium">
                       {c.contacts?.full_name ?? c.contacts?.phone_e164 ?? "Contacto"}
                     </span>
-                    <span className="flex shrink-0 items-center gap-1.5">{(c.unread_count ?? 0) > 0 && <Badge className="min-w-5 justify-center rounded-full px-1.5 text-[10px]">{c.unread_count}</Badge>}<Badge variant="secondary" className="text-[10px]">{c.status}</Badge></span>
+                    <span className="flex shrink-0 items-center gap-1.5">{(c.unread_count ?? 0) > 0 && <Badge className="min-w-5 justify-center rounded-full px-1.5 text-[10px]">{c.unread_count}</Badge>}<Badge variant="secondary" className="text-[10px]">{conversationStatusLabels[c.status] ?? c.status}</Badge></span>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {c.last_message_at ? new Date(c.last_message_at).toLocaleString("pt-PT") : "Sem mensagens"}
@@ -339,7 +345,7 @@ function InboxPage() {
         </section>
 
         <section className={`${active && !mobileDetailsOpen ? "flex" : "hidden lg:flex"} relative min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card`}>
-          {active && <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2 sm:px-3 lg:hidden"><Button type="button" variant="ghost" size="icon" aria-label="Voltar à lista de conversas" onClick={() => { setMobileDetailsOpen(false); setSelected(null); }}><ArrowLeft className="size-5" /></Button><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{active.contacts?.full_name ?? active.contacts?.phone_e164 ?? "Conversa"}</p><p className="truncate text-xs text-muted-foreground">{active.contacts?.phone_e164 ?? active.status}</p></div><Badge variant="secondary" className="shrink-0 text-[10px]">{active.status}</Badge><Button type="button" size="sm" variant="outline" className="shrink-0 px-2 text-xs" onClick={() => setMobileDetailsOpen(true)}><UserPlus className="mr-1 size-4" />Contacto</Button></div>}
+          {active && <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-2 sm:px-3 lg:hidden"><Button type="button" variant="ghost" size="icon" aria-label="Voltar à lista de conversas" onClick={() => { setMobileDetailsOpen(false); setSelected(null); }}><ArrowLeft className="size-5" /></Button><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{active.contacts?.full_name ?? active.contacts?.phone_e164 ?? "Conversa"}</p><p className="truncate text-xs text-muted-foreground">{active.contacts?.phone_e164 ?? conversationStatusLabels[active.status] ?? active.status}</p></div><Badge variant="secondary" className="shrink-0 text-[10px]">{conversationStatusLabels[active.status] ?? active.status}</Badge><Button type="button" size="sm" variant="outline" className="shrink-0 px-2 text-xs" onClick={() => setMobileDetailsOpen(true)}><UserPlus className="mr-1 size-4" />Contacto</Button></div>}
           {!active ? (
             <div className="flex flex-1 items-center justify-center p-6">
               <EmptyState
@@ -417,7 +423,7 @@ function InboxPage() {
                 {active.whatsapp_numbers?.provider === "qr" ? "WhatsApp — QR" : "WhatsApp — Cloud API"}
               </Badge>
               <p className="text-xs text-muted-foreground">
-                Estado: {active.status} · Prioridade: {active.priority}
+                Estado: {conversationStatusLabels[active.status] ?? active.status} · Prioridade: {active.priority}
               </p>
               <div className="mt-3 space-y-2">
                 <Button size="sm" variant="outline" className="w-full" disabled={!subscription.active || !active.contact_id || createLead.isPending || Boolean(notice)} onClick={() => createLead.mutate()}>

@@ -101,6 +101,10 @@ function BookingsPage() {
     return {key,label:new Intl.DateTimeFormat("pt-AO",{weekday:"short",day:"2-digit",month:"short",timeZone:timezone}).format(new Date(key+"T12:00:00Z"))};
   });
   const todayCount = bookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:data?.organization?.timezone??"Africa/Luanda"})===today).length;
+  const completedTodayCount = bookings.filter(b=>b.status==="completed"&&new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone})===today).length;
+  const historyBookings = useMemo(()=>[...(data?.historyBookings??[]),...bookings.filter(b=>new Date(b.starts_at)<new Date()&&["completed","cancelled","no_show","expired"].includes(b.status))]
+    .filter((booking,index,all)=>all.findIndex(item=>item.id===booking.id)===index)
+    .sort((a,b)=>b.starts_at.localeCompare(a.starts_at)),[data?.historyBookings,bookings]);
 
   useEffect(()=>{
     if(!data || !organizationId || initializedSettingsFor.current===organizationId) return;
@@ -175,11 +179,12 @@ function BookingsPage() {
       workspace.error ? <Card><CardContent className="p-6 text-sm text-destructive">{(workspace.error as Error).message}</CardContent></Card> :
       !data ? <div className="py-16 text-sm text-muted-foreground">Não foi possível carregar os dados dos agendamentos.</div> :
       <>
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <Metric icon={CalendarDays} label="Marcações de hoje" value={todayCount}/>
           <Metric icon={CalendarCheck} label="Confirmados" value={confirmedCount}/>
           <Metric icon={CircleAlert} label="Aguardam aprovação" value={pendingCount}/>
           <Metric icon={Clock} label="Reservas activas" value={activeBookings.length}/>
+          <Metric icon={CheckCircle2} label="Concluídas hoje" value={completedTodayCount}/>
         </div>
         {!data?.settings.enabled && <div className="mb-5 flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><p className="text-sm font-semibold">Agendamentos ainda não estão activos</p><p className="text-xs text-muted-foreground">Configura os serviços e horários, depois activa a funcionalidade nas definições.</p></div>
@@ -187,7 +192,7 @@ function BookingsPage() {
         </div>}
         <Tabs defaultValue="agenda" className="space-y-5">
           <TabsList className="h-auto w-full flex-wrap justify-start">
-            <TabsTrigger value="agenda">Agenda</TabsTrigger><TabsTrigger value="reservas">Reservas</TabsTrigger>
+            <TabsTrigger value="agenda">Agenda</TabsTrigger><TabsTrigger value="reservas">Reservas</TabsTrigger><TabsTrigger value="historico">Histórico</TabsTrigger>
             <TabsTrigger value="servicos">Serviços</TabsTrigger><TabsTrigger value="equipa">Equipa</TabsTrigger>
             <TabsTrigger value="recursos">Recursos</TabsTrigger><TabsTrigger value="horarios">Horários</TabsTrigger><TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
@@ -230,6 +235,12 @@ function BookingsPage() {
                 <div className="flex items-end"><Button className="w-full" disabled={!canOperate||!data.settings.enabled||!bookingService||!bookingStart||createMutation.isPending} onClick={()=>createMutation.mutate()}>{createMutation.isPending?<Loader2 className="size-4 animate-spin"/>:<Plus className="size-4"/>}Criar marcação</Button></div>
               </div></CardContent></Card>}
             <div className="space-y-2">{orderedBookings.map(b=><BookingRow key={b.id} booking={b} fmt={fmt} serviceName={serviceNameFor(b.service_id)} contactName={contactNameFor(b.contact_id)} canOperate={canOperate} busy={statusMutation.isPending} onStatus={(status)=>statusMutation.mutate({bookingId:b.id,status})}/>)}</div>
+          </TabsContent>
+          <TabsContent value="historico" className="space-y-4">
+            <SectionHeading title="Histórico de marcações" description={`${historyBookings.length} marcações anteriores — incluindo concluídas, canceladas e não comparecimentos.`}/>
+            {historyBookings.length
+              ? <div className="space-y-2">{historyBookings.map(b=><BookingRow key={b.id} booking={b} fmt={fmt} serviceName={serviceNameFor(b.service_id)} contactName={contactNameFor(b.contact_id)} canOperate={canOperate} busy={statusMutation.isPending} onStatus={(status)=>statusMutation.mutate({bookingId:b.id,status})}/>)}</div>
+              : <EmptyPanel title="Ainda não existe histórico" text="As marcações concluídas ou encerradas aparecerão aqui automaticamente."/>}
           </TabsContent>
           <TabsContent value="servicos" className="space-y-4">
             <SectionHeading title="Catálogo de serviços" description="Define o que os clientes podem marcar, a duração e o preço informativo."/>
