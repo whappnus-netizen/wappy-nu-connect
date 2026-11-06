@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowRight, Bot, Check, ChevronDown, KanbanSquare, Menu, MessagesSquare, QrCode,
-  Smartphone, Sparkles, UserPlus, X, Store, GraduationCap, Stethoscope,
+  Smartphone, Sparkles, UserPlus, X, Store, GraduationCap, Stethoscope, Search,
 } from "lucide-react";
 import "./premium-landing.css";
 import heroPerson from "@/assets/hero-person.jpg";
@@ -63,14 +63,34 @@ function PhoneMock() {
   return (
     <div className="wn-phone" aria-label="Pré-visualização do Inbox da WhappNus">
       <div className="wn-phone-camera" aria-hidden="true" />
-      <div className="wn-phone-screen">
-        <img
-          src="/images/whappnus-inbox-hero.jpg"
-          alt="Inbox da WhappNus com pesquisa, filtros de conversas e lista de clientes"
-          loading="eager"
-          width={360}
-          height={683}
-        />
+      <div className="wn-phone-screen" role="img" aria-label="Pré-visualização do Inbox da WhappNus: pesquisa, filtros e conversas abertas">
+        <div className="wn-inbox-head">
+          <Menu size={17} strokeWidth={2.2} />
+          <div><strong>Inbox</strong><span>Multiatendimento em tempo real — receba, responda e organize</span></div>
+        </div>
+        <div className="wn-inbox-body">
+          <div className="wn-inbox-search"><Search size={16} /><span>Pesquisar conversas</span></div>
+          <div className="wn-inbox-filters">
+            <span>Todas</span><span className="active">Abertas</span>
+            <span>Pendentes</span><span>Em atendimento</span><span>Encerradas</span>
+          </div>
+          <div className="wn-inbox-list">
+            {[
+              ["~Mostro", "28/10/2026, 20:23:20", "2"],
+              ["Celso Queiroz", "28/10/2026, 11:36:09", "20"],
+              ["Isaac .M", "27/10/2026, 23:51:02", "12"],
+              ["F.Miguel", "27/10/2026, 22:21:22", "18"],
+              ["Irene Reis", "27/10/2026, 21:39:14", "17"],
+              ["Bruno Tavares", "27/10/2026, 11:25:11", "4"],
+              ["VNVDIGITAL", "27/10/2026, 10:48:03", "6"],
+            ].map(([name, date, count]) => (
+              <div className="wn-inbox-contact" key={name}>
+                <div><strong>{name}</strong><span>{date}</span></div>
+                <b>{count}</b><small>open</small>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
