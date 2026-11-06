@@ -182,6 +182,10 @@ Deno.serve(async(req:Request)=>{
   if(pending.error)return reply({ok:false,error:"Não foi possível consultar o estado do pagamento."},500);
   if(conflicts.length)return reply({ok:false,error:"Existe uma compra já associada a outra organização. Contacte o suporte.",reason:"SALE_ALREADY_LINKED"},409);
   if(pending.data?.length)return reply({ok:true,applied:false,pending:true,reason:"PAYMENT_NOT_CONFIRMED",message:"A Kursinha ainda não confirmou o pagamento."},202);
+  const terminal=await db.from("kursinha_sales").select("status").eq("buyer_email",buyer).eq("plan_id",plan.data.id).in("status",["cancelled","refunded","invalid"]).order("updated_at",{ascending:false}).limit(1).maybeSingle();
+  if(terminal.error)return reply({ok:false,error:"Não foi possível consultar o estado da compra."},500);
+  if(terminal.data?.status==="cancelled"||terminal.data?.status==="refunded")return reply({ok:false,error:"Esta compra foi cancelada ou reembolsada. Se pretende continuar, faça um novo pagamento.",reason:"PAYMENT_CANCELLED"},409);
+  if(terminal.data?.status==="invalid")return reply({ok:false,error:"O valor ou produto recebido não corresponde ao catálogo actual. Contacte o suporte antes de efectuar outro pagamento.",reason:"PAYMENT_CATALOG_MISMATCH"},409);
   return reply({ok:true,applied:false,pending:true,reason:"PAYMENT_NOT_CONFIRMED",message:"Ainda não recebemos uma compra aprovada para este plano e e-mail. Confirme que usou o mesmo e-mail no checkout."},202);
  }
  const sale=eligible[0];
