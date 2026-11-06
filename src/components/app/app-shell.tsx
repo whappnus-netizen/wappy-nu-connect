@@ -16,6 +16,7 @@ import {
   Menu,
   Bell,
   Check,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -88,6 +89,17 @@ export function AppShell({
       if (error) throw new Error(error.message);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] }),
+  });
+  const dismissNotification = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("organization_notifications")
+        .delete().eq("id", id).eq("organization_id", organizationId!);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications", organizationId] });
+      void queryClient.invalidateQueries({ queryKey: ["organization-notifications-all", organizationId] });
+    },
   });
 
   return (
@@ -169,7 +181,10 @@ export function AppShell({
                   <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{notification.body}</p>
                   <p className="mt-1 text-[10px] text-muted-foreground">{new Date(notification.created_at).toLocaleString("pt-AO")}</p>
                 </div>
-                <Button variant="ghost" size="icon" aria-label="Marcar notificação como lida" disabled={markNotificationRead.isPending} onClick={() => markNotificationRead.mutate(notification.id)}><Check className="size-4" /></Button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button variant="ghost" size="icon" aria-label="Marcar notificação como lida" title="Marcar como lida" disabled={markNotificationRead.isPending} onClick={() => markNotificationRead.mutate(notification.id)}><Check className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" aria-label="Apagar notificação" title="Apagar notificação" disabled={dismissNotification.isPending} onClick={() => dismissNotification.mutate(notification.id)}><Trash2 className="size-4" /></Button>
+                </div>
               </div>
             ))}
           </section>
