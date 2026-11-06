@@ -61,31 +61,16 @@ function Brand({ light = false }: { light?: boolean }) {
 
 function PhoneMock() {
   return (
-    <div className="wn-phone" aria-hidden="true">
+    <div className="wn-phone" aria-label="Pré-visualização do Inbox da WhappNus">
+      <div className="wn-phone-camera" aria-hidden="true" />
       <div className="wn-phone-screen">
-        <div className="wn-phone-top">
-          <p className="wn-phone-hi">Olá, Loja Kianda 👋</p>
-          <p className="wn-phone-sub">Resumo de hoje</p>
-          <div className="wn-phone-card">
-            <span>Conversas abertas</span>
-            <strong>Inbox</strong>
-            <small>IA activa · equipa online</small>
-          </div>
-        </div>
-        <div className="wn-phone-list">
-          <p className="wn-phone-title">Conversas recentes</p>
-          {[
-            ["Cliente", "Têm este modelo em stock?", "IA"],
-            ["Cliente", "Qual é o horário de hoje?", "IA"],
-            ["Cliente", "Quero falar com alguém", "Equipa"],
-          ].map(([n, m, t], i) => (
-            <div key={i} className="wn-phone-row">
-              <span className="wn-phone-ico"><MessagesSquare size={12} /></span>
-              <div><b>{n}</b><small>{m}</small></div>
-              <em className={t === "IA" ? "ai" : ""}>{t}</em>
-            </div>
-          ))}
-        </div>
+        <img
+          src="/images/whappnus-inbox-hero.jpg"
+          alt="Inbox da WhappNus com pesquisa, filtros de conversas e lista de clientes"
+          loading="eager"
+          width={360}
+          height={683}
+        />
       </div>
     </div>
   );
