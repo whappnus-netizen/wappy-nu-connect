@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AssinarRouteImport } from './routes/assinar'
 import { Route as DeletionRouteImport } from './routes/deletion'
 import { Route as OpsAccess9f2c7a61d4RouteImport } from './routes/ops-access-9f2c7a61d4'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
@@ -18,7 +19,6 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
-import { Route as AssinarRouteImport } from './routes/assinar'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
@@ -49,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssinarRoute = AssinarRouteImport.update({
+  id: '/assinar',
+  path: '/assinar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeletionRoute = DeletionRouteImport.update({
@@ -84,11 +89,6 @@ const TermosRoute = TermosRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AssinarRoute = AssinarRouteImport.update({
-  id: '/assinar',
-  path: '/assinar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAgendamentosRoute =
@@ -208,6 +208,7 @@ const ApiPublicWhatsappQrEventsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assinar': typeof AssinarRoute
   '/deletion': typeof DeletionRoute
   '/ops-access-9f2c7a61d4': typeof OpsAccess9f2c7a61d4Route
   '/privacidade': typeof PrivacidadeRoute
@@ -215,7 +216,6 @@ export interface FileRoutesByFullPath {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
-  '/assinar': typeof AssinarRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
@@ -241,6 +241,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assinar': typeof AssinarRoute
   '/deletion': typeof DeletionRoute
   '/ops-access-9f2c7a61d4': typeof OpsAccess9f2c7a61d4Route
   '/privacidade': typeof PrivacidadeRoute
@@ -248,7 +249,6 @@ export interface FileRoutesByTo {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
-  '/assinar': typeof AssinarRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
@@ -276,6 +276,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/assinar': typeof AssinarRoute
   '/deletion': typeof DeletionRoute
   '/ops-access-9f2c7a61d4': typeof OpsAccess9f2c7a61d4Route
   '/privacidade': typeof PrivacidadeRoute
@@ -283,7 +284,6 @@ export interface FileRoutesById {
   '/superadmin': typeof SuperadminRoute
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
-  '/assinar': typeof AssinarRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
@@ -311,6 +311,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/assinar'
     | '/deletion'
     | '/ops-access-9f2c7a61d4'
     | '/privacidade'
@@ -318,7 +319,6 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
-    | '/assinar'
     | '/agendamentos'
     | '/automacoes'
     | '/contactos'
@@ -344,6 +344,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/assinar'
     | '/deletion'
     | '/ops-access-9f2c7a61d4'
     | '/privacidade'
@@ -351,7 +352,6 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
-    | '/assinar'
     | '/agendamentos'
     | '/automacoes'
     | '/contactos'
@@ -378,6 +378,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/assinar'
     | '/deletion'
     | '/ops-access-9f2c7a61d4'
     | '/privacidade'
@@ -385,7 +386,6 @@ export interface FileRouteTypes {
     | '/superadmin'
     | '/termos'
     | '/terms'
-    | '/assinar'
     | '/_authenticated/agendamentos'
     | '/_authenticated/automacoes'
     | '/_authenticated/contactos'
@@ -413,6 +413,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AssinarRoute: typeof AssinarRoute
   DeletionRoute: typeof DeletionRoute
   OpsAccess9f2c7a61d4Route: typeof OpsAccess9f2c7a61d4Route
   PrivacidadeRoute: typeof PrivacidadeRoute
@@ -420,7 +421,6 @@ export interface RootRouteChildren {
   SuperadminRoute: typeof SuperadminRoute
   TermosRoute: typeof TermosRoute
   TermsRoute: typeof TermsRoute
-  AssinarRoute: typeof AssinarRoute
   AuthConfirmRoute: typeof AuthConfirmRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecuperarRoute: typeof AuthRecuperarRoute
@@ -445,6 +445,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assinar': {
+      id: '/assinar'
+      path: '/assinar'
+      fullPath: '/assinar'
+      preLoaderRoute: typeof AssinarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deletion': {
@@ -494,13 +501,6 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/assinar': {
-      id: '/assinar'
-      path: '/assinar'
-      fullPath: '/assinar'
-      preLoaderRoute: typeof AssinarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/agendamentos': {
@@ -700,6 +700,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AssinarRoute: AssinarRoute,
   DeletionRoute: DeletionRoute,
   OpsAccess9f2c7a61d4Route: OpsAccess9f2c7a61d4Route,
   PrivacidadeRoute: PrivacidadeRoute,
@@ -707,7 +708,6 @@ const rootRouteChildren: RootRouteChildren = {
   SuperadminRoute: SuperadminRoute,
   TermosRoute: TermosRoute,
   TermsRoute: TermsRoute,
-  AssinarRoute: AssinarRoute,
   AuthConfirmRoute: AuthConfirmRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRecuperarRoute: AuthRecuperarRoute,
