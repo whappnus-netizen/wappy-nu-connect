@@ -202,7 +202,6 @@ function OnboardingPage() {
       const activated = await claimPendingPayments(selectedPlanCode);
       setLoading(false);
       if (!activated) {
-        setPaymentPending(true);
         return;
       }
     } else {
