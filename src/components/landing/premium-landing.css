@@ -287,3 +287,139 @@ section#planos .wn-head{margin-bottom:44px}
 
 .wn-phone-screen{position:relative;aspect-ratio:401/760;overflow:hidden;border-radius:27px;background:#f0f8f7;line-height:0}
 .wn-phone-screen img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+
+
+/* Conversion-focused cinematic Hero with a looping WhatsApp conversation */
+.wn-hero-cinematic{
+  position:relative;isolation:isolate;display:block;min-height:790px;overflow:hidden;
+  padding:clamp(86px,10vw,132px) 24px clamp(230px,25vw,300px);
+  background:#03150d;color:#f4fff7;border-bottom:1px solid rgba(125,231,164,.18)
+}
+.wn-hero-cinematic:before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 50% 48%,rgba(3,20,12,.42) 0%,rgba(3,20,12,.74) 42%,rgba(2,13,8,.92) 100%),
+    linear-gradient(90deg,rgba(2,14,8,.88) 0%,rgba(3,18,11,.65) 48%,rgba(2,14,8,.86) 100%),
+    linear-gradient(180deg,rgba(2,14,8,.3),rgba(2,14,8,.8))
+}
+.wn-hero-simulation{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+.wn-demo-orbit{position:absolute;border:1px solid rgba(84,218,135,.12);border-radius:50%;filter:drop-shadow(0 0 20px rgba(36,190,101,.08))}
+.wn-demo-orbit-one{width:760px;height:760px;left:50%;top:48%;transform:translate(-50%,-50%)}
+.wn-demo-orbit-two{width:1040px;height:1040px;left:50%;top:48%;transform:translate(-50%,-50%)}
+.wn-demo-bubble{
+  position:absolute;width:clamp(230px,25vw,330px);padding:14px 16px;border:1px solid rgba(198,235,211,.2);
+  border-radius:16px;background:linear-gradient(145deg,rgba(18,43,29,.88),rgba(5,22,13,.82));
+  color:#f3fff6;box-shadow:0 18px 52px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06);
+  backdrop-filter:blur(12px);opacity:0;will-change:opacity,transform
+}
+.wn-demo-label{display:block;margin-bottom:9px;color:#9ddbb3;font-size:8px;font-weight:800;letter-spacing:.15em}
+.wn-demo-audio{top:9%;left:4%;animation:wn-demo-audio 14s ease-in-out infinite}
+.wn-demo-image{top:10%;right:4%;animation:wn-demo-image 14s ease-in-out infinite}
+.wn-demo-text{bottom:10%;left:7%;animation:wn-demo-text 14s ease-in-out infinite}
+.wn-demo-reply{right:7%;bottom:10%;animation:wn-demo-reply 14s ease-in-out infinite}
+.wn-demo-audio-row{display:flex;align-items:center;gap:10px}
+.wn-demo-play{width:28px;height:28px;display:grid;place-items:center;flex-shrink:0;border-radius:50%;background:#1eb768;color:#fff;font-size:10px}
+.wn-demo-wave{height:28px;display:flex;align-items:center;gap:2px;flex:1;overflow:hidden}
+.wn-demo-wave i{display:block;width:3px;min-height:4px;border-radius:4px;background:#6de49a;opacity:.9}
+.wn-demo-audio-row small{color:#d0e6d7;font-size:9px}
+.wn-demo-bubble p{margin-top:10px;color:#edf8f0;font-size:11px;line-height:1.5}
+.wn-demo-ai-note{display:block;margin-top:9px;color:#9adbb1;font-size:9px}
+.wn-demo-ai-note b{color:#68e89a}
+.wn-demo-image-row{display:flex;align-items:center;gap:10px}
+.wn-demo-image-row img{width:62px;height:46px;object-fit:cover;border-radius:8px;filter:saturate(.8)}
+.wn-demo-image-row span{display:grid;gap:4px}
+.wn-demo-image-row b{font-size:10px}
+.wn-demo-image-row small{color:#c1d7c8;font-size:9px;line-height:1.35}
+.wn-demo-reaction{display:inline-flex;margin-top:9px;padding:5px 8px;border-radius:20px;background:rgba(255,255,255,.1);font-size:11px;letter-spacing:3px}
+.wn-demo-check{display:block;margin-top:8px;text-align:right;color:#79e5a0;font-size:9px}
+.wn-hero-cinematic .wn-hero-copy{
+  position:relative;z-index:4;width:min(100%,900px);margin:0 auto;text-align:center;
+  padding:18px 20px 24px
+}
+.wn-hero-kicker{margin-bottom:18px;color:#91e9b0;font-size:11px;font-weight:800;letter-spacing:.2em}
+.wn-hero-cinematic .wn-hero-copy h1{
+  margin:0 auto;max-width:850px;color:#fff;font-size:clamp(2.45rem,5.5vw,4.65rem);line-height:1.04;
+  font-weight:850;text-wrap:balance;text-shadow:0 3px 28px rgba(0,0,0,.34)
+}
+.wn-hero-cinematic .wn-hero-copy h1 span{color:#76e5a0}
+.wn-hero-cinematic .wn-hero-copy>p:not(.wn-hero-kicker){
+  max-width:700px;margin:22px auto 0;color:#e0eee5;font-size:clamp(15px,1.45vw,18px);line-height:1.7
+}
+.wn-hero-cinematic .wn-hero-ctas{justify-content:center;margin-top:30px}
+.wn-hero-cinematic .wn-btn-primary{background:#16a35a;color:#fff;box-shadow:0 10px 30px rgba(13,160,79,.22)}
+.wn-hero-cinematic .wn-btn-primary:hover{background:#20bd6b;box-shadow:0 12px 34px rgba(13,190,91,.3)}
+.wn-hero-cinematic .wn-btn-outline{border-color:rgba(223,246,231,.42);background:rgba(8,28,17,.48);color:#f2fff6;backdrop-filter:blur(8px)}
+.wn-hero-cinematic .wn-btn-outline:hover{border-color:#8be9ac;background:rgba(24,95,54,.45)}
+.wn-hero-cinematic .wn-hero-visual{
+  position:absolute;z-index:2;right:3%;bottom:0;width:clamp(185px,22vw,285px);height:54%;
+  min-height:0;display:block;opacity:.68;pointer-events:none
+}
+.wn-hero-cinematic .wn-hero-blob{position:absolute;inset:18% 0 0;background:radial-gradient(ellipse,rgba(34,144,79,.25),transparent 68%);border-radius:50%}
+.wn-hero-cinematic .wn-hero-img{
+  position:absolute;right:0;bottom:0;width:100%;height:100%;max-height:none;margin:0;
+  object-fit:cover;object-position:center top;border-radius:0;opacity:.22;filter:grayscale(.15) saturate(.7);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 26%,#000 78%,transparent 100%);
+  mask-image:linear-gradient(180deg,transparent 0%,#000 26%,#000 78%,transparent 100%)
+}
+.wn-hero-cinematic .wn-phone{right:0;bottom:5%;width:clamp(138px,15vw,190px);padding:12px 6px 6px;border-radius:30px;opacity:1}
+.wn-hero-cinematic .wn-phone-screen{border-radius:22px}
+.wn-hero-cinematic .wn-phone-camera{top:5px;width:42px;height:3px}
+.wn-section-intro{max-width:760px;margin:14px auto 0;color:var(--mu);font-size:15px;line-height:1.7;text-align:center}
+.wn-cta-copy{max-width:620px}
+.wn-cta h2{max-width:650px;line-height:1.12}
+.wn-cta p{max-width:600px;line-height:1.65}
+@keyframes wn-demo-audio{
+  0%,4%{opacity:0;transform:translate3d(-18px,12px,0)}
+  9%,22%{opacity:1;transform:translate3d(0,0,0)}
+  28%,100%{opacity:0;transform:translate3d(0,-10px,0)}
+}
+@keyframes wn-demo-image{
+  0%,23%{opacity:0;transform:translate3d(18px,12px,0)}
+  29%,43%{opacity:1;transform:translate3d(0,0,0)}
+  50%,100%{opacity:0;transform:translate3d(0,-10px,0)}
+}
+@keyframes wn-demo-text{
+  0%,46%{opacity:0;transform:translate3d(-18px,12px,0)}
+  52%,66%{opacity:1;transform:translate3d(0,0,0)}
+  73%,100%{opacity:0;transform:translate3d(0,-10px,0)}
+}
+@keyframes wn-demo-reply{
+  0%,69%{opacity:0;transform:translate3d(18px,12px,0)}
+  75%,91%{opacity:1;transform:translate3d(0,0,0)}
+  98%,100%{opacity:0;transform:translate3d(0,-10px,0)}
+}
+@media(max-width:767px){
+  .wn-hero-cinematic{min-height:900px;padding:125px 16px 270px}
+  .wn-hero-cinematic .wn-hero-copy{padding:12px 2px}
+  .wn-hero-cinematic .wn-hero-copy h1{font-size:clamp(2.35rem,10vw,3.35rem)}
+  .wn-hero-cinematic .wn-hero-copy>p:not(.wn-hero-kicker){font-size:15px;line-height:1.6}
+  .wn-hero-cinematic .wn-hero-visual{right:2%;width:160px;height:260px;opacity:.55}
+  .wn-hero-cinematic .wn-hero-img{display:none}
+  .wn-hero-cinematic .wn-phone{width:145px;right:0;bottom:5%}
+  .wn-demo-bubble{width:min(43vw,205px);padding:10px;border-radius:12px}
+  .wn-demo-label{font-size:7px}
+  .wn-demo-bubble p{font-size:9px}
+  .wn-demo-audio{top:2%;left:3%}
+  .wn-demo-image{top:2%;right:3%}
+  .wn-demo-text{bottom:2%;left:3%}
+  .wn-demo-reply{right:3%;bottom:2%}
+  .wn-demo-image-row img{width:42px;height:34px}
+  .wn-demo-image-row b{font-size:9px}
+  .wn-demo-image-row small{font-size:8px}
+  .wn-demo-orbit-one{width:440px;height:440px}
+  .wn-demo-orbit-two{width:620px;height:620px}
+}
+@media(max-width:420px){
+  .wn-hero-cinematic{min-height:940px;padding-top:116px}
+  .wn-hero-cinematic .wn-hero-ctas{gap:9px}
+  .wn-hero-cinematic .wn-btn-lg{height:48px;padding:0 16px;font-size:12px}
+  .wn-demo-bubble{width:44vw;padding:8px}
+  .wn-demo-audio-row{gap:6px}
+  .wn-demo-play{width:23px;height:23px}
+  .wn-demo-wave{gap:1px}
+  .wn-demo-wave i{width:2px}
+}
+@media(prefers-reduced-motion:reduce){
+  .wn-demo-bubble{opacity:1;animation:none!important;transform:none!important}
+  .wn-demo-orbit{display:none}
+}

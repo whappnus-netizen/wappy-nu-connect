@@ -19,9 +19,9 @@ const nav = [
 ] as const;
 
 const features = [
-  { icon: MessagesSquare, title: "Atendimento centralizado", text: "Todas as conversas do WhatsApp da empresa num só lugar, com responsável e histórico.", img: featTeam },
-  { icon: Bot, title: "IA treinada com o seu negócio", text: "Defina produtos, serviços, regras e tom. A IA responde com base no que a sua empresa ensinar.", img: featAi },
-  { icon: KanbanSquare, title: "Contactos e CRM", text: "Organize clientes e acompanhe cada oportunidade até ao próximo passo comercial.", img: featCrm },
+  { icon: MessagesSquare, title: "Atendimento centralizado e sem falhas", text: "Adeus às mensagens esquecidas. Organize todas as conversas do WhatsApp da sua empresa num só lugar e acompanhe cada oportunidade antes que o cliente procure a concorrência.", img: featTeam },
+  { icon: Bot, title: "IA que compreende áudios, imagens e PDFs", text: "Treinada com o teu negócio, a WhappNus compreende mensagens de voz, interpreta fotos de produtos e consulta PDFs com informações da tua empresa para responder com contexto e precisão.", img: featAi },
+  { icon: KanbanSquare, title: "Contactos, CRM e controlo total", text: "Acompanhe cada oportunidade, saiba quem precisa de atenção e organize o processo comercial sem ficar 24 horas agarrado ao telemóvel.", img: featCrm },
 ];
 
 const steps = [
@@ -31,9 +31,9 @@ const steps = [
 ];
 
 const audiences = [
-  { icon: Store, title: "Lojas e comércio", text: "Responda sobre produtos, preços e disponibilidade sem deixar clientes à espera." },
-  { icon: Stethoscope, title: "Clínicas e serviços", text: "Organize marcações, dúvidas frequentes e acompanhamento de pacientes ou clientes." },
-  { icon: GraduationCap, title: "Escolas e formações", text: "Esclareça inscrições, horários e propinas com informação sempre consistente." },
+  { icon: Store, title: "Lojas e comércio", text: "Responda automaticamente a perguntas sobre preços, tamanhos, cores, stock e entregas. O cliente recebe orientação enquanto ainda está pronto para comprar." },
+  { icon: Stethoscope, title: "Clínicas e serviços", text: "Organize perguntas frequentes, horários e pedidos de marcação, para que cada pessoa saiba como avançar sem esperar horas por uma resposta." },
+  { icon: GraduationCap, title: "Escolas e formações", text: "Esclareça inscrições, propinas, documentos e horários com respostas consistentes, mesmo quando a equipa está ocupada." },
 ];
 
 const plans = [
@@ -104,10 +104,36 @@ export function PremiumLanding() {
         )}
       </header>
 
-      <section className="wn-wrap wn-hero">
+      <section className="wn-wrap wn-hero wn-hero-cinematic">
+        <div className="wn-hero-simulation" aria-hidden="true">
+          <div className="wn-demo-orbit wn-demo-orbit-one" />
+          <div className="wn-demo-orbit wn-demo-orbit-two" />
+          <div className="wn-demo-bubble wn-demo-audio">
+            <span className="wn-demo-label">WHATSAPP · MENSAGEM DE ÁUDIO</span>
+            <div className="wn-demo-audio-row"><span className="wn-demo-play">▶</span><span className="wn-demo-wave">{Array.from({ length: 27 }, (_, i) => <i key={i} style={{ height: `${8 + ((i * 13) % 22)}px` }} />)}</span><small>0:18</small></div>
+            <p>“Boa tarde. Têm este produto disponível para entrega em Viana?”</p>
+            <span className="wn-demo-ai-note">Áudio compreendido pela IA <b>✓</b></span>
+          </div>
+          <div className="wn-demo-bubble wn-demo-image">
+            <span className="wn-demo-label">IMAGEM RECEBIDA</span>
+            <div className="wn-demo-image-row"><img src={featCrm} alt="" /><span><b>Imagem analisada</b><small>Produto identificado · detalhes reconhecidos</small></span></div>
+            <span className="wn-demo-ai-note">A IA analisou a fotografia <b>✓</b></span>
+          </div>
+          <div className="wn-demo-bubble wn-demo-text">
+            <span className="wn-demo-label">MENSAGEM DE TEXTO</span>
+            <p>“Quanto custa e quais são as formas de pagamento?”</p>
+            <span className="wn-demo-reaction">❤️  👍  🔥</span>
+          </div>
+          <div className="wn-demo-bubble wn-demo-reply">
+            <span className="wn-demo-label">RESPOSTA DA WHAPPNUS</span>
+            <p>“Temos disponibilidade! Posso enviar os preços e ajudar a concluir a sua encomenda.”</p>
+            <span className="wn-demo-check">✓✓ Entregue</span>
+          </div>
+        </div>
         <div className="wn-hero-copy">
-          <h1>Ligue. Treine. Atenda. Tudo no <span>WhappNus.</span></h1>
-          <p>Conecte o WhatsApp da sua empresa, ensine a IA sobre os seus produtos, serviços e regras, e responda aos clientes com mais rapidez e consistência.</p>
+          <p className="wn-hero-kicker">LIGA. TREINA. ATENDE. TUDO NO WHAPPNUS.</p>
+          <h1>Não percas clientes no WhatsApp só porque <span>demoras a responder.</span></h1>
+          <p>A WhappNus coloca um atendente inteligente no teu WhatsApp para responder na hora, compreender áudios e imagens e transformar conversas em vendas — mesmo quando estás ocupado ou a descansar.</p>
           <div className="wn-hero-ctas">
             <Link to="/auth/registo" className="wn-btn wn-btn-primary wn-btn-lg">Começar grátis <ArrowRight size={16} /></Link>
             <a href="#como-funciona" className="wn-btn wn-btn-outline wn-btn-lg">Ver como funciona <ChevronDown size={16} /></a>
@@ -124,7 +150,7 @@ export function PremiumLanding() {
         <div className="wn-panel">
           <div className="wn-head">
             <p className="wn-eyebrow">Recursos</p>
-            <h2>Tudo o que precisa numa só plataforma</h2>
+            <h2>Deixe de perder oportunidades por falta de resposta</h2>
           </div>
           <div className="wn-features">
             {features.map((f) => (
@@ -161,7 +187,8 @@ export function PremiumLanding() {
       <section id="para-quem" className="wn-wrap wn-section wn-section-tight">
         <div className="wn-head">
           <p className="wn-eyebrow">Para quem é</p>
-          <h2>Pensado para negócios que vivem do WhatsApp</h2>
+          <h2>O teu negócio está a crescer, mas o teu atendimento continua igual?</h2>
+          <p className="wn-section-intro">Se és tu quem vende, atende, negoceia e entrega, sabes como é cansativo gerir dezenas de mensagens por dia. A WhappNus adapta-se ao teu sector e ajuda-te a responder às perguntas repetitivas sobre preços, localização, disponibilidade e marcações.</p>
         </div>
         <div className="wn-audience">
           {audiences.map((a) => (
@@ -196,8 +223,8 @@ export function PremiumLanding() {
         <div className="wn-cta">
           <img src={featAi} alt="" loading="lazy" width={1024} height={768} className="wn-cta-img" />
           <div className="wn-cta-copy">
-            <h2>Pronto para atender melhor no WhatsApp?</h2>
-            <p>Crie a sua conta, ligue o número da empresa e prepare a sua IA hoje mesmo.</p>
+            <h2>O teu negócio precisa de vender mais, mas tu também precisas de ter paz.</h2>
+            <p>Deixa de viver agarrado ao telemóvel. Responde a tempo, reduz oportunidades perdidas e dá aos teus potenciais clientes uma razão para comprar contigo — não com a concorrência.</p>
           </div>
           <div className="wn-cta-btns">
             <Link to="/auth/registo" className="wn-btn wn-btn-light wn-btn-lg">Criar conta grátis <ArrowRight size={16} /></Link>
@@ -236,7 +263,7 @@ export function PremiumLanding() {
         <div className="wn-footer">
           <div className="wn-foot-brand">
             <Brand light />
-            <p>Atendimento, IA e CRM no WhatsApp da sua empresa, numa plataforma feita para Angola.</p>
+            <p>Mais tempo para gerir o negócio. Menos oportunidades perdidas no WhatsApp. Tecnologia feita para empresas angolanas.</p>
           </div>
           <div><h4>Plataforma</h4><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#planos">Preços</a></div>
           <div><h4>Conta</h4><Link to="/auth/registo">Criar conta</Link><Link to="/auth/login">Entrar</Link></div>
