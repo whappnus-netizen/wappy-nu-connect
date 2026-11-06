@@ -105,8 +105,11 @@ function LoginPage() {
       }
     }
     setLoading(false);
-    const requestedPlan = new URLSearchParams(window.location.search).get("plan")
-      ?? String(authData.user.user_metadata?.selected_plan_code ?? "");
+    const queryPlan = new URLSearchParams(window.location.search).get("plan") ?? "";
+    const metadataPlan = String(authData.user.user_metadata?.selected_plan_code ?? "");
+    const requestedPlan = ["start-monthly", "pro-monthly", "premium-monthly"].includes(queryPlan)
+      ? queryPlan
+      : metadataPlan;
     if (["start-monthly", "pro-monthly", "premium-monthly"].includes(requestedPlan)) {
       const { error: intentError } = await supabase.auth.updateUser({ data: { selected_plan_code: requestedPlan } });
       if (intentError) {
