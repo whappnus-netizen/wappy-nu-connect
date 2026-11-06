@@ -61,9 +61,7 @@ function SignupPage() {
       password,
       options: {
         data: metadata,
-        emailRedirectTo: selectedPlan
-          ? `https://whappnus.online/auth/confirm?plan=${encodeURIComponent(selectedPlan)}`
-          : "https://whappnus.online/auth/confirm",
+        emailRedirectTo: "https://whappnus.online/auth/confirm",
       },
     });
     setLoading(false);
@@ -77,7 +75,11 @@ function SignupPage() {
       return;
     }
     if (data.session) {
-      navigate({ to: "/onboarding" });
+      if (selectedPlan) {
+        window.location.assign(`/onboarding?plan=${encodeURIComponent(selectedPlan)}`);
+      } else {
+        navigate({ to: "/onboarding" });
+      }
     } else {
       toast.success(selectedPlan
         ? "Conta criada. Confirme o e-mail; depois entraremos na etapa de activação do plano."
