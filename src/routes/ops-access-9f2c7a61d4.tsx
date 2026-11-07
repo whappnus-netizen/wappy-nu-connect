@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity, Building2, CheckCircle2, CircleDollarSign, CreditCard, LayoutDashboard, Mail,
   LoaderCircle, LockKeyhole, LogOut, Plus, RefreshCw, Search, ShieldCheck,
-  Smartphone, Sparkles, Users, Wallet, AlertTriangle, ArrowUpRight, Clock3, Trash2, Menu, X,
+  Smartphone, Sparkles, Users, Wallet, AlertTriangle, ArrowUpRight, Clock3, Trash2, Menu, X, LifeBuoy, MessageSquare, Send,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -180,6 +180,10 @@ function SuperAdminPage() {
   const [userSearch, setUserSearch] = useState("");
   const [emailStatus, setEmailStatus] = useState("all");
   const [emailTemplate, setEmailTemplate] = useState("all");
+  const [supportSearch, setSupportSearch] = useState("");
+  const [supportStatus, setSupportStatus] = useState("all");
+  const [selectedSupportTicketId, setSelectedSupportTicketId] = useState<string | null>(null);
+  const [supportReplyText, setSupportReplyText] = useState("");
   const [orgName, setOrgName] = useState("");
   const [orgSlug, setOrgSlug] = useState("");
   const [ownerId, setOwnerId] = useState("");
@@ -243,6 +247,19 @@ function SuperAdminPage() {
   const plans = useQuery({ queryKey: ["superadmin", "plans"], queryFn: () => adminApi<Plan[]>("plans.list"), enabled: tab === "plans" || tab === "subscriptions", retry: false, staleTime: 60_000 });
   const subscriptions = useQuery({ queryKey: ["superadmin", "subscriptions"], queryFn: () => adminApi<any[]>("subscriptions.list"), enabled: tab === "subscriptions", retry: false, staleTime: 20_000, refetchInterval: 60_000 });
   const reminders = useQuery({ queryKey: ["superadmin", "reminders"], queryFn: () => adminApi<any[]>("reminders.list"), enabled: tab === "renewals", retry: false, staleTime: 20_000, refetchInterval: 60_000 });
+  const supportTickets = useQuery({ queryKey: ["superadmin", "support-tickets", supportSearch, supportStatus], queryFn: () => adminApi<any[]>("support.tickets.list", { search: supportSearch, status: supportStatus }), enabled: tab === "support", retry: false, staleTime: 10_000, refetchInterval: 20_000 });
+  const activeSupportTicketId = selectedSupportTicketId && (supportTickets.data ?? []).some((t: any) => t.id === selectedSupportTicketId) ? selectedSupportTicketId : supportTickets.data?.[0]?.id ?? null;
+  const supportMessages = useQuery({ queryKey: ["superadmin", "support-messages", activeSupportTicketId], queryFn: () => adminApi<any[]>("support.messages.list", { ticket_id: activeSupportTicketId }), enabled: tab === "support" && Boolean(activeSupportTicketId), retry: false, refetchInterval: 10_000 });
+  const sendSupportReply = useMutation({
+    mutationFn: () => adminApi<any>("support.ticket.reply", { ticket_id: activeSupportTicketId, body: supportReplyText.trim() }),
+    onSuccess: async () => { setSupportReplyText(""); toast.success("Resposta enviada ao cliente."); await Promise.all([client.invalidateQueries({ queryKey: ["superadmin", "support-messages", activeSupportTicketId] }), client.invalidateQueries({ queryKey: ["superadmin", "support-tickets"] })]); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const updateSupportStatus = useMutation({
+    mutationFn: (status: string) => adminApi<any>("support.ticket.status", { ticket_id: activeSupportTicketId, status }),
+    onSuccess: async () => { toast.success("Estado do ticket actualizado."); await client.invalidateQueries({ queryKey: ["superadmin", "support-tickets"] }); },
+    onError: (error: Error) => toast.error(error.message),
+  });
   const payments = useQuery({ queryKey: ["superadmin", "payments"], queryFn: () => adminApi<any[]>("payments.list"), enabled: tab === "payments", retry: false });
   const health = useQuery({ queryKey: ["superadmin", "health"], queryFn: () => adminApi<any>("health"), enabled: tab === "health", retry: false });
   const audit = useQuery({ queryKey: ["superadmin", "audit"], queryFn: () => adminApi<any[]>("audit.list"), enabled: tab === "audit", retry: false });
