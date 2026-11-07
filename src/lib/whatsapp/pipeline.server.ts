@@ -126,6 +126,24 @@ async function recordDetectedPaymentProof(input: {
   return true;
 }
 
+const paymentContextPattern = /\\b(pagamento|pagamentos|transfer[eê]ncia|comprovativo|recibo|paguei|pagar|liquidar|valor recebido)\\b/i;
+
+async function hasRecentPaymentContext(
+  organizationId: string,
+  conversationId: string,
+  messageText: string | null,
+): Promise<boolean> {
+  if (paymentContextPattern.test(messageText ?? "")) return true;
+  const { data, error } = await serviceClient().from("messages")
+    .select("body")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) return false;
+  return (data ?? []).some((row) => paymentContextPattern.test(String(row.body ?? "")));
+}
+
 async function analyzeAndRecordPaymentProof(
   number: NumberRow,
   incoming: NormalizedIncoming,
@@ -937,6 +955,14 @@ export async function processIncomingMessage(
     // Na Cloud API o indicador acompanha a preparação; no QR o provider trata disso no envio.
     if (number.provider !== "qr") await showTypingIndicator();
 
+    // Quando o contexto recente indica uma transacção, analisa o anexo em paralelo
+    // com a resposta normal. A resposta multimodal principal também pode devolver
+    // metadados estruturados; a chave única da mensagem impede registos duplicados.
+    const proofFallbackPromise = (["image", "document"].includes(incoming.messageType) && incoming.mediaId &&
+      await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body))
+      ? analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null)
+      : Promise.resolve(false);
+
     let ai: Awaited<ReturnType<typeof generateViaWhappNusAI>>;
     try {
       ai = await generateViaWhappNusAI({
@@ -963,9 +989,13 @@ export async function processIncomingMessage(
       });
       // Não contornar limites de plano nem estados de atendimento intencionais.
       if (["AUTO_REPLY_DISABLED", "NO_ACTIVE_AGENT", "SUBSCRIPTION_REQUIRED", "ACCOUNT_SUSPENDED", "AI_CONVERSATIONS_EXHAUSTED", "PLAN_HAS_NO_AI_CONVERSATIONS"].includes(errorCode)) {
+        await proofFallbackPromise;
         return { ...base, aiReplied: false, aiSkippedReason: errorCode };
       }
-      const fallbackText = "Peço desculpa, estou com uma dificuldade momentânea para processar a tua mensagem. Podes tentar novamente dentro de instantes? Se for urgente, a nossa equipa pode ajudar.";
+      const fallbackProofRecorded = await proofFallbackPromise;
+      const fallbackText = fallbackProofRecorded
+        ? "Recebi o comprovativo. Obrigado por o enviares. A nossa equipa vai verificar o documento e actualizar o estado do pagamento. Por enquanto, o pagamento ainda está pendente de confirmação."
+        : "Peço desculpa, estou com uma dificuldade momentânea para processar a tua mensagem. Podes tentar novamente dentro de instantes? Se for urgente, a nossa equipa pode ajudar.";
       await sendOutgoingMessage({
         organizationId: number.organization_id,
         whatsappNumberId: number.id,
@@ -976,8 +1006,9 @@ export async function processIncomingMessage(
       return { ...base, aiReplied: true, aiSkippedReason: "ai_generation_fallback" };
     }
 
+    let paymentProofRecorded = false;
     if (ai.paymentProof && ["image", "document"].includes(incoming.messageType)) {
-      const recorded = await recordDetectedPaymentProof({
+      paymentProofRecorded = await recordDetectedPaymentProof({
         organizationId: number.organization_id,
         whatsappNumberId: number.id,
         conversationId: res.conversation_id,
@@ -985,14 +1016,15 @@ export async function processIncomingMessage(
         incoming,
         analysis: ai.paymentProof,
       });
-      if (recorded) {
-        const item = ai.paymentProof.itemName ? " referente a " + ai.paymentProof.itemName : "";
-        ai = {
-          ...ai,
-          text: "Recebi o comprovativo" + item + ". Obrigado por o enviares. A nossa equipa vai verificar o documento e actualizar o estado do pagamento. Por enquanto, o pagamento ainda está pendente de confirmação.",
-          reactionEmoji: null,
-        };
-      }
+    }
+    const fallbackProofRecorded = await proofFallbackPromise;
+    if (paymentProofRecorded || fallbackProofRecorded) {
+      const item = ai.paymentProof?.itemName ? " referente a " + ai.paymentProof.itemName : "";
+      ai = {
+        ...ai,
+        text: "Recebi o comprovativo" + item + ". Obrigado por o enviares. A nossa equipa vai verificar o documento e actualizar o estado do pagamento. Por enquanto, o pagamento ainda está pendente de confirmação.",
+        reactionEmoji: null,
+      };
     }
     await waitForResponseDelay(behavior.responseDelaySeconds);
     await sendOutgoingMessage({
