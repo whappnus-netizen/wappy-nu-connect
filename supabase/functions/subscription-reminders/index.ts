@@ -105,6 +105,17 @@ Deno.serve(async (req: Request) => {
   if (!suppliedSecret || suppliedHash !== reminderConfig.secret_hash) return json({ ok: false, error: "Não autorizado." }, 401);
 
   const engineUrl = "https://whappnus-whatsapp-engine-production.up.railway.app";
+  const { data: senderConfig } = await db.from("subscription_reminder_config")
+    .select("platform_sender_organization_id,platform_sender_whatsapp_number_id").eq("id", true).maybeSingle();
+  const senderOrganizationId = senderConfig?.platform_sender_organization_id ?? null;
+  const senderNumberId = senderConfig?.platform_sender_whatsapp_number_id ?? null;
+  const senderSessionResult = senderOrganizationId && senderNumberId
+    ? await db.from("whatsapp_sessions").select("whatsapp_number_id,phone_number,display_name")
+        .eq("organization_id", senderOrganizationId).eq("whatsapp_number_id", senderNumberId)
+        .eq("status", "connected").maybeSingle()
+    : { data: null, error: null };
+  const platformSession = senderSessionResult.data;
+
 
   const now = new Date();
   const lower = new Date(now.getTime() + 48 * hour).toISOString();
@@ -179,12 +190,9 @@ Deno.serve(async (req: Request) => {
       if (!emailOk) result.errors.push(`${org.name}: falha no e-mail de aviso de renovação.`);
     }
     const recipientPhone = String(metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
-    const sessionResult = await db.from("whatsapp_sessions")
-      .select("whatsapp_number_id,phone_number,display_name").eq("organization_id", org.id)
-      .eq("status", "connected").not("whatsapp_number_id", "is", null).order("updated_at", { ascending: false }).limit(1).maybeSingle();
-    const session = sessionResult.data;
-    if (!recipientPhone || !session?.whatsapp_number_id) {
-      const reason = !recipientPhone ? "Falta o WhatsApp de contacto do proprietário." : "Não existe sessão WhatsApp ligada para esta organização.";
+    const session = platformSession;
+    if (!recipientPhone || !session?.whatsapp_number_id || !senderOrganizationId) {
+      const reason = !recipientPhone ? "Falta o WhatsApp pessoal do proprietário." : "O número emissor oficial WHAPPNUS não está ligado.";
       await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone || null, whatsapp_number_id: session?.whatsapp_number_id ?? null, error_message: reason, updated_at: new Date().toISOString() }).eq("id", reminderLogId!);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays } });
       await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
@@ -194,7 +202,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      const sessionId = `${org.id}:${session.whatsapp_number_id}`;
+      const sessionId = `${senderOrganizationId}:${session.whatsapp_number_id}`;
       const response = await fetch(`${engineUrl}/internal/subscription-reminder`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${serviceKey}` },
@@ -206,7 +214,7 @@ Deno.serve(async (req: Request) => {
       await db.from("subscription_reminder_logs").update({ status: "sent", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }).eq("id", reminderLogId!);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: true } });
       await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
-      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "sent", destination: recipientPhone, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, metadata: { reminder_days: reminderDays, whatsapp_number_id: session.whatsapp_number_id } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "sent", destination: recipientPhone, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, metadata: { reminder_days: reminderDays, whatsapp_number_id: session.whatsapp_number_id, sender_organization_id: senderOrganizationId } });
       result.whatsapp_sent += 1;
     } catch (error) {
       const messageError = error instanceof Error ? error.message : String(error);
