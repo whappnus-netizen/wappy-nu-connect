@@ -885,7 +885,7 @@ export async function processIncomingMessage(
   const paymentQuestion = /\b(pagamento|pagamentos|transfer[eê]ncia|comprovativo|recibo|j[aá] paguei|foi pago|foi confirmado|confirmaram|receberam o valor|valor recebido|estado do pagamento|status do pagamento|liquidado|liquida[cç][aã]o)\b/i.test(incoming.body ?? "");
   if (paymentQuestion && !["image", "document"].includes(incoming.messageType) && (res.contact_id || res.conversation_id)) {
     const paymentQuery = admin.from("customer_payments")
-      .select("status,amount_aoa,description,reference,received_at,confirmed_at")
+      .select("status,amount_aoa,description,item_name,reference,received_at,confirmed_at")
       .eq("organization_id", number.organization_id)
       .order("created_at", { ascending: false })
       .limit(5);
