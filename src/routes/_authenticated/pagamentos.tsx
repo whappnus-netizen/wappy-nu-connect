@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
 import { getMessageMediaSignedUrl } from "@/lib/whatsapp.functions";
@@ -60,6 +61,7 @@ function PaymentsPage() {
   const [formNotice, setFormNotice] = useState("");
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [reviewError, setReviewError] = useState("");
+  const [receiptPreview, setReceiptPreview] = useState<{ url: string; mimeType: string } | null>(null);
 
   const paymentsQuery = useQuery({
     queryKey: ["customer-payments", orgId],
@@ -164,7 +166,10 @@ function PaymentsPage() {
         if (!error) signedUrl = data?.signedUrl ?? null;
       }
       if (!signedUrl) { setReviewError("Não foi possível abrir o comprovativo. Verifique as permissões da organização."); return; }
-      window.open(signedUrl, "_blank", "noopener,noreferrer");
+      const mimeType = typeof payment.extraction_data?.mimeType === "string"
+        ? payment.extraction_data.mimeType
+        : payment.receipt_path?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/*";
+      setReceiptPreview({ url: signedUrl, mimeType });
     } catch {
       setReviewError("Não foi possível abrir o comprovativo. Actualize a página e tente novamente.");
     }
@@ -215,6 +220,16 @@ function PaymentsPage() {
         </section>
         <p className="text-xs text-muted-foreground">A confirmação é manual. Um comprovativo, por si só, não prova que a transferência foi liquidada. Os registos e anexos não são partilhados entre organizações.</p>
       </div>
+      <Dialog open={Boolean(receiptPreview)} onOpenChange={(open) => { if (!open) setReceiptPreview(null); }}>
+        <DialogContent className="flex h-[85vh] max-w-5xl flex-col">
+          <DialogHeader><DialogTitle>Comprovativo de pagamento</DialogTitle></DialogHeader>
+          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-muted/20">
+            {receiptPreview?.mimeType === "application/pdf"
+              ? <iframe title="Pré-visualização do comprovativo" src={receiptPreview.url} className="h-full w-full" />
+              : receiptPreview && <img src={receiptPreview.url} alt="Comprovativo de pagamento" className="h-full w-full object-contain" />}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
