@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/app-shell";
@@ -9,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase/client";
+import { getMessageMediaSignedUrl } from "@/lib/whatsapp.functions";
 import { CheckCircle2, Clock3, FileImage, Search, ShieldAlert, XCircle, ReceiptText } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pagamentos")({
@@ -45,6 +47,7 @@ function PaymentsPage() {
   const orgId = membership?.organization_id;
   const canReview = membership?.role === "OWNER" || membership?.role === "ADMIN";
   const queryClient = useQueryClient();
+  const getMessageMediaSignedUrlFn = useServerFn(getMessageMediaSignedUrl);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | PaymentStatus>("all");
   const [amount, setAmount] = useState("");
@@ -149,11 +152,18 @@ function PaymentsPage() {
     onError: (error: Error) => setReviewError(error.message),
   });
 
-  const openReceipt = async (bucket: string, path: string) => {
-    const safeBucket = bucket === "whatsapp-incoming-media" ? "whatsapp-incoming-media" : "customer-payment-receipts";
-    const { data, error } = await supabase.storage.from(safeBucket).createSignedUrl(path, 60);
-    if (error || !data?.signedUrl) { setReviewError("Não foi possível abrir o comprovativo. Verifique as permissões da organização."); return; }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  const openReceipt = async (payment: Payment) => {
+    let signedUrl: string | null = null;
+    if (payment.detection_source === "whatsapp_ai" && payment.source_message_id && orgId) {
+      const result = await getMessageMediaSignedUrlFn({ data: { organizationId: orgId, messageId: payment.source_message_id } });
+      signedUrl = result.url;
+    } else if (payment.receipt_path) {
+      const safeBucket = payment.receipt_bucket === "whatsapp-incoming-media" ? "whatsapp-incoming-media" : "customer-payment-receipts";
+      const { data, error } = await supabase.storage.from(safeBucket).createSignedUrl(payment.receipt_path, 60);
+      if (!error) signedUrl = data?.signedUrl ?? null;
+    }
+    if (!signedUrl) { setReviewError("Não foi possível abrir o comprovativo. Verifique as permissões da organização."); return; }
+    window.open(signedUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -192,7 +202,7 @@ function PaymentsPage() {
               {filtered.map((p) => <article key={p.id} className="space-y-3 p-4 sm:p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                   <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{money(p.amount_aoa == null ? null : Number(p.amount_aoa))}</h3><Badge variant={p.status === "confirmed" ? "default" : p.status === "rejected" || p.status === "refunded" ? "destructive" : "secondary"}>{statusLabel[p.status]}</Badge>{p.detection_source === "whatsapp_ai" && <Badge variant="outline">Detetado pela IA</Badge>}</div><p className="mt-1 break-words text-sm">{p.description}</p><p className="mt-1 text-xs text-muted-foreground">{p.contacts?.full_name || p.contacts?.phone_e164 || "Cliente não associado"} · {methodLabel[p.payment_method] ?? p.payment_method} · {new Date(p.received_at).toLocaleString("pt-AO")}</p>{p.item_name && <p className="text-sm"><span className="font-medium">Produto/serviço associado:</span> {p.item_name}</p>}{typeof p.extraction_data?.payerName === "string" && <p className="text-sm"><span className="font-medium">Titular indicado no comprovativo:</span> {p.extraction_data.payerName}</p>}{p.detection_source === "whatsapp_ai" && <p className="text-xs text-muted-foreground">Análise automática: {typeof p.extraction_data?.summary === "string" ? p.extraction_data.summary : "Aguarda verificação do documento."} · Confiança estimada: {Math.round(Number(p.extraction_data?.confidence ?? 0) * 100)}%</p>}{p.reference && <p className="mt-1 text-xs text-muted-foreground">Referência: {p.reference}</p>}{p.review_note && <p className="mt-2 rounded-md bg-secondary p-2 text-sm">Nota da revisão: {p.review_note}</p>}</div>
-                  {p.receipt_path && <Button type="button" variant="outline" size="sm" onClick={() => void openReceipt(p.receipt_bucket, p.receipt_path!)}><FileImage className="mr-2 size-4" />Abrir comprovativo</Button>}
+                  {p.receipt_path && <Button type="button" variant="outline" size="sm" onClick={() => void openReceipt(p)}><FileImage className="mr-2 size-4" />Abrir comprovativo</Button>}
                 </div>
                 {canReview && ["pending_review", "needs_review"].includes(p.status) && <div className="space-y-2 rounded-lg border border-border bg-surface/60 p-3"><label className="block space-y-1 text-xs"><span className="font-medium">Nota de revisão (opcional)</span><Textarea rows={2} maxLength={1000} value={reviewNotes[p.id] ?? ""} onChange={(e) => setReviewNotes((prev) => ({ ...prev, [p.id]: e.target.value }))} placeholder="Ex.: Valor confirmado no extrato bancário." /></label><div className="flex flex-wrap gap-2"><Button size="sm" disabled={reviewPayment.isPending} onClick={() => reviewPayment.mutate({ payment: p, status: "confirmed" })}><CheckCircle2 className="mr-1 size-4" />Confirmar pagamento</Button><Button size="sm" variant="outline" disabled={reviewPayment.isPending} onClick={() => reviewPayment.mutate({ payment: p, status: "needs_review" })}><ShieldAlert className="mr-1 size-4" />Pedir verificação</Button><Button size="sm" variant="destructive" disabled={reviewPayment.isPending} onClick={() => reviewPayment.mutate({ payment: p, status: "rejected" })}><XCircle className="mr-1 size-4" />Rejeitar</Button></div></div>}
               </article>)}
