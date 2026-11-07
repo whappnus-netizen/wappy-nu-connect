@@ -120,7 +120,7 @@ Deno.serve(async (req: Request) => {
   const now = new Date();
   const lower = new Date(now.getTime() + 48 * hour).toISOString();
   const upper = new Date(now.getTime() + 96 * hour).toISOString();
-  const result = { scanned: 0, whatsapp_sent: 0, queued_or_failed: 0, expired_notices: 0, skipped_duplicates: 0, errors: [] as string[] };
+  const result = { scanned: 0, whatsapp_sent: 0, queued_or_failed: 0, expired_notices: 0, skipped_duplicates: 0, payment_whatsapp_retried: 0, payment_whatsapp_failed: 0, errors: [] as string[] };
 
   const { data: expiring, error: expiringError } = await db.from("organization_subscriptions")
     .select("id,organization_id,status,current_period_end,subscription_plans(name,price_aoa)")
@@ -308,6 +308,50 @@ Deno.serve(async (req: Request) => {
       idempotencyKey: `subscription_expired:${sub.id}`,
       organizationId: sub.organization_id, eventType: "subscription_expired",
     });
+  }
+
+  // Retry de avisos de pagamento aprovado cujo envio WhatsApp falhou anteriormente.
+  const { data: failedPaymentNotices, error: failedPaymentError } = await db.from("platform_notification_delivery_logs")
+    .select("id,organization_id,subscription_id,recipient_user_id,destination,message,idempotency_key,metadata")
+    .eq("event_type", "payment_approved").eq("channel", "whatsapp").eq("status", "failed")
+    .gte("created_at", new Date(now.getTime() - 14 * 86400000).toISOString())
+    .order("created_at", { ascending: true }).limit(100);
+  if (failedPaymentError) result.errors.push("Consulta de avisos de pagamento pendentes: " + failedPaymentError.message);
+  for (const notice of failedPaymentNotices ?? []) {
+    if (!notice.destination || !notice.message || !senderOrganizationId || !platformSession?.whatsapp_number_id) {
+      result.payment_whatsapp_failed += 1;
+      continue;
+    }
+    const claim = await db.from("platform_notification_delivery_logs").update({
+      status: "queued", error_message: null, updated_at: new Date().toISOString(),
+    }).eq("id", notice.id).eq("status", "failed").select("id").maybeSingle();
+    if (claim.error || !claim.data?.id) continue;
+    try {
+      const response = await fetch(`${engineUrl}/internal/subscription-reminder`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({
+          sessionId: `${senderOrganizationId}:${platformSession.whatsapp_number_id}`,
+          to: notice.destination, body: notice.message,
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok !== true) throw new Error(`WhatsApp HTTP ${response.status}: ${String(payload?.error ?? "envio não confirmado").slice(0, 240)}`);
+      await db.from("platform_notification_delivery_logs").update({
+        status: "sent", sent_at: new Date().toISOString(), error_message: null,
+        updated_at: new Date().toISOString(),
+        metadata: { ...(notice.metadata ?? {}), retry_at: new Date().toISOString(), retry_source: "subscription-reminders" },
+      }).eq("id", notice.id);
+      result.payment_whatsapp_retried += 1;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      await db.from("platform_notification_delivery_logs").update({
+        status: "failed", error_message: reason.slice(0, 500), updated_at: new Date().toISOString(),
+        metadata: { ...(notice.metadata ?? {}), last_retry_at: new Date().toISOString(), retry_source: "subscription-reminders" },
+      }).eq("id", notice.id);
+      result.payment_whatsapp_failed += 1;
+    }
   }
 
   return json({ ok: true, data: result });
