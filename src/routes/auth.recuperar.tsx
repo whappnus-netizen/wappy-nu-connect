@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
 import { AuthCard } from "@/components/app/auth-card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ export const Route = createFileRoute("/auth/recuperar")({
       { title: "Recuperar palavra-passe — WHAPPNUS" },
       { name: "description", content: "Receba um link para redefinir a palavra-passe da sua conta WHAPPNUS." },
       { property: "og:title", content: "Recuperar palavra-passe — Wappy Nus" },
-      { property: "og:description", content: "Redefinição de acesso à conta Wappy Nus." },
+      { property: "og:description", content: "Redefinição segura de acesso à conta WHAPPNUS." },
     ],
   }),
   component: RecoverPage,
