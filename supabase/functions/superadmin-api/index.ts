@@ -428,12 +428,20 @@ Deno.serve(async (req: Request) => {
       const rows = data ?? [];
       const ids = rows.map((row: any) => row.id);
       const orgIds = [...new Set(rows.map((row: any) => row.organization_id))];
-      const [logs, sessions, memberships] = await Promise.all([
+      const [logs, memberships, senderConfigResult] = await Promise.all([
         ids.length ? db.from("subscription_reminder_logs").select("id,subscription_id,reminder_days,status,recipient_phone,whatsapp_number_id,error_message,sent_at,created_at").in("subscription_id", ids).order("created_at", { ascending: false }) : { data: [], error: null },
-        orgIds.length ? db.from("whatsapp_sessions").select("organization_id,whatsapp_number_id,status,phone_number,display_name").in("organization_id", orgIds).eq("status", "connected") : { data: [], error: null },
         orgIds.length ? db.from("memberships").select("organization_id,user_id,role").in("organization_id", orgIds) : { data: [], error: null },
+        db.from("subscription_reminder_config").select("platform_sender_organization_id,platform_sender_whatsapp_number_id").eq("id", true).maybeSingle(),
       ]);
-      if (logs.error) throw logs.error; if (sessions.error) throw sessions.error; if (memberships.error) throw memberships.error;
+      if (logs.error) throw logs.error; if (memberships.error) throw memberships.error; if (senderConfigResult.error) throw senderConfigResult.error;
+      const senderOrgId = senderConfigResult.data?.platform_sender_organization_id ?? null;
+      const senderNumberId = senderConfigResult.data?.platform_sender_whatsapp_number_id ?? null;
+      const senderSessionResult = senderOrgId && senderNumberId
+        ? await db.from("whatsapp_sessions").select("whatsapp_number_id,status,phone_number,display_name")
+            .eq("organization_id", senderOrgId).eq("whatsapp_number_id", senderNumberId).eq("status", "connected").maybeSingle()
+        : { data: null, error: null };
+      if (senderSessionResult.error) throw senderSessionResult.error;
+      const senderSession = senderSessionResult.data ? { ...senderSessionResult.data, organization_id: senderOrgId } : null;
       const ownerByOrg = new Map<string, string>();
       for (const member of memberships.data ?? []) if (member.role === "OWNER" || member.role === "owner") ownerByOrg.set(member.organization_id, member.user_id);
       const ownerIds = [...new Set([...ownerByOrg.values()])];
@@ -441,7 +449,6 @@ Deno.serve(async (req: Request) => {
       const authById = new Map(authRows);
       const logsBySubscription = new Map<string, any>();
       for (const log of logs.data ?? []) if (!logsBySubscription.has(log.subscription_id)) logsBySubscription.set(log.subscription_id, log);
-      const sessionsByOrg = new Map((sessions.data ?? []).map((row: any) => [row.organization_id, row]));
       return json({ ok: true, data: rows.map((row: any) => {
         const end = row.current_period_end ? new Date(row.current_period_end).getTime() : null;
         const reminder = logsBySubscription.get(row.id);
@@ -452,7 +459,7 @@ Deno.serve(async (req: Request) => {
           days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
           reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,
           reminder_sent_at: reminder?.sent_at ?? null, reminder_error: reminder?.error_message ?? null,
-          whatsapp_session: sessionsByOrg.get(row.organization_id) ?? null };
+          whatsapp_session: senderSession, whatsapp_sender: senderSession?.display_name ?? "WHAPPNUS" };
       }) });
     }
 
