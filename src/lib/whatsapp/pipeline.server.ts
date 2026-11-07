@@ -9,7 +9,7 @@
  * O resto da aplicação (inbox, dashboard, CRM) nunca precisa saber a origem.
  */
 import { serviceClient } from "../whatsapp.server";
-import { generateViaWhappNusAI } from "../ai-engine.server";
+import { analyzePaymentProofViaWhappNusAI, generateViaWhappNusAI } from "../ai-engine.server";
 import type { NormalizedIncoming, OutgoingMedia, SessionRef } from "./provider.server";
 import { providerByName } from "./registry.server";
 
@@ -40,6 +40,158 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
 function waitForHumanReadDelay(seconds: number): Promise<void> {
   const delayMs = Math.round(Math.max(0, Math.min(25, seconds)) * 1000);
   return delayMs === 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+type PaymentProofData = {
+  confidence: number;
+  amount: number | null;
+  originalCurrency: string | null;
+  reference: string | null;
+  paymentMethod: "bank_transfer" | "multicaixa_express" | "unitel_money" | "africell_money" | "cash" | "other";
+  payerName: string | null;
+  beneficiaryName: string | null;
+  transactionDate: string | null;
+  itemName: string | null;
+  summary: string;
+};
+
+async function recordDetectedPaymentProof(input: {
+  organizationId: string;
+  whatsappNumberId: string;
+  conversationId: string;
+  contactId: string | null;
+  incoming: NormalizedIncoming;
+  analysis: PaymentProofData;
+}): Promise<boolean> {
+  const { analysis, incoming } = input;
+  if (analysis.confidence < 0.6 || !incoming.mediaId ||
+      !incoming.mediaId.startsWith(input.organizationId + "/" + input.whatsappNumberId + "/")) return false;
+
+  const admin = serviceClient();
+  const { data: sourceMessage, error: sourceError } = await admin.from("messages")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("conversation_id", input.conversationId)
+    .eq("wa_message_id", incoming.waMessageId)
+    .eq("direction", "inbound")
+    .maybeSingle();
+  if (sourceError) throw new Error("Não foi possível associar o comprovativo à mensagem original: " + sourceError.message);
+  if (!sourceMessage?.id) return false;
+
+  const itemName = analysis.itemName?.trim().slice(0, 200) || null;
+  const description = itemName
+    ? "Comprovativo recebido via WhatsApp — " + itemName
+    : "Comprovativo de pagamento recebido via WhatsApp";
+  const receivedAt = incoming.sentAt && Number.isFinite(new Date(incoming.sentAt).getTime())
+    ? new Date(incoming.sentAt).toISOString()
+    : new Date().toISOString();
+  let duplicateReference = false;
+  if (analysis.reference) {
+    const { data: existingReference } = await admin.from("customer_payments")
+      .select("id")
+      .eq("organization_id", input.organizationId)
+      .eq("reference", analysis.reference)
+      .limit(1)
+      .maybeSingle();
+    duplicateReference = Boolean(existingReference?.id);
+  }
+  const extractionData = {
+    confidence: analysis.confidence,
+    mimeType: incoming.mediaMimeType,
+    originalCurrency: analysis.originalCurrency,
+    reference: analysis.reference,
+    duplicateReference,
+    payerName: analysis.payerName,
+    beneficiaryName: analysis.beneficiaryName,
+    transactionDate: analysis.transactionDate,
+    summary: analysis.summary,
+    detectedAt: new Date().toISOString(),
+  };
+  const { error } = await admin.from("customer_payments").upsert({
+    organization_id: input.organizationId,
+    contact_id: input.contactId,
+    conversation_id: input.conversationId,
+    amount_aoa: analysis.amount,
+    currency: "AOA",
+    description,
+    item_name: itemName,
+    payment_method: analysis.paymentMethod,
+    reference: duplicateReference ? null : analysis.reference,
+    status: "pending_review",
+    receipt_path: incoming.mediaId,
+    receipt_bucket: "whatsapp-incoming-media",
+    receipt_sha256: null,
+    source_message_id: sourceMessage.id,
+    detection_source: "whatsapp_ai",
+    extraction_data: extractionData,
+    received_at: receivedAt,
+    created_by: null,
+    idempotency_key: "whatsapp-proof:" + sourceMessage.id,
+    metadata: extractionData,
+  }, { onConflict: "organization_id,source_message_id", ignoreDuplicates: true });
+  if (error) throw new Error("Não foi possível registar o comprovativo: " + error.message);
+
+  await logWhatsAppEvent(input.organizationId, "message_received", {
+    whatsappNumberId: input.whatsappNumberId,
+    provider: incoming.provider,
+    detail: { stage: "payment_proof_detected", sourceMessageId: sourceMessage.id, confidence: analysis.confidence },
+  });
+  return true;
+}
+
+const paymentContextPattern = /\b(pagamento|pagamentos|transfer[eê]ncias?|comprovativos?|recibos?|paguei|pagar|liquidar|valor recebido)\b/i;
+
+async function hasRecentPaymentContext(
+  organizationId: string,
+  conversationId: string,
+  messageText: string | null,
+): Promise<boolean> {
+  if (paymentContextPattern.test(messageText ?? "")) return true;
+  const { data, error } = await serviceClient().from("messages")
+    .select("body")
+    .eq("organization_id", organizationId)
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (error) return false;
+  return (data ?? []).some((row) => paymentContextPattern.test(String(row.body ?? "")));
+}
+
+async function analyzeAndRecordPaymentProof(
+  number: NumberRow,
+  incoming: NormalizedIncoming,
+  conversationId: string,
+  contactId: string | null,
+): Promise<boolean> {
+  if (!["image", "document"].includes(incoming.messageType) || !incoming.mediaId || !incoming.mediaMimeType) return false;
+  try {
+    const analysis = await analyzePaymentProofViaWhappNusAI({
+      organizationId: number.organization_id,
+      whatsappNumberId: number.id,
+      conversationId,
+      contactId,
+      mediaPath: incoming.mediaId,
+      mediaMimeType: incoming.mediaMimeType,
+      messageType: incoming.messageType as "image" | "document",
+      messageText: incoming.body,
+    });
+    if (!analysis.isPaymentProof) return false;
+    return await recordDetectedPaymentProof({
+      organizationId: number.organization_id,
+      whatsappNumberId: number.id,
+      conversationId,
+      contactId,
+      incoming,
+      analysis,
+    });
+  } catch (error) {
+    await logWhatsAppEvent(number.organization_id, "error", {
+      whatsappNumberId: number.id,
+      provider: incoming.provider,
+      detail: { stage: "payment_proof_analysis", error: (error as Error).message.slice(0, 180) },
+    });
+    return false;
+  }
 }
 
 /** Log técnico. Nunca grava conteúdo de mensagens nem credenciais. */
@@ -675,6 +827,9 @@ export async function processIncomingMessage(
             detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type, steps: executionSteps.length },
           });
           if (selectedReason !== "welcome_automation") {
+            if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+              await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
+            }
             return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
           }
           // A saudação não deve impedir a IA de responder à pergunta da primeira mensagem.
@@ -708,6 +863,11 @@ export async function processIncomingMessage(
               : null;
 
   if (skip) {
+    // A validação documental é uma tarefa de backoffice: pode ocorrer mesmo
+    // quando a IA de atendimento está desligada nesta conversa.
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+      await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
+    }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
       whatsappNumberId: number.id,
       provider: incoming.provider,
@@ -727,6 +887,9 @@ export async function processIncomingMessage(
     .eq("is_ai", true)
     .gte("created_at", since);
   if ((count ?? 0) >= 6) {
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+      await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
+    }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
       whatsappNumberId: number.id,
       provider: incoming.provider,
@@ -757,9 +920,9 @@ export async function processIncomingMessage(
 
   // Respostas determinísticas sobre pagamentos registados: nunca inferir pagamento apenas pelo comprovativo.
   const paymentQuestion = /\b(pagamento|pagamentos|transfer[eê]ncia|comprovativo|recibo|j[aá] paguei|foi pago|foi confirmado|confirmaram|receberam o valor|valor recebido|estado do pagamento|status do pagamento|liquidado|liquida[cç][aã]o)\b/i.test(incoming.body ?? "");
-  if (paymentQuestion && (res.contact_id || res.conversation_id)) {
+  if (paymentQuestion && !["image", "document"].includes(incoming.messageType) && (res.contact_id || res.conversation_id)) {
     const paymentQuery = admin.from("customer_payments")
-      .select("status,amount_aoa,description,reference,received_at,confirmed_at")
+      .select("status,amount_aoa,description,item_name,reference,received_at,confirmed_at")
       .eq("organization_id", number.organization_id)
       .order("created_at", { ascending: false })
       .limit(5);
@@ -772,8 +935,8 @@ export async function processIncomingMessage(
         detail: { stage: "customer_payment_lookup", error: paymentResult.error.message.slice(0, 200) },
       });
     } else if ((paymentResult.data ?? []).length > 0) {
-      const latest = paymentResult.data![0] as { status: string; amount_aoa: number; description: string; reference: string | null; received_at: string; confirmed_at: string | null };
-      const amountText = new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 2 }).format(Number(latest.amount_aoa));
+      const latest = paymentResult.data![0] as { status: string; amount_aoa: number | null; description: string; item_name: string | null; reference: string | null; received_at: string; confirmed_at: string | null };
+      const amountText = latest.amount_aoa == null ? "valor ainda não identificado" : new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 2 }).format(Number(latest.amount_aoa));
       const refText = latest.reference ? " Referência: " + latest.reference + "." : "";
       const dateText = new Date(latest.received_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" });
       const responseText = latest.status === "confirmed"
@@ -811,6 +974,14 @@ export async function processIncomingMessage(
     // Na Cloud API o indicador acompanha a preparação; no QR o provider trata disso no envio.
     if (number.provider !== "qr") await showTypingIndicator();
 
+    // Quando o contexto recente indica uma transacção, analisa o anexo em paralelo
+    // com a resposta normal. A resposta multimodal principal também pode devolver
+    // metadados estruturados; a chave única da mensagem impede registos duplicados.
+    const proofFallbackPromise = (["image", "document"].includes(incoming.messageType) && incoming.mediaId &&
+      await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body))
+      ? analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null)
+      : Promise.resolve(false);
+
     let ai: Awaited<ReturnType<typeof generateViaWhappNusAI>>;
     try {
       ai = await generateViaWhappNusAI({
@@ -837,9 +1008,13 @@ export async function processIncomingMessage(
       });
       // Não contornar limites de plano nem estados de atendimento intencionais.
       if (["AUTO_REPLY_DISABLED", "NO_ACTIVE_AGENT", "SUBSCRIPTION_REQUIRED", "ACCOUNT_SUSPENDED", "AI_CONVERSATIONS_EXHAUSTED", "PLAN_HAS_NO_AI_CONVERSATIONS"].includes(errorCode)) {
+        await proofFallbackPromise;
         return { ...base, aiReplied: false, aiSkippedReason: errorCode };
       }
-      const fallbackText = "Peço desculpa, estou com uma dificuldade momentânea para processar a tua mensagem. Podes tentar novamente dentro de instantes? Se for urgente, a nossa equipa pode ajudar.";
+      const fallbackProofRecorded = await proofFallbackPromise;
+      const fallbackText = fallbackProofRecorded
+        ? "Recebi o comprovativo. Obrigado por o enviares. A nossa equipa vai verificar o documento e actualizar o estado do pagamento. Por enquanto, o pagamento ainda está pendente de confirmação."
+        : "Peço desculpa, estou com uma dificuldade momentânea para processar a tua mensagem. Podes tentar novamente dentro de instantes? Se for urgente, a nossa equipa pode ajudar.";
       await sendOutgoingMessage({
         organizationId: number.organization_id,
         whatsappNumberId: number.id,
@@ -850,6 +1025,26 @@ export async function processIncomingMessage(
       return { ...base, aiReplied: true, aiSkippedReason: "ai_generation_fallback" };
     }
 
+    let paymentProofRecorded = false;
+    if (ai.paymentProof && ["image", "document"].includes(incoming.messageType)) {
+      paymentProofRecorded = await recordDetectedPaymentProof({
+        organizationId: number.organization_id,
+        whatsappNumberId: number.id,
+        conversationId: res.conversation_id,
+        contactId: res.contact_id ?? null,
+        incoming,
+        analysis: ai.paymentProof,
+      });
+    }
+    const fallbackProofRecorded = await proofFallbackPromise;
+    if (paymentProofRecorded || fallbackProofRecorded) {
+      const item = ai.paymentProof?.itemName ? " referente a " + ai.paymentProof.itemName : "";
+      ai = {
+        ...ai,
+        text: "Recebi o comprovativo" + item + ". Obrigado por o enviares. A nossa equipa vai verificar o documento e actualizar o estado do pagamento. Por enquanto, o pagamento ainda está pendente de confirmação.",
+        reactionEmoji: null,
+      };
+    }
     await waitForResponseDelay(behavior.responseDelaySeconds);
     await sendOutgoingMessage({
       organizationId: number.organization_id,
