@@ -31,6 +31,7 @@ function LoginPage() {
   const [notice] = useState(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
+    if (params.get("password_updated") === "1") return "Palavra-passe actualizada com sucesso. Já pode entrar com a nova palavra-passe.";
     if (params.get("confirmed") === "1") return "Email confirmado. Agora entre com a sua palavra-passe."; 
     if (params.get("registered") === "1") return "Conta criada. Confirme o email que enviámos e depois entre aqui."; 
     return "";
