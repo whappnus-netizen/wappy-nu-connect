@@ -203,14 +203,14 @@ Deno.serve(async (req: Request) => {
       });
       const responseBody = await response.json().catch(() => ({}));
       if (!response.ok || responseBody?.ok !== true) throw new Error(`WhatsApp Engine HTTP ${response.status}: ${String(responseBody?.error ?? "envio não confirmado").slice(0, 240)}`);
-      await db.from("subscription_reminder_logs").update({ status: "sent", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }).eq("id", inserted.id);
+      await db.from("subscription_reminder_logs").update({ status: "sent", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }).eq("id", reminderLogId!);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: true } });
       await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
       await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "sent", destination: recipientPhone, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, metadata: { reminder_days: reminderDays, whatsapp_number_id: session.whatsapp_number_id } });
       result.whatsapp_sent += 1;
     } catch (error) {
       const messageError = error instanceof Error ? error.message : String(error);
-      await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, error_message: messageError.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", inserted.id);
+      await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, error_message: messageError.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", reminderLogId!);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: false } });
       await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
       await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "failed", destination: recipientPhone, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, errorMessage: messageError.slice(0, 500), metadata: { reminder_days: reminderDays } });
@@ -278,6 +278,8 @@ Deno.serve(async (req: Request) => {
       }
     }
     await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WhappNus expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
+    const expiredOwnerId = ownerResult.data?.user_id ?? null;
+    await recordDelivery(db, { organizationId: sub.organization_id, subscriptionId: sub.id, recipientUserId: expiredOwnerId, eventType: "subscription_expired", channel: "in_app", status: "sent", destination: null, message, idempotencyKey: `subscription_expired:${sub.id}:in_app`, metadata: { expired: true } });
     result.expired_notices += 1;
   }
 
