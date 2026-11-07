@@ -155,8 +155,41 @@ export const sendWhatsAppMessage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!conv) throw new Error("Conversa não encontrada nesta organização.");
 
-    const numberId = (conv as { whatsapp_number_id: string | null }).whatsapp_number_id;
+    let numberId = (conv as { whatsapp_number_id: string | null }).whatsapp_number_id;
     if (!numberId) throw new Error("Conversa sem número WhatsApp ligado.");
+
+    const { data: originalNumber, error: originalNumberError } = await admin.from("whatsapp_numbers")
+      .select("id,phone_e164,deleted_at")
+      .eq("id", numberId)
+      .eq("organization_id", data.organizationId)
+      .maybeSingle();
+    if (originalNumberError) throw new Error("Não foi possível validar o número associado à conversa.");
+    if (!originalNumber) throw new Error("O número WhatsApp associado a esta conversa já não existe.");
+
+    // Quando um número é removido e reconectado com o mesmo telefone, a nova
+    // ligação recebe outro UUID. Reassocia apenas se existir exactamente uma
+    // ligação activa para o mesmo E.164; nunca encaminha para um telefone diferente.
+    if (originalNumber.deleted_at) {
+      const { data: replacements, error: replacementError } = await admin.from("whatsapp_numbers")
+        .select("id")
+        .eq("organization_id", data.organizationId)
+        .eq("phone_e164", originalNumber.phone_e164)
+        .is("deleted_at", null)
+        .eq("status", "connected")
+        .limit(2);
+      if (replacementError) throw new Error("Não foi possível localizar a ligação WhatsApp activa.");
+      if ((replacements ?? []).length !== 1) {
+        throw new Error("Esta conversa pertence a um número WhatsApp removido. Reconecte o mesmo número ou escolha uma ligação activa compatível.");
+      }
+      const replacementId = replacements![0].id;
+      const { error: reassignmentError } = await admin.from("conversations")
+        .update({ whatsapp_number_id: replacementId, updated_at: new Date().toISOString() })
+        .eq("id", data.conversationId)
+        .eq("organization_id", data.organizationId)
+        .eq("whatsapp_number_id", numberId);
+      if (reassignmentError) throw new Error("Não foi possível actualizar a ligação desta conversa.");
+      numberId = replacementId;
+    }
 
     // Envio pelo provedor do próprio número: Cloud API oficial ou QR Code.
     const sent = await sendOutgoingMessage({
