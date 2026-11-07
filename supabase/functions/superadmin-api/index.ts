@@ -61,8 +61,8 @@ Deno.serve(async (req: Request) => {
     const permissions = admin.permissions ?? {};
     return admin.role === "owner" ||
       (admin.role === "admin" && !["team.promote_owner"].includes(permission)) ||
-      admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "notifications.list", "dashboard"].includes(permission) ||
-      admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "notifications.list", "health", "dashboard", "support.tickets.list", "support.messages.list", "support.ticket.reply", "support.ticket.status"].includes(permission) ||
+      admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "notifications.list", "notification-deliveries.list", "dashboard"].includes(permission) ||
+      admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "notifications.list", "notification-deliveries.list", "health", "dashboard", "support.tickets.list", "support.messages.list", "support.ticket.reply", "support.ticket.status"].includes(permission) ||
       permissions[permission] === true;
   };
   if (!action) return fail("Ação não especificada.");
@@ -447,7 +447,7 @@ Deno.serve(async (req: Request) => {
         const reminder = logsBySubscription.get(row.id);
         const owner = authById.get(ownerByOrg.get(row.organization_id) ?? "");
         const metadata = owner?.user_metadata ?? {};
-        return { ...row, contact_phone: row.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
+        return { ...row, contact_phone: metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
           client_name: metadata.full_name ?? metadata.name ?? null, client_email: owner?.email ?? null,
           days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
           reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,
@@ -540,6 +540,14 @@ Deno.serve(async (req: Request) => {
       if (error) throw error;
       await audit("support.ticket.status_changed", "support_ticket", ticketId, before.organization_id, { from: before.status, to: status });
       return json({ ok: true, data });
+    }
+
+    if (action === "notification-deliveries.list") {
+      const { data, error } = await db.from("platform_notification_delivery_logs")
+        .select("id,organization_id,subscription_id,recipient_user_id,event_type,channel,status,destination,message,idempotency_key,error_message,sent_at,created_at,metadata,organizations(name,slug)")
+        .order("created_at", { ascending: false }).limit(300);
+      if (error) throw error;
+      return json({ ok: true, data: data ?? [] });
     }
 
     if (action === "notifications.list") {
