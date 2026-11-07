@@ -149,8 +149,9 @@ function PaymentsPage() {
     onError: (error: Error) => setReviewError(error.message),
   });
 
-  const openReceipt = async (path: string) => {
-    const { data, error } = await supabase.storage.from("customer-payment-receipts").createSignedUrl(path, 60);
+  const openReceipt = async (bucket: string, path: string) => {
+    const safeBucket = bucket === "whatsapp-incoming-media" ? "whatsapp-incoming-media" : "customer-payment-receipts";
+    const { data, error } = await supabase.storage.from(safeBucket).createSignedUrl(path, 60);
     if (error || !data?.signedUrl) { setReviewError("Não foi possível abrir o comprovativo. Verifique as permissões da organização."); return; }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
