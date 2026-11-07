@@ -898,8 +898,8 @@ export async function processIncomingMessage(
         detail: { stage: "customer_payment_lookup", error: paymentResult.error.message.slice(0, 200) },
       });
     } else if ((paymentResult.data ?? []).length > 0) {
-      const latest = paymentResult.data![0] as { status: string; amount_aoa: number; description: string; reference: string | null; received_at: string; confirmed_at: string | null };
-      const amountText = new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 2 }).format(Number(latest.amount_aoa));
+      const latest = paymentResult.data![0] as { status: string; amount_aoa: number | null; description: string; item_name: string | null; reference: string | null; received_at: string; confirmed_at: string | null };
+      const amountText = latest.amount_aoa == null ? "valor ainda não identificado" : new Intl.NumberFormat("pt-AO", { style: "currency", currency: "AOA", maximumFractionDigits: 2 }).format(Number(latest.amount_aoa));
       const refText = latest.reference ? " Referência: " + latest.reference + "." : "";
       const dateText = new Date(latest.received_at).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" });
       const responseText = latest.status === "confirmed"
