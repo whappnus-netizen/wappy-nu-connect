@@ -115,7 +115,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + secret },
     body: JSON.stringify(input),
-    signal: AbortSignal.timeout(9000),
+    signal: AbortSignal.timeout(15000),
   });
   const raw = await response.text();
   let data: Record<string, unknown> = {};
