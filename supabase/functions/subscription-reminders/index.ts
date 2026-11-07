@@ -6,6 +6,25 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 });
 const hour = 60 * 60 * 1000;
 
+async function recordDelivery(db: any, input: {
+  organizationId: string; subscriptionId?: string | null; recipientUserId?: string | null;
+  eventType: "payment_approved" | "subscription_expiring" | "subscription_expired" | "manual";
+  channel: "in_app" | "whatsapp" | "email"; status: "queued" | "sent" | "failed" | "skipped";
+  destination?: string | null; message?: string | null; idempotencyKey: string;
+  errorMessage?: string | null; metadata?: Record<string, unknown>;
+}) {
+  const now = new Date().toISOString();
+  const { error } = await db.from("platform_notification_delivery_logs").upsert({
+    organization_id: input.organizationId, subscription_id: input.subscriptionId ?? null,
+    recipient_user_id: input.recipientUserId ?? null, event_type: input.eventType,
+    channel: input.channel, status: input.status, destination: input.destination ?? null,
+    message: input.message ?? null, idempotency_key: input.idempotencyKey,
+    error_message: input.errorMessage ?? null, sent_at: input.status === "sent" ? now : null,
+    metadata: input.metadata ?? {}, updated_at: now,
+  }, { onConflict: "idempotency_key" });
+  if (error) console.error("[subscription-reminders delivery log]", input.channel, error.message);
+}
+
 async function sendTransactionalEmail(db: any, input: {
   template: string; to: string; name?: string; vars: Record<string, unknown>;
   idempotencyKey: string; organizationId: string; eventType: string;
@@ -122,12 +141,24 @@ Deno.serve(async (req: Request) => {
     const templateIndex = (now.getUTCDate() + org.name.length + reminderDays) % templates.length;
     const message = templates[templateIndex](org.name, planName, endDate);
 
-    const { data: inserted, error: logError } = await db.from("subscription_reminder_logs").upsert({
-      organization_id: org.id, subscription_id: sub.id, reminder_days: reminderDays, status: "queued",
-      message, updated_at: now.toISOString(),
-    }, { onConflict: "subscription_id,reminder_days", ignoreDuplicates: true }).select("id").maybeSingle();
-    if (logError) { result.errors.push(`Registo de aviso ${sub.id}: ${logError.message}`); continue; }
-    if (!inserted?.id) { result.skipped_duplicates += 1; continue; }
+    const priorReminder = await db.from("subscription_reminder_logs").select("id,status")
+      .eq("subscription_id", sub.id).eq("reminder_days", reminderDays).maybeSingle();
+    if (priorReminder.error) { result.errors.push(`Consulta de aviso ${sub.id}: ${priorReminder.error.message}`); continue; }
+    if (priorReminder.data?.status === "sent") { result.skipped_duplicates += 1; continue; }
+    let reminderLogId = priorReminder.data?.id as string | undefined;
+    if (reminderLogId) {
+      const retry = await db.from("subscription_reminder_logs").update({
+        status: "queued", message, error_message: null, updated_at: now.toISOString(),
+      }).eq("id", reminderLogId).select("id").single();
+      if (retry.error) { result.errors.push(`Reactivação de aviso ${sub.id}: ${retry.error.message}`); continue; }
+    } else {
+      const inserted = await db.from("subscription_reminder_logs").insert({
+        organization_id: org.id, subscription_id: sub.id, reminder_days: reminderDays, status: "queued",
+        message, updated_at: now.toISOString(),
+      }).select("id").single();
+      if (inserted.error) { result.errors.push(`Registo de aviso ${sub.id}: ${inserted.error.message}`); continue; }
+      reminderLogId = inserted.data.id;
+    }
 
     const ownerResult = await db.from("memberships").select("user_id").eq("organization_id", org.id).eq("role", "OWNER").limit(1).maybeSingle();
     let owner: any = null;
@@ -147,15 +178,17 @@ Deno.serve(async (req: Request) => {
       });
       if (!emailOk) result.errors.push(`${org.name}: falha no e-mail de aviso de renovação.`);
     }
-    const recipientPhone = String(org.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
+    const recipientPhone = String(metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
     const sessionResult = await db.from("whatsapp_sessions")
       .select("whatsapp_number_id,phone_number,display_name").eq("organization_id", org.id)
       .eq("status", "connected").not("whatsapp_number_id", "is", null).order("updated_at", { ascending: false }).limit(1).maybeSingle();
     const session = sessionResult.data;
     if (!recipientPhone || !session?.whatsapp_number_id) {
       const reason = !recipientPhone ? "Falta o WhatsApp de contacto do proprietário." : "Não existe sessão WhatsApp ligada para esta organização.";
-      await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone || null, whatsapp_number_id: session?.whatsapp_number_id ?? null, error_message: reason, updated_at: new Date().toISOString() }).eq("id", inserted.id);
+      await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone || null, whatsapp_number_id: session?.whatsapp_number_id ?? null, error_message: reason, updated_at: new Date().toISOString() }).eq("id", reminderLogId!);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "failed", destination: recipientPhone || null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, errorMessage: reason, metadata: { reminder_days: reminderDays } });
       result.queued_or_failed += 1;
       continue;
     }
@@ -172,11 +205,15 @@ Deno.serve(async (req: Request) => {
       if (!response.ok || responseBody?.ok !== true) throw new Error(`WhatsApp Engine HTTP ${response.status}: ${String(responseBody?.error ?? "envio não confirmado").slice(0, 240)}`);
       await db.from("subscription_reminder_logs").update({ status: "sent", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }).eq("id", inserted.id);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: true } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "sent", destination: recipientPhone, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, metadata: { reminder_days: reminderDays, whatsapp_number_id: session.whatsapp_number_id } });
       result.whatsapp_sent += 1;
     } catch (error) {
       const messageError = error instanceof Error ? error.message : String(error);
       await db.from("subscription_reminder_logs").update({ status: "failed", recipient_phone: recipientPhone, whatsapp_number_id: session.whatsapp_number_id, error_message: messageError.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", inserted.id);
       await db.from("organization_notifications").insert({ organization_id: org.id, title: "A sua assinatura está perto de terminar", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", reminder_days: reminderDays, whatsapp_sent: false } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "in_app", status: "sent", destination: owner?.email ?? null, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:in_app`, metadata: { reminder_days: reminderDays } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerResult.data?.user_id ?? null, eventType: "subscription_expiring", channel: "whatsapp", status: "failed", destination: recipientPhone, message, idempotencyKey: `subscription_expiring:${sub.id}:${reminderDays}:whatsapp`, errorMessage: messageError.slice(0, 500), metadata: { reminder_days: reminderDays } });
       result.queued_or_failed += 1;
       result.errors.push(`${org.name}: ${messageError}`);
     }
