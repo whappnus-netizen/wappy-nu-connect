@@ -138,7 +138,7 @@ async function recordDetectedPaymentProof(input: {
   return true;
 }
 
-const paymentContextPattern = /\b(pagamento|pagamentos|transfer[eê]ncia|comprovativo|recibo|paguei|pagar|liquidar|valor recebido)\b/i;
+const paymentContextPattern = /\b(pagamento|pagamentos|transfer[eê]ncias?|comprovativos?|recibos?|paguei|pagar|liquidar|valor recebido)\b/i;
 
 async function hasRecentPaymentContext(
   organizationId: string,
