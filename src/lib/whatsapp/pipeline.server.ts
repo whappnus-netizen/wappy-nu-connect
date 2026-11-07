@@ -85,9 +85,21 @@ async function recordDetectedPaymentProof(input: {
   const receivedAt = incoming.sentAt && Number.isFinite(new Date(incoming.sentAt).getTime())
     ? new Date(incoming.sentAt).toISOString()
     : new Date().toISOString();
+  let duplicateReference = false;
+  if (analysis.reference) {
+    const { data: existingReference } = await admin.from("customer_payments")
+      .select("id")
+      .eq("organization_id", input.organizationId)
+      .eq("reference", analysis.reference)
+      .limit(1)
+      .maybeSingle();
+    duplicateReference = Boolean(existingReference?.id);
+  }
   const extractionData = {
     confidence: analysis.confidence,
     originalCurrency: analysis.originalCurrency,
+    reference: analysis.reference,
+    duplicateReference,
     payerName: analysis.payerName,
     beneficiaryName: analysis.beneficiaryName,
     transactionDate: analysis.transactionDate,
