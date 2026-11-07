@@ -153,17 +153,21 @@ function PaymentsPage() {
   });
 
   const openReceipt = async (payment: Payment) => {
-    let signedUrl: string | null = null;
-    if (payment.detection_source === "whatsapp_ai" && payment.source_message_id && orgId) {
-      const result = await getMessageMediaSignedUrlFn({ data: { organizationId: orgId, messageId: payment.source_message_id } });
-      signedUrl = result.url;
-    } else if (payment.receipt_path) {
-      const safeBucket = payment.receipt_bucket === "whatsapp-incoming-media" ? "whatsapp-incoming-media" : "customer-payment-receipts";
-      const { data, error } = await supabase.storage.from(safeBucket).createSignedUrl(payment.receipt_path, 60);
-      if (!error) signedUrl = data?.signedUrl ?? null;
+    try {
+      let signedUrl: string | null = null;
+      if (payment.detection_source === "whatsapp_ai" && payment.source_message_id && orgId) {
+        const result = await getMessageMediaSignedUrlFn({ data: { organizationId: orgId, messageId: payment.source_message_id } });
+        signedUrl = result.url;
+      } else if (payment.receipt_path) {
+        const safeBucket = payment.receipt_bucket === "whatsapp-incoming-media" ? "whatsapp-incoming-media" : "customer-payment-receipts";
+        const { data, error } = await supabase.storage.from(safeBucket).createSignedUrl(payment.receipt_path, 60);
+        if (!error) signedUrl = data?.signedUrl ?? null;
+      }
+      if (!signedUrl) { setReviewError("Não foi possível abrir o comprovativo. Verifique as permissões da organização."); return; }
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      setReviewError("Não foi possível abrir o comprovativo. Actualize a página e tente novamente.");
     }
-    if (!signedUrl) { setReviewError("Não foi possível abrir o comprovativo. Verifique as permissões da organização."); return; }
-    window.open(signedUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
