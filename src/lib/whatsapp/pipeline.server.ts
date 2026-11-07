@@ -97,6 +97,7 @@ async function recordDetectedPaymentProof(input: {
   }
   const extractionData = {
     confidence: analysis.confidence,
+    mimeType: incoming.mediaMimeType,
     originalCurrency: analysis.originalCurrency,
     reference: analysis.reference,
     duplicateReference,
