@@ -53,16 +53,21 @@ async function sendOwnerWhatsApp(db:any,p:{
    },{onConflict:"idempotency_key"});
    return false;
   }
-  const sessionResult=await db.from("whatsapp_sessions")
-   .select("whatsapp_number_id").eq("organization_id",p.organizationId).eq("status","connected")
-   .not("whatsapp_number_id","is",null).order("updated_at",{ascending:false}).limit(1).maybeSingle();
+  const {data:senderConfig,error:senderConfigError}=await db.from("subscription_reminder_config")
+   .select("platform_sender_organization_id,platform_sender_whatsapp_number_id").eq("id",true).maybeSingle();
+  if(senderConfigError)throw senderConfigError;
+  const senderOrganizationId=senderConfig?.platform_sender_organization_id??null;
+  const senderNumberId=senderConfig?.platform_sender_whatsapp_number_id??null;
+  const sessionResult=senderOrganizationId&&senderNumberId?await db.from("whatsapp_sessions")
+   .select("whatsapp_number_id").eq("organization_id",senderOrganizationId).eq("whatsapp_number_id",senderNumberId)
+   .eq("status","connected").maybeSingle():{data:null,error:null};
   if(sessionResult.error)throw sessionResult.error;
   const session=sessionResult.data;
-  if(!session?.whatsapp_number_id){
+  if(!session?.whatsapp_number_id||!senderOrganizationId){
    await db.from("platform_notification_delivery_logs").upsert({
     organization_id:p.organizationId,recipient_user_id:p.ownerUserId,event_type:p.eventType,channel:"whatsapp",
     status:"failed",destination:phone,message:p.message,idempotency_key:logKey,
-    error_message:"A organização não tem uma sessão WhatsApp ligada para enviar o aviso ao proprietário.",
+    error_message:"O número emissor oficial WHAPPNUS não está ligado.",
     updated_at:now,metadata:{source:"kursinha-webhook"}
    },{onConflict:"idempotency_key"});
    return false;
@@ -70,14 +75,14 @@ async function sendOwnerWhatsApp(db:any,p:{
   const queued=await db.from("platform_notification_delivery_logs").upsert({
    organization_id:p.organizationId,recipient_user_id:p.ownerUserId,event_type:p.eventType,channel:"whatsapp",
    status:"queued",destination:phone,message:p.message,idempotency_key:logKey,error_message:null,
-   updated_at:now,metadata:{source:"kursinha-webhook",whatsapp_number_id:session.whatsapp_number_id}
+   updated_at:now,metadata:{source:"kursinha-webhook",whatsapp_number_id:session.whatsapp_number_id,sender_organization_id:senderOrganizationId}
   },{onConflict:"idempotency_key"});
   if(queued.error)throw queued.error;
   const engineUrl=Deno.env.get("WHATSAPP_ENGINE_URL")??"https://whappnus-whatsapp-engine-production.up.railway.app";
   const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
   const response=await fetch(`${engineUrl.replace(/\/$/,"")}/internal/subscription-reminder`,{
    method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${serviceKey}`},
-   body:JSON.stringify({sessionId:`${p.organizationId}:${session.whatsapp_number_id}`,to:phone,body:p.message}),
+   body:JSON.stringify({sessionId:`${senderOrganizationId}:${session.whatsapp_number_id}`,to:phone,body:p.message}),
    signal:AbortSignal.timeout(20000)
   });
   const payload:any=await response.json().catch(()=>({}));
