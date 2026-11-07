@@ -814,6 +814,9 @@ export async function processIncomingMessage(
             detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type, steps: executionSteps.length },
           });
           if (selectedReason !== "welcome_automation") {
+            if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+              await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
+            }
             return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
           }
           // A saudação não deve impedir a IA de responder à pergunta da primeira mensagem.
@@ -871,6 +874,9 @@ export async function processIncomingMessage(
     .eq("is_ai", true)
     .gte("created_at", since);
   if ((count ?? 0) >= 6) {
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+      await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
+    }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
       whatsappNumberId: number.id,
       provider: incoming.provider,
