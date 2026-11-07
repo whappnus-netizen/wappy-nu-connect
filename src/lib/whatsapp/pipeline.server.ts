@@ -115,7 +115,7 @@ async function recordDetectedPaymentProof(input: {
     description,
     item_name: itemName,
     payment_method: analysis.paymentMethod,
-    reference: analysis.reference,
+    reference: duplicateReference ? null : analysis.reference,
     status: "pending_review",
     receipt_path: incoming.mediaId,
     receipt_bucket: "whatsapp-incoming-media",
