@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/client";
 import { AuthCard } from "@/components/app/auth-card";
 import { Button } from "@/components/ui/button";
@@ -10,10 +9,10 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/auth/recuperar")({
   head: () => ({
     meta: [
-      { title: "Recuperar palavra-passe — Wappy Nus" },
-      { name: "description", content: "Receba um link para redefinir a palavra-passe da sua conta Wappy Nus." },
+      { title: "Recuperar palavra-passe — WHAPPNUS" },
+      { name: "description", content: "Receba um link para redefinir a palavra-passe da sua conta WHAPPNUS." },
       { property: "og:title", content: "Recuperar palavra-passe — Wappy Nus" },
-      { property: "og:description", content: "Redefinição de acesso à conta Wappy Nus." },
+      { property: "og:description", content: "Redefinição segura de acesso à conta WHAPPNUS." },
     ],
   }),
   component: RecoverPage,
@@ -27,21 +26,24 @@ function RecoverPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/login`,
-    });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      if (error) throw error;
+      setSent(true);
+    } catch {
+      // Keep the response generic so the form never reveals whether an email is registered.
+      setSent(true);
+    } finally {
+      setLoading(false);
     }
-    setSent(true);
   }
 
   return (
     <AuthCard
       title="Recuperar palavra-passe"
-      subtitle="Enviamos um link de redefinição para o seu email."
+      subtitle="Enviamos um link seguro para redefinir a sua palavra-passe."
       footer={<Link to="/auth/login" className="font-medium text-primary">Voltar ao login</Link>}
     >
       {sent ? (

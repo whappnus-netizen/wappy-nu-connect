@@ -61,8 +61,8 @@ Deno.serve(async (req: Request) => {
     const permissions = admin.permissions ?? {};
     return admin.role === "owner" ||
       (admin.role === "admin" && !["team.promote_owner"].includes(permission)) ||
-      admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "notifications.list", "dashboard"].includes(permission) ||
-      admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "notifications.list", "health", "dashboard"].includes(permission) ||
+      admin.role === "billing" && ["plans.list", "plans.save", "subscriptions.list", "payments.list", "notifications.list", "notification-deliveries.list", "dashboard"].includes(permission) ||
+      admin.role === "support" && ["organizations.list", "plans.list", "subscriptions.list", "payments.list", "notifications.list", "notification-deliveries.list", "health", "dashboard", "support.tickets.list", "support.messages.list", "support.ticket.reply", "support.ticket.status"].includes(permission) ||
       permissions[permission] === true;
   };
   if (!action) return fail("Ação não especificada.");
@@ -428,12 +428,20 @@ Deno.serve(async (req: Request) => {
       const rows = data ?? [];
       const ids = rows.map((row: any) => row.id);
       const orgIds = [...new Set(rows.map((row: any) => row.organization_id))];
-      const [logs, sessions, memberships] = await Promise.all([
+      const [logs, memberships, senderConfigResult] = await Promise.all([
         ids.length ? db.from("subscription_reminder_logs").select("id,subscription_id,reminder_days,status,recipient_phone,whatsapp_number_id,error_message,sent_at,created_at").in("subscription_id", ids).order("created_at", { ascending: false }) : { data: [], error: null },
-        orgIds.length ? db.from("whatsapp_sessions").select("organization_id,whatsapp_number_id,status,phone_number,display_name").in("organization_id", orgIds).eq("status", "connected") : { data: [], error: null },
         orgIds.length ? db.from("memberships").select("organization_id,user_id,role").in("organization_id", orgIds) : { data: [], error: null },
+        db.from("subscription_reminder_config").select("platform_sender_organization_id,platform_sender_whatsapp_number_id").eq("id", true).maybeSingle(),
       ]);
-      if (logs.error) throw logs.error; if (sessions.error) throw sessions.error; if (memberships.error) throw memberships.error;
+      if (logs.error) throw logs.error; if (memberships.error) throw memberships.error; if (senderConfigResult.error) throw senderConfigResult.error;
+      const senderOrgId = senderConfigResult.data?.platform_sender_organization_id ?? null;
+      const senderNumberId = senderConfigResult.data?.platform_sender_whatsapp_number_id ?? null;
+      const senderSessionResult = senderOrgId && senderNumberId
+        ? await db.from("whatsapp_sessions").select("whatsapp_number_id,status,phone_number,display_name")
+            .eq("organization_id", senderOrgId).eq("whatsapp_number_id", senderNumberId).eq("status", "connected").maybeSingle()
+        : { data: null, error: null };
+      if (senderSessionResult.error) throw senderSessionResult.error;
+      const senderSession = senderSessionResult.data ? { ...senderSessionResult.data, organization_id: senderOrgId } : null;
       const ownerByOrg = new Map<string, string>();
       for (const member of memberships.data ?? []) if (member.role === "OWNER" || member.role === "owner") ownerByOrg.set(member.organization_id, member.user_id);
       const ownerIds = [...new Set([...ownerByOrg.values()])];
@@ -441,19 +449,112 @@ Deno.serve(async (req: Request) => {
       const authById = new Map(authRows);
       const logsBySubscription = new Map<string, any>();
       for (const log of logs.data ?? []) if (!logsBySubscription.has(log.subscription_id)) logsBySubscription.set(log.subscription_id, log);
-      const sessionsByOrg = new Map((sessions.data ?? []).map((row: any) => [row.organization_id, row]));
       return json({ ok: true, data: rows.map((row: any) => {
         const end = row.current_period_end ? new Date(row.current_period_end).getTime() : null;
         const reminder = logsBySubscription.get(row.id);
         const owner = authById.get(ownerByOrg.get(row.organization_id) ?? "");
         const metadata = owner?.user_metadata ?? {};
-        return { ...row, contact_phone: row.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
+        return { ...row, contact_phone: metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
           client_name: metadata.full_name ?? metadata.name ?? null, client_email: owner?.email ?? null,
           days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
           reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,
           reminder_sent_at: reminder?.sent_at ?? null, reminder_error: reminder?.error_message ?? null,
-          whatsapp_session: sessionsByOrg.get(row.organization_id) ?? null };
+          whatsapp_session: senderSession, whatsapp_sender: senderSession?.display_name ?? "WHAPPNUS" };
       }) });
+    }
+
+    if (action === "support.tickets.list") {
+      const requestedStatus = str(input.status, 40);
+      const search = str(input.search, 120).replace(/[,%()]/g, "");
+      let query = db.from("support_tickets")
+        .select("id,organization_id,created_by,subject,category,priority,status,assigned_admin_id,last_message_at,resolved_at,created_at,updated_at,organizations(name,slug)")
+        .order("last_message_at", { ascending: false }).limit(200);
+      if (requestedStatus && requestedStatus !== "all") query = query.eq("status", requestedStatus);
+      const { data, error } = await query;
+      if (error) throw error;
+      const rows = data ?? [];
+      const userIds = [...new Set(rows.map((row: any) => row.created_by).filter(Boolean))];
+      const userRows = await Promise.all(userIds.map(async (id: string) => {
+        const { data: result } = await db.auth.admin.getUserById(id);
+        return [id, result.user ?? null] as const;
+      }));
+      const users = new Map(userRows);
+      const enriched = rows.map((row: any) => {
+        const user = users.get(row.created_by);
+        const metadata = user?.user_metadata ?? {};
+        return { ...row, client_name: metadata.full_name ?? metadata.name ?? null,
+          client_email: user?.email ?? null, client_phone: metadata.phone ?? user?.phone ?? null };
+      });
+      return json({ ok: true, data: enriched.filter((row: any) => !search ||
+        [row.subject, row.client_name, row.client_email, row.organizations?.name].some((value: unknown) =>
+          String(value ?? "").toLowerCase().includes(search.toLowerCase()))) });
+    }
+
+    if (action === "support.messages.list") {
+      const ticketId = str(input.ticket_id, 60);
+      if (!ticketId) return fail("Selecciona um ticket.");
+      const { data, error } = await db.from("support_messages")
+        .select("id,ticket_id,organization_id,author_user_id,author_type,body,is_internal,created_at")
+        .eq("ticket_id", ticketId).order("created_at", { ascending: true }).limit(500);
+      if (error) throw error;
+      return json({ ok: true, data: data ?? [] });
+    }
+
+    if (action === "support.ticket.reply") {
+      const ticketId = str(input.ticket_id, 60);
+      const body = str(input.body, 10000);
+      if (!ticketId || !body) return fail("O ticket e a mensagem são obrigatórios.");
+      const { data: ticket, error: ticketError } = await db.from("support_tickets")
+        .select("id,organization_id,subject,created_by").eq("id", ticketId).maybeSingle();
+      if (ticketError) throw ticketError;
+      if (!ticket) return fail("Ticket não encontrado.", 404);
+      const { data: message, error } = await db.from("support_messages").insert({
+        ticket_id: ticket.id, organization_id: ticket.organization_id, author_user_id: actor.id,
+        author_type: "admin", body, is_internal: false,
+      }).select("id,ticket_id,organization_id,author_user_id,author_type,body,created_at").single();
+      if (error) throw error;
+      const notificationBody = "A equipa WHAPPNUS respondeu ao teu pedido #" + ticket.id.slice(0, 8) + ": " + body.slice(0, 700);
+      const { error: notificationError } = await db.from("organization_notifications").insert({
+        organization_id: ticket.organization_id, title: "Nova resposta do suporte", body: notificationBody,
+        notification_type: "support", created_by: actor.id, metadata: { ticket_id: ticket.id, source: "support_ticket" },
+      });
+      if (notificationError) console.error("support notification insert failed", notificationError.message);
+      const log = await db.from("platform_notification_delivery_logs").upsert({
+        organization_id: ticket.organization_id, recipient_user_id: ticket.created_by, event_type: "manual",
+        channel: "in_app", status: "sent", destination: ticket.created_by, message: notificationBody,
+        idempotency_key: "support_reply:" + message.id, sent_at: new Date().toISOString(),
+        metadata: { ticket_id: ticket.id, message_id: message.id, source: "support_ticket" },
+      }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+      if (log.error) console.error("support delivery log failed", log.error.message);
+      await audit("support.ticket.replied", "support_ticket", ticket.id, ticket.organization_id, { message_id: message.id });
+      return json({ ok: true, data: message });
+    }
+
+    if (action === "support.ticket.status") {
+      const ticketId = str(input.ticket_id, 60);
+      const status = str(input.status, 40);
+      if (!ticketId || !["open", "in_progress", "waiting_customer", "resolved", "closed"].includes(status)) {
+        return fail("Estado do ticket inválido.");
+      }
+      const { data: before, error: beforeError } = await db.from("support_tickets")
+        .select("id,organization_id,status").eq("id", ticketId).maybeSingle();
+      if (beforeError) throw beforeError;
+      if (!before) return fail("Ticket não encontrado.", 404);
+      const { data, error } = await db.from("support_tickets").update({
+        status, resolved_at: ["resolved", "closed"].includes(status) ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", ticketId).select("id,status,resolved_at").single();
+      if (error) throw error;
+      await audit("support.ticket.status_changed", "support_ticket", ticketId, before.organization_id, { from: before.status, to: status });
+      return json({ ok: true, data });
+    }
+
+    if (action === "notification-deliveries.list") {
+      const { data, error } = await db.from("platform_notification_delivery_logs")
+        .select("id,organization_id,subscription_id,recipient_user_id,event_type,channel,status,destination,message,idempotency_key,error_message,sent_at,created_at,metadata,organizations(name,slug)")
+        .order("created_at", { ascending: false }).limit(300);
+      if (error) throw error;
+      return json({ ok: true, data: data ?? [] });
     }
 
     if (action === "notifications.list") {

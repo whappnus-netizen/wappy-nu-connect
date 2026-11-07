@@ -29,6 +29,77 @@ async function sendEmail(db:any,p:{template:string;to:string;name?:string;vars?:
   if(ins.data?.id)await db.from("email_delivery_logs").update(r.ok&&j.ok?{status:"sent",provider_message_id:j.messageId??null,sent_at:new Date().toISOString(),error_message:null}:{status:"failed",error_message:String(j.error??r.status).slice(0,300)}).eq("id",ins.data.id);
  }catch(e){console.error("[email]",p.template,e instanceof Error?e.message:e);await db.from("email_delivery_logs").update({status:"failed",error_message:"network_uncertain"}).eq("idempotency_key",p.idempotencyKey).eq("status","sending");}
 }
+async function sendOwnerWhatsApp(db:any,p:{
+ organizationId:string;ownerUserId:string;eventType:"payment_approved"|"subscription_expiring"|"subscription_expired";
+ idempotencyKey:string;message:string;
+}){
+ const now=new Date().toISOString();
+ const logKey=p.idempotencyKey+":whatsapp";
+ try{
+  const existing=await db.from("platform_notification_delivery_logs").select("id,status")
+   .eq("idempotency_key",logKey).maybeSingle();
+  if(existing.error)throw existing.error;
+  if(existing.data?.status==="sent")return true;
+  const {data:userData,error:userError}=await db.auth.admin.getUserById(p.ownerUserId);
+  if(userError)throw userError;
+  const owner=userData.user,metadata=owner?.user_metadata??{};
+  const phone=String(metadata.phone??metadata.phone_number??owner?.phone??"").trim();
+  if(!phone){
+   await db.from("platform_notification_delivery_logs").upsert({
+    organization_id:p.organizationId,recipient_user_id:p.ownerUserId,event_type:p.eventType,channel:"whatsapp",
+    status:"skipped",destination:null,message:p.message,idempotency_key:logKey,
+    error_message:"O proprietário ainda não tem um WhatsApp pessoal registado.",updated_at:now,
+    metadata:{source:"kursinha-webhook"}
+   },{onConflict:"idempotency_key"});
+   return false;
+  }
+  const {data:senderConfig,error:senderConfigError}=await db.from("subscription_reminder_config")
+   .select("platform_sender_organization_id,platform_sender_whatsapp_number_id").eq("id",true).maybeSingle();
+  if(senderConfigError)throw senderConfigError;
+  const senderOrganizationId=senderConfig?.platform_sender_organization_id??null;
+  const senderNumberId=senderConfig?.platform_sender_whatsapp_number_id??null;
+  const sessionResult=senderOrganizationId&&senderNumberId?await db.from("whatsapp_sessions")
+   .select("whatsapp_number_id").eq("organization_id",senderOrganizationId).eq("whatsapp_number_id",senderNumberId)
+   .eq("status","connected").maybeSingle():{data:null,error:null};
+  if(sessionResult.error)throw sessionResult.error;
+  const session=sessionResult.data;
+  if(!session?.whatsapp_number_id||!senderOrganizationId){
+   await db.from("platform_notification_delivery_logs").upsert({
+    organization_id:p.organizationId,recipient_user_id:p.ownerUserId,event_type:p.eventType,channel:"whatsapp",
+    status:"failed",destination:phone,message:p.message,idempotency_key:logKey,
+    error_message:"O número emissor oficial WHAPPNUS não está ligado.",
+    updated_at:now,metadata:{source:"kursinha-webhook"}
+   },{onConflict:"idempotency_key"});
+   return false;
+  }
+  const queued=await db.from("platform_notification_delivery_logs").upsert({
+   organization_id:p.organizationId,recipient_user_id:p.ownerUserId,event_type:p.eventType,channel:"whatsapp",
+   status:"queued",destination:phone,message:p.message,idempotency_key:logKey,error_message:null,
+   updated_at:now,metadata:{source:"kursinha-webhook",whatsapp_number_id:session.whatsapp_number_id,sender_organization_id:senderOrganizationId}
+  },{onConflict:"idempotency_key"});
+  if(queued.error)throw queued.error;
+  const engineUrl=Deno.env.get("WHATSAPP_ENGINE_URL")??"https://whappnus-whatsapp-engine-production.up.railway.app";
+  const serviceKey=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"";
+  const response=await fetch(`${engineUrl.replace(/\/$/,"")}/internal/subscription-reminder`,{
+   method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${serviceKey}`},
+   body:JSON.stringify({sessionId:`${senderOrganizationId}:${session.whatsapp_number_id}`,to:phone,body:p.message}),
+   signal:AbortSignal.timeout(20000)
+  });
+  const payload:any=await response.json().catch(()=>({}));
+  if(!response.ok||payload?.ok!==true)throw new Error(`WhatsApp HTTP ${response.status}: ${String(payload?.error??"envio não confirmado").slice(0,240)}`);
+  await db.from("platform_notification_delivery_logs").update({status:"sent",sent_at:new Date().toISOString(),error_message:null,updated_at:new Date().toISOString()}).eq("idempotency_key",logKey);
+  return true;
+ }catch(error){
+  const message=error instanceof Error?error.message:"Falha no envio WhatsApp.";
+  console.error("[kursinha-webhook whatsapp]",p.idempotencyKey,message);
+  await db.from("platform_notification_delivery_logs").upsert({
+   organization_id:p.organizationId,recipient_user_id:p.ownerUserId,event_type:p.eventType,channel:"whatsapp",
+   status:"failed",message:p.message,idempotency_key:logKey,error_message:message.slice(0,500),
+   updated_at:new Date().toISOString(),metadata:{source:"kursinha-webhook"}
+  },{onConflict:"idempotency_key"});
+  return false;
+ }
+}
 async function recordAffiliateCommission(db:any,referredUserId:string,saleId:string,planId:string|null|undefined,price:number,now:string){
  if(!referredUserId||!planId||!Number.isFinite(price)||price<=0)return;
  const referral=await db.from("affiliate_referrals").select("id,affiliate_user_id,status,expires_at").eq("referred_user_id",referredUserId).in("status",["active","converted"]).maybeSingle();if(referral.error)throw referral.error;
@@ -113,6 +184,8 @@ Deno.serve(async(req:Request)=>{
        const sub:any=ss.data?.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",ss.data.subscription_id).maybeSingle():{data:null};
        const s0:any=sub.data;
        await sendEmail(db,{template:"payment_approved",to:buyer,name:common.buyer_name,event,organizationId:ids[0],idempotencyKey:"payment_approved:"+saleId,vars:{plan:s0?.subscription_plans?.name||productName,organization:s0?.organizations?.name,amount:common.amount_aoa,approved_at:now,period_start:s0?.current_period_start,period_end:s0?.current_period_end,reference:common.order_id||saleId}});
+       const ownerMessage=`O teu pagamento WHAPPNUS foi confirmado. O plano ${s0?.subscription_plans?.name||productName} da organização ${s0?.organizations?.name||"da tua conta"} está activo. A validade pode ser consultada no painel Assinatura.`;
+       await sendOwnerWhatsApp(db,{organizationId:ids[0],ownerUserId:pr.data.id,eventType:"payment_approved",idempotencyKey:"payment_approved:"+saleId,message:ownerMessage});
       }
      }
     }
@@ -203,6 +276,8 @@ Deno.serve(async(req:Request)=>{
   const subInfo=si.subscription_id?await db.from("organization_subscriptions").select("current_period_start,current_period_end,subscription_plans(name),organizations(name)").eq("id",si.subscription_id).maybeSingle():{data:null,error:null};
   const ss:any=subInfo.data;
   await sendEmail(db,{template:"payment_approved",to:si.buyer_email,name:si.buyer_name,event:"sale.approved",organizationId:si.organization_id,idempotencyKey:"payment_approved:"+sale.sale_id,vars:{plan:ss?.subscription_plans?.name||plan.data.name,organization:ss?.organizations?.name,amount:si.amount_aoa,approved_at:si.approved_at||now,period_start:ss?.current_period_start,period_end:ss?.current_period_end,reference:si.order_id||sale.sale_id}});
+  const ownerMessage=`O teu pagamento WHAPPNUS foi confirmado. O plano ${ss?.subscription_plans?.name||plan.data.name} da organização ${ss?.organizations?.name||"da tua conta"} está activo. A validade pode ser consultada no painel Assinatura.`;
+  await sendOwnerWhatsApp(db,{organizationId:si.organization_id,ownerUserId:u.id,eventType:"payment_approved",idempotencyKey:"payment_approved:"+sale.sale_id,message:ownerMessage});
  }
  return reply({ok:true,applied:true,plan_code:planCode,organization_id:orgId});
 });

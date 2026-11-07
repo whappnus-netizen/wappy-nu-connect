@@ -10,6 +10,8 @@ import {
   Workflow,
   Sparkles,
   ReceiptText,
+  CreditCard,
+  LifeBuoy,
   UsersRound,
   Settings,
   LogOut,
@@ -28,6 +30,7 @@ import { supabase } from "@/lib/supabase/client";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/assinatura", label: "Assinatura", icon: CreditCard },
   { to: "/inbox", label: "Inbox", icon: MessagesSquare },
   { to: "/whatsapp", label: "WhatsApp", icon: Smartphone },
   { to: "/contactos", label: "Contactos", icon: Users },
@@ -39,6 +42,7 @@ const nav = [
   { to: "/equipa", label: "Equipa", icon: UsersRound },
   { to: "/definicoes", label: "Definições", icon: Settings },
   { to: "/notificacoes", label: "Notificações", icon: Bell },
+  { to: "/suporte", label: "Suporte", icon: LifeBuoy },
 ] as const;
 
 export function Logo({ className }: { className?: string }) {

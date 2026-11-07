@@ -1,0 +1,1 @@
+grant all on public.support_tickets, public.support_messages to service_role;
