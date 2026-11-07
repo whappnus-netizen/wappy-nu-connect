@@ -108,10 +108,10 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
   const configuredUrl = process.env["WHAPPNUS_AI_ENGINE_URL"];
   const secret = process.env["WHAPPNUS_AI_ENGINE_SECRET"];
   if (!configuredUrl || !secret) throw new Error("Motor de IA não configurado para analisar comprovativos.");
-  const url = /^https?:\\/\\//i.test(configuredUrl) ? configuredUrl : "https://" + configuredUrl;
+  const url = /^https?:\/\//i.test(configuredUrl) ? configuredUrl : "https://" + configuredUrl;
   const engineUrl = new URL(url);
-  engineUrl.pathname = engineUrl.pathname.replace(/\\/$/, "");
-  const response = await fetch(engineUrl.toString().replace(/\\/$/, "") + "/v1/payment-proof/analyze", {
+  engineUrl.pathname = engineUrl.pathname.replace(/\/$/, "");
+  const response = await fetch(engineUrl.toString().replace(/\/$/, "") + "/v1/payment-proof/analyze", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + secret },
     body: JSON.stringify(input),
