@@ -29,6 +29,7 @@ function SettingsPage() {
   const [timezone, setTimezone] = useState("Africa/Luanda");
   const [currency, setCurrency] = useState("AOA");
   const [contactPhone, setContactPhone] = useState("");
+  const [personalWhatsapp, setPersonalWhatsapp] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [photoTarget, setPhotoTarget] = useState<"profile" | "organization">("profile");
@@ -56,6 +57,11 @@ function SettingsPage() {
     const signupPhone = String(user?.user_metadata?.["phone"] ?? "").trim();
     setContactPhone(savedPhone || signupPhone);
   }, [contactQuery.data, user?.user_metadata?.["phone"]]);
+
+  useEffect(() => {
+    const accountPhone = String(user?.user_metadata?.["phone"] ?? user?.phone ?? "").trim();
+    setPersonalWhatsapp(accountPhone);
+  }, [user?.id, user?.user_metadata?.["phone"], user?.phone]);
 
   const assetsQuery = useQuery({
     queryKey: ["settings-assets", user?.id, orgId],
@@ -122,6 +128,26 @@ function SettingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const savePersonalWhatsapp = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error("Sessão não encontrada.");
+      const digits = personalWhatsapp.trim().replace(/[^0-9]/g, "").replace(/^00/, "");
+      const normalizedDigits = digits.length === 9 ? "244" + digits : digits;
+      if (normalizedDigits.length < 8 || normalizedDigits.length > 15) {
+        throw new Error("Indica um WhatsApp pessoal válido com o indicativo do país, por exemplo +244.");
+      }
+      const normalized = "+" + normalizedDigits;
+      const { error } = await supabase.auth.updateUser({ data: { phone: normalized } });
+      if (error) throw new Error(error.message);
+      return normalized;
+    },
+    onSuccess: (normalized) => {
+      setPersonalWhatsapp(normalized);
+      toast.success("WhatsApp pessoal para avisos WHAPPNUS actualizado.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       if (!orgId) throw new Error("Não foi encontrada uma organização activa.");
@@ -159,7 +185,7 @@ function SettingsPage() {
             <div className="space-y-1.5"><Label htmlFor="org-name">Nome da organização</Label><Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={!canEdit || save.isPending} required /></div>
             <div className="space-y-1.5"><Label htmlFor="org-timezone">Fuso horário (IANA)</Label><Input id="org-timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Africa/Luanda" disabled={!canEdit || save.isPending} required /><p className="text-xs text-muted-foreground">Exemplo para Angola: Africa/Luanda.</p></div>
             <div className="space-y-1.5"><Label htmlFor="org-currency">Moeda (código ISO)</Label><Input id="org-currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} placeholder="AOA" disabled={!canEdit || save.isPending} required /></div>
-            <div className="space-y-1.5"><Label htmlFor="org-contact-phone">WhatsApp de contacto para avisos da assinatura</Label><Input id="org-contact-phone" type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} maxLength={40} placeholder="+244 9xx xxx xxx" disabled={!canEdit || save.isPending} /><p className="text-xs text-muted-foreground">Receberá os avisos importantes sobre renovação neste número. Use o indicativo do país, por exemplo +244.</p></div>
+            <div className="space-y-1.5"><Label htmlFor="org-contact-phone">WhatsApp de contacto da empresa</Label><Input id="org-contact-phone" type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} maxLength={40} placeholder="+244 9xx xxx xxx" disabled={!canEdit || save.isPending} /><p className="text-xs text-muted-foreground">Número público de contacto da organização. Os avisos privados de conta e renovação são enviados para o WhatsApp pessoal indicado na secção Conta.</p></div>
             {error && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">{error}</p>}
             {notice && <p role="status" className="rounded-md border border-primary/30 bg-primary/5 p-2 text-sm">{notice}</p>}
             {canEdit ? <Button type="submit" disabled={save.isPending}>{save.isPending ? "A guardar…" : "Guardar definições"}</Button> : <p className="text-xs text-muted-foreground">Contacte o OWNER ou ADMIN para alterar estas definições.</p>}
@@ -173,6 +199,10 @@ function SettingsPage() {
             <Row label="Nome" value={(user?.user_metadata?.["full_name"] as string) ?? "—"} />
             <Row label="Fuso horário da organização" value={timezone} />
             <Row label="Moeda da organização" value={currency} />
+            <form className="mt-4 space-y-3 border-t border-border pt-4" onSubmit={(e) => { e.preventDefault(); savePersonalWhatsapp.mutate(); }}>
+              <div className="space-y-1.5"><Label htmlFor="personal-whatsapp">WhatsApp pessoal para avisos da WHAPPNUS</Label><Input id="personal-whatsapp" type="tel" value={personalWhatsapp} onChange={(e) => setPersonalWhatsapp(e.target.value)} maxLength={24} placeholder="+244 9xx xxx xxx" disabled={savePersonalWhatsapp.isPending} /><p className="text-xs text-muted-foreground">Este é o número privado que recebe avisos de renovação e confirmação de pagamento enviados pelo número oficial WHAPPNUS. Não é o WhatsApp comercial ligado à tua organização.</p></div>
+              <Button type="submit" size="sm" disabled={savePersonalWhatsapp.isPending}>{savePersonalWhatsapp.isPending ? "A guardar…" : "Guardar WhatsApp pessoal"}</Button>
+            </form>
           </div>
         </section>
 
