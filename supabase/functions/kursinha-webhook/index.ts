@@ -127,7 +127,8 @@ Deno.serve(async(req:Request)=>{
  if(!url||!anon||!service)return reply({ok:false,error:"Configuração do servidor incompleta."},500);
  const db=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
  const sig=req.headers.get("X-Webhook-Signature");
- if(sig===null)return reply({ok:false,error:"Assinatura obrigatória."},401);
+ // Kursinha server-to-server deliveries must carry HMAC. Authenticated app actions
+ // (purchase recovery) use the Supabase user JWT and are handled below.
  if(sig!==null){
   const secret=Deno.env.get("KURSINHA_WEBHOOK_SECRET");if(!secret)return reply({ok:false,error:"Webhook não configurado no servidor."},503);
   const raw=await req.text();if(!(await signatureOK(raw,sig,secret)))return reply({ok:false,error:"Assinatura inválida."},401);
