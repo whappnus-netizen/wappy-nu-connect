@@ -181,7 +181,9 @@ export const sendWhatsAppMessage = createServerFn({ method: "POST" })
       if ((replacements ?? []).length !== 1) {
         throw new Error("Esta conversa pertence a um número WhatsApp removido. Reconecte o mesmo número ou escolha uma ligação activa compatível.");
       }
-      const replacementId = replacements![0].id;
+      const replacement = replacements?.[0];
+      if (!replacement) throw new Error("Não foi possível validar a ligação WhatsApp activa.");
+      const replacementId = replacement.id;
       const { error: reassignmentError } = await admin.from("conversations")
         .update({ whatsapp_number_id: replacementId, updated_at: new Date().toISOString() })
         .eq("id", data.conversationId)
@@ -192,6 +194,7 @@ export const sendWhatsAppMessage = createServerFn({ method: "POST" })
     }
 
     // Envio pelo provedor do próprio número: Cloud API oficial ou QR Code.
+    if (!numberId) throw new Error("Conversa sem número WhatsApp ligado.");
     const sent = await sendOutgoingMessage({
       organizationId: data.organizationId,
       whatsappNumberId: numberId,

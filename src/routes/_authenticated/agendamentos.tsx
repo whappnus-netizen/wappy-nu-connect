@@ -101,7 +101,7 @@ function BookingsPage() {
     return {key,label:new Intl.DateTimeFormat("pt-AO",{weekday:"short",day:"2-digit",month:"short",timeZone:timezone}).format(new Date(key+"T12:00:00Z"))};
   });
   const todayCount = bookings.filter(b=>new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:data?.organization?.timezone??"Africa/Luanda"})===today).length;
-  const completedTodayCount = bookings.filter(b=>b.status==="completed"&&new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone})===today).length;
+  const completedTodayCount = bookings.filter(b=>b.status==="completed"&&new Date(b.starts_at).toLocaleDateString("en-CA",{timeZone:timezone})===today).length;
   const historyBookings = useMemo(()=>[...(data?.historyBookings??[]),...bookings.filter(b=>new Date(b.starts_at)<new Date()&&["completed","cancelled","no_show","expired"].includes(b.status))]
     .filter((booking,index,all)=>all.findIndex(item=>item.id===booking.id)===index)
     .sort((a,b)=>b.starts_at.localeCompare(a.starts_at)),[data?.historyBookings,bookings]);
