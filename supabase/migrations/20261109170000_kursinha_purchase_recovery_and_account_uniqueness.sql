@@ -2,28 +2,8 @@
 -- Auth email is normalized at the database boundary; phone uniqueness remains enforced
 -- by the existing private.account_phone_registry trigger and advisory lock.
 
-create or replace function private.normalize_auth_email()
-returns trigger
-language plpgsql
-security definer
-set search_path = pg_catalog
-as $$
-begin
-  if new.email is not null then
-    new.email := lower(btrim(new.email));
-  end if;
-  return new;
-end;
-$$;
-
-drop trigger if exists normalize_auth_email_before_write on auth.users;
-create trigger normalize_auth_email_before_write
-before insert or update of email on auth.users
-for each row execute function private.normalize_auth_email();
-
-create unique index if not exists auth_users_email_ci_unique
-on auth.users (lower(email))
-where email is not null and is_sso_user = false and deleted_at is null;
+-- Supabase Auth already enforces unique email addresses and the signup client lowercases
+-- the address before signUp. Its managed auth.users table cannot be modified by this project role.
 
 create table if not exists public.kursinha_purchase_claim_requests (
   id uuid primary key default gen_random_uuid(),
