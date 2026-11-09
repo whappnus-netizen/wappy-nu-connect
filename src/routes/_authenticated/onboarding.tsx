@@ -36,6 +36,8 @@ function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [technicalError, setTechnicalError] = useState<string | null>(null);
   const [paymentPending, setPaymentPending] = useState(false);
+  const [saleReference, setSaleReference] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const requestedPlan = typeof window !== "undefined"
     ? new URLSearchParams(window.location.search).get("plan") ?? ""
     : "";
@@ -70,6 +72,26 @@ function OnboardingPage() {
     console.error("[WhappNus] A compra não pôde ser associada com segurança.", data);
     toast.error(data?.error ?? "Não foi possível associar esta compra. Contacte o suporte.");
     return false;
+  }
+
+  async function requestPurchaseReview(e: React.FormEvent) {
+    e.preventDefault();
+    const reference = saleReference.trim();
+    if (!reference) {
+      toast.error("Indica a referência/ID da compra Kursinha.");
+      return;
+    }
+    setReviewSubmitting(true);
+    const { data, error } = await supabase.functions.invoke("kursinha-webhook", {
+      body: { action: "request_purchase_review", sale_id: reference },
+    });
+    setReviewSubmitting(false);
+    if (error || data?.ok !== true) {
+      toast.error(data?.error ?? "Não foi possível enviar o pedido de validação.");
+      return;
+    }
+    setSaleReference("");
+    toast.success("Pedido enviado. A equipa WHAPPNUS vai validar a titularidade antes de activar o plano.");
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -240,6 +262,21 @@ function OnboardingPage() {
             }}>
               {loading ? "A verificar pagamento..." : selectedPlanCode ? "Verificar pagamento e activar plano" : "Ir para o Dashboard"}
             </Button>
+            <div className="mt-5 border-t border-border pt-4">
+              <h3 className="text-sm font-semibold">Pagaste com outro e-mail?</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Indica a referência da compra Kursinha. A compra não será transferida automaticamente: a nossa equipa vai confirmar a titularidade antes de activar o plano.
+              </p>
+              <form onSubmit={requestPurchaseReview} className="mt-3 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="kursinha-sale-reference">Referência/ID da compra</Label>
+                  <Input id="kursinha-sale-reference" value={saleReference} onChange={(e) => setSaleReference(e.target.value)} placeholder="ID da venda Kursinha" required />
+                </div>
+                <Button type="submit" variant="outline" className="w-full" disabled={reviewSubmitting}>
+                  {reviewSubmitting ? "A enviar pedido..." : "Pedir validação manual"}
+                </Button>
+              </form>
+            </div>
           </>
         ) : (
           <form onSubmit={onSubmit} className="space-y-4">
