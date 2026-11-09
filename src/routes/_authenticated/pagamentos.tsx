@@ -20,10 +20,18 @@ export const Route = createFileRoute("/_authenticated/pagamentos")({
 });
 
 type PaymentStatus = "pending_review" | "confirmed" | "rejected" | "needs_review" | "cancelled" | "refunded";
+type PaymentExtractionData = Record<string, unknown> & {
+  payerName?: unknown;
+  reference?: unknown;
+  duplicateReference?: unknown;
+  summary?: unknown;
+  confidence?: unknown;
+  mimeType?: unknown;
+};
 type Payment = {
   id: string; organization_id: string; contact_id: string | null; conversation_id: string | null;
   amount_aoa: number | null; currency: string; description: string; payment_method: string; reference: string | null;
-  item_name: string | null; receipt_bucket: string; source_message_id: string | null; detection_source: "manual" | "whatsapp_ai"; extraction_data: Record<string, unknown>;
+  item_name: string | null; receipt_bucket: string; source_message_id: string | null; detection_source: "manual" | "whatsapp_ai"; extraction_data: PaymentExtractionData;
   status: PaymentStatus; receipt_path: string | null; receipt_sha256: string | null; received_at: string;
   confirmed_at: string | null; review_note: string | null; created_at: string;
   contacts?: { full_name: string | null; phone_e164: string } | null;
