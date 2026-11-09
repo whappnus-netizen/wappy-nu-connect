@@ -82,6 +82,15 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'REQUEST_ALREADY_REVIEWED');
   end if;
 
+  if not p_approve then
+    update public.kursinha_purchase_claim_requests
+      set status = 'rejected', reviewed_by = p_admin_user_id,
+          reviewed_at = now(), admin_note = nullif(btrim(p_admin_note), ''),
+          updated_at = now()
+    where id = p_request_id;
+    return jsonb_build_object('ok', true, 'rejected', true);
+  end if;
+
   select * into v_sale
   from public.kursinha_sales
   where sale_id = v_request.sale_id
