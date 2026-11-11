@@ -568,7 +568,7 @@ Deno.serve(async (req: Request) => {
         const reminder = logsBySubscription.get(row.id);
         const owner = authById.get(ownerByOrg.get(row.organization_id) ?? "");
         const metadata = owner?.user_metadata ?? {};
-        return { ...row, contact_phone: metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
+        return { ...row, contact_phone: row.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
           client_name: metadata.full_name ?? metadata.name ?? null, client_email: owner?.email ?? null,
           days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
           reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,
