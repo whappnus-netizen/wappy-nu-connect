@@ -269,14 +269,24 @@ Deno.serve(async (req: Request) => {
     const owner = ownerData.user;
     const metadata = owner?.user_metadata ?? {};
     const recipientPhone = String(org.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
-    const { data: inserted, error: reminderInsertError } = await db.from("subscription_reminder_logs").upsert({
-      organization_id: sub.organization_id, subscription_id: sub.id, reminder_days: 0,
-      status: "queued", recipient_phone: recipientPhone || null,
-      whatsapp_number_id: platformSession?.whatsapp_number_id ?? null,
-      message, error_message: null, updated_at: now.toISOString(),
-    }, { onConflict: "subscription_id,reminder_days", ignoreDuplicates: true }).select("id").maybeSingle();
-    if (reminderInsertError) { result.errors.push(`${org.name}: falha ao registar expiração: ${reminderInsertError.message}`); continue; }
-    if (!inserted?.id) continue;
+    const priorExpiry = await db.from("subscription_reminder_logs").select("id,status")
+      .eq("subscription_id", sub.id).eq("reminder_days", 0).maybeSingle();
+    if (priorExpiry.error) { result.errors.push(`${org.name}: falha ao consultar aviso de expiração: ${priorExpiry.error.message}`); continue; }
+    if (priorExpiry.data?.status === "sent") continue;
+    const expiryLog = priorExpiry.data?.id
+      ? await db.from("subscription_reminder_logs").update({
+          status: "queued", recipient_phone: recipientPhone || null,
+          whatsapp_number_id: platformSession?.whatsapp_number_id ?? null,
+          message, error_message: null, updated_at: now.toISOString(),
+        }).eq("id", priorExpiry.data.id).select("id").single()
+      : await db.from("subscription_reminder_logs").insert({
+          organization_id: sub.organization_id, subscription_id: sub.id, reminder_days: 0,
+          status: "queued", recipient_phone: recipientPhone || null,
+          whatsapp_number_id: platformSession?.whatsapp_number_id ?? null,
+          message, updated_at: now.toISOString(),
+        }).select("id").single();
+    if (expiryLog.error || !expiryLog.data?.id) { result.errors.push(`${org.name}: falha ao registar expiração.`); continue; }
+    const inserted = expiryLog.data;
     await db.from("organization_subscriptions").update({ status: "expired", updated_at: now.toISOString() }).eq("id", sub.id).in("status", ["active", "trialing"]);
 
     if (owner?.email) {
@@ -291,8 +301,12 @@ Deno.serve(async (req: Request) => {
       if (!emailOk) result.errors.push(`${org.name}: falha no e-mail de expiração.`);
     }
 
-    await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WHAPPNUS expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
-    await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "in_app", status: "sent", destination: ownerId, message, idempotencyKey: `subscription_expired:${sub.id}:in_app`, metadata: { expired: true } });
+    const inAppKey = `subscription_expired:${sub.id}:in_app`;
+    const priorInApp = await db.from("platform_notification_delivery_logs").select("id").eq("idempotency_key", inAppKey).maybeSingle();
+    if (!priorInApp.data) {
+      await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WHAPPNUS expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "in_app", status: "sent", destination: ownerId, message, idempotencyKey: inAppKey, metadata: { expired: true } });
+    }
 
     if (!recipientPhone || !platformSession?.whatsapp_number_id || !senderOrganizationId || !bridgeSecret) {
       const reason = !recipientPhone ? "Telefone de contacto da organização não configurado." : !platformSession?.whatsapp_number_id ? "Número emissor WHAPPNUS desligado." : "WHATSAPP_QR_BRIDGE_SECRET não configurado.";
