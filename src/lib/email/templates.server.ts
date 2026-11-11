@@ -55,7 +55,7 @@ export function renderTemplate(code: TemplateCode, v: Vars): { subject: string; 
   const hi = `<p>Olá${v["name"] ? `, <strong>${esc(v["name"])}</strong>` : ""}!</p>`;
   const sign = `<p style="margin-top:28px">Com os melhores cumprimentos,<br><strong>Equipa WhappNus</strong></p>`;
   const support = `<p style="color:#6b7280;font-size:13px">Precisa de ajuda? Responda a este e-mail.</p>`;
-  const go = button("Aceder à WhappNus", `${APP_URL}/assinatura`);
+  const go = button("Aceder à WhappNus", `${APP_URL}/dashboard`);
   const t = (subject: string, pre: string, body: string) => ({ subject, html: layout(pre, body + sign) });
 
   switch (code) {
