@@ -443,8 +443,8 @@ Deno.serve(async (req: Request) => {
       const days = sub.current_period_end ? Math.max(0, Math.ceil((new Date(sub.current_period_end).getTime() - Date.now()) / 86400000)) : 0;
       const eventType = sub.current_period_end && new Date(sub.current_period_end).getTime() > Date.now() ? "subscription_expiring" : "subscription_expired";
       const message = eventType === "subscription_expired"
-        ? `Olá! Aqui é a equipa WHAPPNUS. A assinatura da organização ${org.name} terminou. O atendimento automático, a IA e as automações podem ficar pausados, e os seus clientes podem ficar sem resposta. Renove agora para recuperar o acesso: https://whappnus.online/dashboard → Assinatura → Ver planos. Se precisar de ajuda, estamos disponíveis.`
-        : `Olá! Aqui é a equipa WHAPPNUS. A assinatura ${planName} da organização ${org.name} termina em ${endDate}. Renove antes dessa data para manter o atendimento com IA e as automações activos e evitar que os seus clientes fiquem sem resposta. Renove na sua conta: https://whappnus.online/dashboard → Assinatura → Ver planos. Estamos disponíveis para ajudar.`;
+        ? `Olá! Aqui é a equipa WHAPPNUS. A assinatura da organização ${org.name} terminou. O atendimento automático, a IA e as automações podem ficar pausados, e os seus clientes podem ficar sem resposta. Renove agora para recuperar o acesso: https://whappnus.online/assinatura. Se precisar de ajuda, estamos disponíveis.`
+        : `Olá! Aqui é a equipa WHAPPNUS. A assinatura ${planName} da organização ${org.name} termina em ${endDate}. Renove antes dessa data para manter o atendimento com IA e as automações activos e evitar que os seus clientes fiquem sem resposta. Renove na sua conta: https://whappnus.online/assinatura. Estamos disponíveis para ajudar.`;
       const baseKey = `subscription_admin_notice:${sub.id}:${crypto.randomUUID()}`;
       const results: Record<string, string> = {};
       const writeDelivery = async (channel: "in_app" | "email" | "whatsapp", status: "queued" | "sent" | "failed", destination: string | null, errorMessage: string | null = null) => {
