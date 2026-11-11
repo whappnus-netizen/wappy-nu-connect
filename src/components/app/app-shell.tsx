@@ -175,7 +175,7 @@ export function AppShell({
               <p className="text-sm font-semibold">Acesso limitado — assinatura suspensa</p>
               <p className="text-xs text-muted-foreground">Os dados e o histórico continuam disponíveis. A IA e as automações ficam pausadas até o administrador reactivar o plano.</p>
             </div>
-            <Button asChild size="sm"><a href="/#planos">Ver planos</a></Button>
+            <Button asChild size="sm"><Link to="/assinatura">Ver planos</Link></Button>
           </div>
         )}
         {notifications && notifications.length > 0 && (

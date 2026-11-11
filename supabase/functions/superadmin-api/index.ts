@@ -418,6 +418,120 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, data: enriched });
     }
 
+    if (action === "subscriptions.reminder.send") {
+      if (!["owner", "admin"].includes(admin.role)) return fail("Só o proprietário ou administrador da plataforma pode enviar avisos de renovação.", 403);
+      const subscriptionId = str(input.subscription_id, 60);
+      if (!subscriptionId) return fail("Assinatura não identificada.");
+      const { data: sub, error: subError } = await db.from("organization_subscriptions")
+        .select("id,organization_id,status,current_period_end,amount_aoa,subscription_plans(name),organizations(id,name,contact_phone)")
+        .eq("id", subscriptionId).maybeSingle();
+      if (subError) throw subError;
+      if (!sub) return fail("Assinatura não encontrada.", 404);
+      const org = sub.organizations as any;
+      if (!org?.id) return fail("Organização associada não encontrada.", 409);
+      const ownerMembership = await db.from("memberships").select("user_id")
+        .eq("organization_id", org.id).in("role", ["OWNER", "owner"]).limit(1).maybeSingle();
+      if (ownerMembership.error) throw ownerMembership.error;
+      const ownerId = ownerMembership.data?.user_id ?? null;
+      const ownerResult = ownerId ? await db.auth.admin.getUserById(ownerId) : { data: { user: null }, error: null };
+      const owner = ownerResult.data?.user ?? null;
+      const metadata = owner?.user_metadata ?? {};
+      const recipientEmail = String(owner?.email ?? "").trim().toLowerCase();
+      const recipientPhone = String(org.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
+      const planName = String((sub.subscription_plans as any)?.name ?? "WHAPPNUS");
+      const endDate = sub.current_period_end ? new Date(sub.current_period_end).toLocaleDateString("pt-AO", { timeZone: "Africa/Luanda" }) : "—";
+      const days = sub.current_period_end ? Math.max(0, Math.ceil((new Date(sub.current_period_end).getTime() - Date.now()) / 86400000)) : 0;
+      const eventType = sub.current_period_end && new Date(sub.current_period_end).getTime() > Date.now() ? "subscription_expiring" : "subscription_expired";
+      const message = eventType === "subscription_expired"
+        ? `Olá! Aqui é a equipa WHAPPNUS. A assinatura da organização ${org.name} terminou. O atendimento automático, a IA e as automações podem ficar pausados, e os seus clientes podem ficar sem resposta. Renove agora para recuperar o acesso: https://whappnus.online/assinatura. Se precisar de ajuda, estamos disponíveis.`
+        : `Olá! Aqui é a equipa WHAPPNUS. A assinatura ${planName} da organização ${org.name} termina em ${endDate}. Renove antes dessa data para manter o atendimento com IA e as automações activos e evitar que os seus clientes fiquem sem resposta. Renove na sua conta: https://whappnus.online/assinatura. Estamos disponíveis para ajudar.`;
+      const baseKey = `subscription_admin_notice:${sub.id}:${crypto.randomUUID()}`;
+      const results: Record<string, string> = {};
+      const writeDelivery = async (channel: "in_app" | "email" | "whatsapp", status: "queued" | "sent" | "failed", destination: string | null, errorMessage: string | null = null) => {
+        const { error } = await db.from("platform_notification_delivery_logs").upsert({
+          organization_id: org.id, subscription_id: sub.id, recipient_user_id: ownerId,
+          event_type: "manual", channel, status, destination, message,
+          idempotency_key: `${baseKey}:${channel}`, error_message: errorMessage,
+          sent_at: status === "sent" ? new Date().toISOString() : null,
+          metadata: { source: "superadmin", template: eventType, actor_user_id: actor.id },
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "idempotency_key" });
+        if (error) throw error;
+      };
+
+      const inApp = await db.from("organization_notifications").insert({
+        organization_id: org.id,
+        title: eventType === "subscription_expired" ? "A sua assinatura terminou" : "A sua assinatura está a terminar",
+        body: message, notification_type: "subscription", created_by: actor.id,
+        metadata: { source: "superadmin", subscription_id: sub.id, event: eventType },
+      });
+      if (inApp.error) throw inApp.error;
+      await writeDelivery("in_app", "sent", ownerId, null);
+      results.in_app = "sent";
+
+      if (recipientEmail) {
+        const emailSecret = Deno.env.get("EMAIL_DISPATCH_SECRET") ?? "";
+        const endpoint = Deno.env.get("EMAIL_DISPATCH_URL") ?? "https://whappnus.online/api/public/email/dispatch";
+        if (!emailSecret) {
+          await writeDelivery("email", "failed", recipientEmail, "EMAIL_DISPATCH_SECRET não configurado.");
+          results.email = "failed";
+        } else {
+          const emailResponse = await fetch(endpoint, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-email-secret": emailSecret },
+            body: JSON.stringify({
+              template: eventType, to: recipientEmail,
+              name: String(metadata.full_name ?? metadata.name ?? org.name),
+              vars: { name: metadata.full_name ?? metadata.name ?? org.name, organization: org.name, plan: planName, period_end: sub.current_period_end, days },
+              idempotency_key: `${baseKey}:email`,
+            }),
+            signal: AbortSignal.timeout(15000),
+          });
+          const payload = await emailResponse.json().catch(() => ({}));
+          const ok = emailResponse.ok && payload?.ok === true;
+          await writeDelivery("email", ok ? "sent" : "failed", recipientEmail, ok ? null : String(payload?.error ?? `HTTP ${emailResponse.status}`).slice(0, 300));
+          results.email = ok ? "sent" : "failed";
+        }
+      } else {
+        await writeDelivery("email", "skipped" as any, null, "Proprietário sem e-mail.");
+        results.email = "skipped";
+      }
+
+      const senderConfig = await db.from("subscription_reminder_config")
+        .select("platform_sender_organization_id,platform_sender_whatsapp_number_id").eq("id", true).maybeSingle();
+      if (senderConfig.error) throw senderConfig.error;
+      const senderOrgId = senderConfig.data?.platform_sender_organization_id ?? null;
+      const senderNumberId = senderConfig.data?.platform_sender_whatsapp_number_id ?? null;
+      const senderSession = senderOrgId && senderNumberId
+        ? await db.from("whatsapp_sessions").select("whatsapp_number_id,status")
+            .eq("organization_id", senderOrgId).eq("whatsapp_number_id", senderNumberId).eq("status", "connected").maybeSingle()
+        : { data: null, error: null };
+      if (senderSession.error) throw senderSession.error;
+      const bridgeSecret = Deno.env.get("WHATSAPP_QR_BRIDGE_SECRET") ?? "";
+      if (!recipientPhone || !senderSession.data || !senderOrgId || !bridgeSecret) {
+        const reason = !recipientPhone ? "Telefone de contacto da organização não configurado." :
+          !senderSession.data ? "Número emissor WHAPPNUS desligado ou sem sessão activa." :
+          "WHATSAPP_QR_BRIDGE_SECRET não configurado no Supabase.";
+        await writeDelivery("whatsapp", "failed", recipientPhone || null, reason);
+        results.whatsapp = "failed";
+      } else {
+        const sessionId = `${senderOrgId}:${senderNumberId}`;
+        const engineUrl = "https://whappnus-whatsapp-engine-production.up.railway.app";
+        const waResponse = await fetch(`${engineUrl}/sessions/${encodeURIComponent(sessionId)}/messages`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${bridgeSecret}` },
+          body: JSON.stringify({ to: recipientPhone, body: message }),
+          signal: AbortSignal.timeout(20000),
+        });
+        const waPayload = await waResponse.json().catch(() => ({}));
+        const ok = waResponse.ok && waPayload?.ok === true;
+        await writeDelivery("whatsapp", ok ? "sent" : "failed", recipientPhone, ok ? null : String(waPayload?.error ?? `HTTP ${waResponse.status}`).slice(0, 300));
+        results.whatsapp = ok ? "sent" : "failed";
+      }
+      await audit("subscription.reminder.sent", "subscription", sub.id, org.id, { channels: results, recipient_email: recipientEmail || null, recipient_phone: recipientPhone || null });
+      return json({ ok: true, data: { organization: org.name, channels: results, message: "Aviso processado. Consulta o estado de cada canal no histórico de entregas." } });
+    }
+
     if (action === "reminders.list") {
       const cutoff = new Date(Date.now() + 7 * 86400000).toISOString();
       const { data, error } = await db.from("organization_subscriptions")
@@ -454,7 +568,7 @@ Deno.serve(async (req: Request) => {
         const reminder = logsBySubscription.get(row.id);
         const owner = authById.get(ownerByOrg.get(row.organization_id) ?? "");
         const metadata = owner?.user_metadata ?? {};
-        return { ...row, contact_phone: metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
+        return { ...row, contact_phone: row.organizations?.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? null,
           client_name: metadata.full_name ?? metadata.name ?? null, client_email: owner?.email ?? null,
           days_remaining: end === null ? null : Math.ceil((end - Date.now()) / 86400000),
           reminder_status: reminder?.status ?? "A agendar", reminder_days: reminder?.reminder_days ?? null,

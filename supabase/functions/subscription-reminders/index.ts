@@ -259,35 +259,80 @@ Deno.serve(async (req: Request) => {
     .in("status", ["active", "trialing", "expired"]).lt("current_period_end", now.toISOString()).limit(500);
   if (expiredError) result.errors.push("Consulta de assinaturas expiradas: " + expiredError.message);
   for (const sub of expired ?? []) {
-    const orgResult = await db.from("organizations").select("id,name").eq("id", sub.organization_id).maybeSingle();
+    const orgResult = await db.from("organizations").select("id,name,contact_phone").eq("id", sub.organization_id).maybeSingle();
     if (!orgResult.data) continue;
-    const message = `A assinatura da organização ${orgResult.data.name} expirou. Os dados continuam guardados, mas os recursos sujeitos ao plano podem ficar limitados. Renove a assinatura para voltar a utilizar os recursos contratados.`;
-    const { data: inserted } = await db.from("subscription_reminder_logs").upsert({
-      organization_id: sub.organization_id, subscription_id: sub.id, reminder_days: 0,
-      status: "skipped", message, error_message: "Aviso de expiração publicado apenas no centro de notificações.",
-      updated_at: now.toISOString(),
-    }, { onConflict: "subscription_id,reminder_days", ignoreDuplicates: true }).select("id").maybeSingle();
-    if (!inserted?.id) continue;
-    await db.from("organization_subscriptions").update({ status: "expired", updated_at: now.toISOString() }).eq("id", sub.id).in("status", ["active", "trialing"]);
+    const org = orgResult.data;
+    const message = `A assinatura da organização ${org.name} expirou. O atendimento automático, a IA e as automações estão suspensos, e os seus clientes podem ficar sem resposta. Renove agora para recuperar o acesso: https://whappnus.online/dashboard → Assinatura → Ver planos. Os seus dados continuam guardados.`;
     const ownerResult = await db.from("memberships").select("user_id").eq("organization_id", sub.organization_id).eq("role", "OWNER").limit(1).maybeSingle();
-    if (ownerResult.data?.user_id) {
-      const { data: ownerData } = await db.auth.admin.getUserById(ownerResult.data.user_id);
-      const owner = ownerData.user;
-      if (owner?.email) {
-        const meta = owner.user_metadata ?? {};
-        const emailOk = await sendTransactionalEmail(db, {
-          template: "subscription_expired", to: owner.email,
-          name: String(meta.full_name ?? meta.name ?? orgResult.data.name),
-          vars: { name: meta.full_name ?? meta.name ?? orgResult.data.name, organization: orgResult.data.name, plan: (sub.subscription_plans as any)?.name ?? "WhappNus", period_end: sub.current_period_end },
-          idempotencyKey: `subscription_expired:${sub.id}`,
-          organizationId: sub.organization_id, eventType: "subscription_expired",
+    const ownerId = ownerResult.data?.user_id ?? null;
+    const { data: ownerData } = ownerId ? await db.auth.admin.getUserById(ownerId) : { data: { user: null } };
+    const owner = ownerData.user;
+    const metadata = owner?.user_metadata ?? {};
+    const recipientPhone = String(org.contact_phone ?? metadata.phone ?? metadata.phone_number ?? owner?.phone ?? "").trim();
+    const priorExpiry = await db.from("subscription_reminder_logs").select("id,status")
+      .eq("subscription_id", sub.id).eq("reminder_days", 0).maybeSingle();
+    if (priorExpiry.error) { result.errors.push(`${org.name}: falha ao consultar aviso de expiração: ${priorExpiry.error.message}`); continue; }
+    if (priorExpiry.data?.status === "sent") continue;
+    const expiryLog = priorExpiry.data?.id
+      ? await db.from("subscription_reminder_logs").update({
+          status: "queued", recipient_phone: recipientPhone || null,
+          whatsapp_number_id: platformSession?.whatsapp_number_id ?? null,
+          message, error_message: null, updated_at: now.toISOString(),
+        }).eq("id", priorExpiry.data.id).select("id").single()
+      : await db.from("subscription_reminder_logs").insert({
+          organization_id: sub.organization_id, subscription_id: sub.id, reminder_days: 0,
+          status: "queued", recipient_phone: recipientPhone || null,
+          whatsapp_number_id: platformSession?.whatsapp_number_id ?? null,
+          message, updated_at: now.toISOString(),
+        }).select("id").single();
+    if (expiryLog.error || !expiryLog.data?.id) { result.errors.push(`${org.name}: falha ao registar expiração.`); continue; }
+    const inserted = expiryLog.data;
+    await db.from("organization_subscriptions").update({ status: "expired", updated_at: now.toISOString() }).eq("id", sub.id).in("status", ["active", "trialing"]);
+
+    if (owner?.email) {
+      const emailOk = await sendTransactionalEmail(db, {
+        template: "subscription_expired", to: owner.email,
+        name: String(metadata.full_name ?? metadata.name ?? org.name),
+        vars: { name: metadata.full_name ?? metadata.name ?? org.name, organization: org.name, plan: (sub.subscription_plans as any)?.name ?? "WHAPPNUS", period_end: sub.current_period_end },
+        idempotencyKey: `subscription_expired:${sub.id}`,
+        organizationId: sub.organization_id, eventType: "subscription_expired",
+      });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "email", status: emailOk ? "sent" : "failed", destination: owner.email, message, idempotencyKey: `subscription_expired:${sub.id}:email`, errorMessage: emailOk ? null : "Falha no envio do e-mail.", metadata: { expired: true } });
+      if (!emailOk) result.errors.push(`${org.name}: falha no e-mail de expiração.`);
+    }
+
+    const inAppKey = `subscription_expired:${sub.id}:in_app`;
+    const priorInApp = await db.from("platform_notification_delivery_logs").select("id").eq("idempotency_key", inAppKey).maybeSingle();
+    if (!priorInApp.data) {
+      await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WHAPPNUS expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "in_app", status: "sent", destination: ownerId, message, idempotencyKey: inAppKey, metadata: { expired: true } });
+    }
+
+    if (!recipientPhone || !platformSession?.whatsapp_number_id || !senderOrganizationId || !bridgeSecret) {
+      const reason = !recipientPhone ? "Telefone de contacto da organização não configurado." : !platformSession?.whatsapp_number_id ? "Número emissor WHAPPNUS desligado." : "WHATSAPP_QR_BRIDGE_SECRET não configurado.";
+      await db.from("subscription_reminder_logs").update({ status: "failed", error_message: reason, updated_at: new Date().toISOString() }).eq("id", inserted.id);
+      await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "whatsapp", status: "failed", destination: recipientPhone || null, message, idempotencyKey: `subscription_expired:${sub.id}:whatsapp`, errorMessage: reason, metadata: { expired: true } });
+      result.errors.push(`${org.name}: ${reason}`);
+    } else {
+      try {
+        const sessionId = `${senderOrganizationId}:${platformSession.whatsapp_number_id}`;
+        const response = await fetch(`${engineUrl}/sessions/${encodeURIComponent(sessionId)}/messages`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${bridgeSecret}` },
+          body: JSON.stringify({ to: recipientPhone, body: message }),
+          signal: AbortSignal.timeout(20000),
         });
-        if (!emailOk) result.errors.push(`${orgResult.data.name}: falha no e-mail de expiração.`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok !== true) throw new Error(`WhatsApp HTTP ${response.status}: ${String(payload?.error ?? "envio não confirmado").slice(0, 240)}`);
+        await db.from("subscription_reminder_logs").update({ status: "sent", sent_at: new Date().toISOString(), error_message: null, updated_at: new Date().toISOString() }).eq("id", inserted.id);
+        await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "whatsapp", status: "sent", destination: recipientPhone, message, idempotencyKey: `subscription_expired:${sub.id}:whatsapp`, metadata: { expired: true, sender_organization_id: senderOrganizationId, whatsapp_number_id: platformSession.whatsapp_number_id } });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        await db.from("subscription_reminder_logs").update({ status: "failed", error_message: reason.slice(0, 500), updated_at: new Date().toISOString() }).eq("id", inserted.id);
+        await recordDelivery(db, { organizationId: org.id, subscriptionId: sub.id, recipientUserId: ownerId, eventType: "subscription_expired", channel: "whatsapp", status: "failed", destination: recipientPhone, message, idempotencyKey: `subscription_expired:${sub.id}:whatsapp`, errorMessage: reason.slice(0, 500), metadata: { expired: true } });
+        result.errors.push(`${org.name}: ${reason}`);
       }
     }
-    await db.from("organization_notifications").insert({ organization_id: sub.organization_id, title: "A sua assinatura WhappNus expirou", body: message, notification_type: "subscription", metadata: { source: "subscription-reminder", expired: true } });
-    const expiredOwnerId = ownerResult.data?.user_id ?? null;
-    await recordDelivery(db, { organizationId: sub.organization_id, subscriptionId: sub.id, recipientUserId: expiredOwnerId, eventType: "subscription_expired", channel: "in_app", status: "sent", destination: null, message, idempotencyKey: `subscription_expired:${sub.id}:in_app`, metadata: { expired: true } });
     result.expired_notices += 1;
   }
 
@@ -313,12 +358,12 @@ Deno.serve(async (req: Request) => {
   // Retry de avisos de pagamento aprovado cujo envio WhatsApp falhou anteriormente.
   const { data: failedPaymentNotices, error: failedPaymentError } = await db.from("platform_notification_delivery_logs")
     .select("id,organization_id,subscription_id,recipient_user_id,destination,message,idempotency_key,metadata")
-    .eq("event_type", "payment_approved").eq("channel", "whatsapp").eq("status", "failed")
+    .in("event_type", ["payment_approved", "subscription_expiring", "subscription_expired"]).eq("channel", "whatsapp").eq("status", "failed")
     .gte("created_at", new Date(now.getTime() - 14 * 86400000).toISOString())
     .order("created_at", { ascending: true }).limit(100);
   if (failedPaymentError) result.errors.push("Consulta de avisos de pagamento pendentes: " + failedPaymentError.message);
   for (const notice of failedPaymentNotices ?? []) {
-    if (!notice.destination || !notice.message || !senderOrganizationId || !platformSession?.whatsapp_number_id) {
+    if (!notice.destination || !notice.message || !senderOrganizationId || !platformSession?.whatsapp_number_id || !bridgeSecret) {
       result.payment_whatsapp_failed += 1;
       continue;
     }
@@ -327,6 +372,7 @@ Deno.serve(async (req: Request) => {
     }).eq("id", notice.id).eq("status", "failed").select("id").maybeSingle();
     if (claim.error || !claim.data?.id) continue;
     try {
+      const sessionId = `${senderOrganizationId}:${platformSession.whatsapp_number_id}`;
       const response = await fetch(`${engineUrl}/internal/subscription-reminder`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${serviceKey}` },

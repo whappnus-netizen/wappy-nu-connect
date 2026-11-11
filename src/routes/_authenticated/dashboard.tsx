@@ -204,7 +204,7 @@ function DashboardPage() {
             ].map((item) => <div key={item.label} className="rounded-lg border border-border p-3"><p className="text-xs text-muted-foreground">{item.label}</p><p className="mt-1 text-base font-semibold tabular-nums">{item.used} / {item.limit > 0 ? item.limit : "—"}</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: item.limit > 0 ? Math.min(100, item.used / item.limit * 100) + "%" : "0%" }} /></div></div>)}
           </div>
           </div>
-          {suspended && <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm">A IA e as automações estão bloqueadas até a assinatura ser reactivada pelo administrador.</p><Button asChild size="sm"><a href="/#planos">Ver planos</a></Button></div>}
+          {suspended && <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm">A IA e as automações estão bloqueadas até a assinatura ser reactivada pelo administrador.</p><Button asChild size="sm"><Link to="/assinatura">Ver planos</Link></Button></div>}
         </section>;
       })()}
 
