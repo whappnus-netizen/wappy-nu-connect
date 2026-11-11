@@ -83,10 +83,10 @@ export function renderTemplate(code: TemplateCode, v: Vars): { subject: string; 
         `<h1 style="font-size:22px;margin:0 0 12px">Reembolso confirmado</h1>${hi}<p>O pagamento abaixo foi reembolsado e a assinatura associada foi encerrada.</p>${rows([["Plano", String(v["plan"] ?? "")], ["Valor", kz(v["amount"])], ["Referência", String(v["reference"] ?? "")]])}${support}`);
     case "subscription_expiring":
       return t(`O teu plano WhappNus expira ${Number(v["days"]) <= 0 ? "hoje" : `em ${esc(v["days"])} dia(s)`}`, "Renova para não perder o acesso.",
-        `<h1 style="font-size:22px;margin:0 0 12px">A tua assinatura está a terminar</h1>${hi}${rows([["Plano", String(v["plan"] ?? "")], ["Expira em", dt(v["period_end"])]])}<p>Renova para manter o atendimento por WhatsApp, a IA e as automações a funcionar sem interrupções.</p>${button("Renovar agora", `${APP_URL}/#planos`)}`);
+        `<h1 style="font-size:22px;margin:0 0 12px">A tua assinatura está a terminar</h1>${hi}${rows([["Plano", String(v["plan"] ?? "")], ["Expira em", dt(v["period_end"])]])}<p>Renova para manter o atendimento por WhatsApp, a IA e as automações a funcionar sem interrupções.</p>${button("Renovar agora", `${APP_URL}/dashboard`)}`);
     case "subscription_expired":
       return t("O teu plano WhappNus terminou", "Renova para reactivar a tua conta.",
-        `<h1 style="font-size:22px;margin:0 0 12px">A tua assinatura terminou</h1>${hi}<p>O plano <strong>${esc(v["plan"] ?? "")}</strong> expirou. O atendimento automático, a IA e as automações ficam suspensos até renovares. Os teus dados continuam guardados.</p>${button("Renovar plano", `${APP_URL}/#planos`)}${support}`);
+        `<h1 style="font-size:22px;margin:0 0 12px">A tua assinatura terminou</h1>${hi}<p>O plano <strong>${esc(v["plan"] ?? "")}</strong> expirou. O atendimento automático, a IA e as automações ficam suspensos até renovares. Os teus dados continuam guardados.</p>${button("Renovar plano", `${APP_URL}/dashboard`)}${support}`);
   }
 }
 
