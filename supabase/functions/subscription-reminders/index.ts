@@ -327,6 +327,7 @@ Deno.serve(async (req: Request) => {
     }).eq("id", notice.id).eq("status", "failed").select("id").maybeSingle();
     if (claim.error || !claim.data?.id) continue;
     try {
+      const sessionId = `${senderOrganizationId}:${platformSession.whatsapp_number_id}`;
       const response = await fetch(`${engineUrl}/internal/subscription-reminder`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${serviceKey}` },
