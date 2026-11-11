@@ -344,12 +344,12 @@ Deno.serve(async (req: Request) => {
   // Retry de avisos de pagamento aprovado cujo envio WhatsApp falhou anteriormente.
   const { data: failedPaymentNotices, error: failedPaymentError } = await db.from("platform_notification_delivery_logs")
     .select("id,organization_id,subscription_id,recipient_user_id,destination,message,idempotency_key,metadata")
-    .eq("event_type", "payment_approved").eq("channel", "whatsapp").eq("status", "failed")
+    .in("event_type", ["payment_approved", "subscription_expiring", "subscription_expired"]).eq("channel", "whatsapp").eq("status", "failed")
     .gte("created_at", new Date(now.getTime() - 14 * 86400000).toISOString())
     .order("created_at", { ascending: true }).limit(100);
   if (failedPaymentError) result.errors.push("Consulta de avisos de pagamento pendentes: " + failedPaymentError.message);
   for (const notice of failedPaymentNotices ?? []) {
-    if (!notice.destination || !notice.message || !senderOrganizationId || !platformSession?.whatsapp_number_id) {
+    if (!notice.destination || !notice.message || !senderOrganizationId || !platformSession?.whatsapp_number_id || !bridgeSecret) {
       result.payment_whatsapp_failed += 1;
       continue;
     }
