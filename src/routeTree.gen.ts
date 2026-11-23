@@ -20,6 +20,7 @@ import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
+import { Route as AuthenticatedAssinaturaRouteImport } from './routes/_authenticated/assinatura'
 import { Route as AuthenticatedAutomacoesRouteImport } from './routes/_authenticated/automacoes'
 import { Route as AuthenticatedContactosRouteImport } from './routes/_authenticated/contactos'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
@@ -32,11 +33,13 @@ import { Route as AuthenticatedNotificacoesRouteImport } from './routes/_authent
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedPagamentosRouteImport } from './routes/_authenticated/pagamentos'
 import { Route as AuthenticatedParceriasRouteImport } from './routes/_authenticated/parcerias'
+import { Route as AuthenticatedSuporteRouteImport } from './routes/_authenticated/suporte'
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthConfirmRouteImport } from './routes/auth.confirm'
 import { Route as AuthLoginRouteImport } from './routes/auth.login'
 import { Route as AuthRecuperarRouteImport } from './routes/auth.recuperar'
 import { Route as AuthRegistoRouteImport } from './routes/auth.registo'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth.reset-password'
 import { Route as ApiPublicEmailDispatchRouteImport } from './routes/api/public/email.dispatch'
 import { Route as ApiPublicEmailWelcomeRouteImport } from './routes/api/public/email.welcome'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
@@ -97,6 +100,11 @@ const AuthenticatedAgendamentosRoute =
     path: '/agendamentos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAssinaturaRoute = AuthenticatedAssinaturaRouteImport.update({
+  id: '/assinatura',
+  path: '/assinatura',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAutomacoesRoute = AuthenticatedAutomacoesRouteImport.update({
   id: '/automacoes',
   path: '/automacoes',
@@ -158,6 +166,11 @@ const AuthenticatedParceriasRoute = AuthenticatedParceriasRouteImport.update({
   path: '/parcerias',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSuporteRoute = AuthenticatedSuporteRouteImport.update({
+  id: '/suporte',
+  path: '/suporte',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedWhatsappRoute = AuthenticatedWhatsappRouteImport.update({
   id: '/whatsapp',
   path: '/whatsapp',
@@ -181,6 +194,11 @@ const AuthRecuperarRoute = AuthRecuperarRouteImport.update({
 const AuthRegistoRoute = AuthRegistoRouteImport.update({
   id: '/auth/registo',
   path: '/auth/registo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicEmailDispatchRoute = ApiPublicEmailDispatchRouteImport.update({
@@ -217,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/assinatura': typeof AuthenticatedAssinaturaRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -229,11 +248,13 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/parcerias': typeof AuthenticatedParceriasRoute
+  '/suporte': typeof AuthenticatedSuporteRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/api/public/email/dispatch': typeof ApiPublicEmailDispatchRoute
   '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -250,6 +271,7 @@ export interface FileRoutesByTo {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/assinatura': typeof AuthenticatedAssinaturaRoute
   '/automacoes': typeof AuthenticatedAutomacoesRoute
   '/contactos': typeof AuthenticatedContactosRoute
   '/crm': typeof AuthenticatedCrmRoute
@@ -262,11 +284,13 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/pagamentos': typeof AuthenticatedPagamentosRoute
   '/parcerias': typeof AuthenticatedParceriasRoute
+  '/suporte': typeof AuthenticatedSuporteRoute
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/api/public/email/dispatch': typeof ApiPublicEmailDispatchRoute
   '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -285,6 +309,7 @@ export interface FileRoutesById {
   '/termos': typeof TermosRoute
   '/terms': typeof TermsRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
+  '/_authenticated/assinatura': typeof AuthenticatedAssinaturaRoute
   '/_authenticated/automacoes': typeof AuthenticatedAutomacoesRoute
   '/_authenticated/contactos': typeof AuthenticatedContactosRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
@@ -297,11 +322,13 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/pagamentos': typeof AuthenticatedPagamentosRoute
   '/_authenticated/parcerias': typeof AuthenticatedParceriasRoute
+  '/_authenticated/suporte': typeof AuthenticatedSuporteRoute
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/confirm': typeof AuthConfirmRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/recuperar': typeof AuthRecuperarRoute
   '/auth/registo': typeof AuthRegistoRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/api/public/email/dispatch': typeof ApiPublicEmailDispatchRoute
   '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
@@ -320,6 +347,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/agendamentos'
+    | '/assinatura'
     | '/automacoes'
     | '/contactos'
     | '/crm'
@@ -332,11 +360,13 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pagamentos'
     | '/parcerias'
+    | '/suporte'
     | '/whatsapp'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
+    | '/auth/reset-password'
     | '/api/public/email/dispatch'
     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
@@ -353,6 +383,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/agendamentos'
+    | '/assinatura'
     | '/automacoes'
     | '/contactos'
     | '/crm'
@@ -365,11 +396,13 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pagamentos'
     | '/parcerias'
+    | '/suporte'
     | '/whatsapp'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
+    | '/auth/reset-password'
     | '/api/public/email/dispatch'
     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
@@ -387,6 +420,7 @@ export interface FileRouteTypes {
     | '/termos'
     | '/terms'
     | '/_authenticated/agendamentos'
+    | '/_authenticated/assinatura'
     | '/_authenticated/automacoes'
     | '/_authenticated/contactos'
     | '/_authenticated/crm'
@@ -399,11 +433,13 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/pagamentos'
     | '/_authenticated/parcerias'
+    | '/_authenticated/suporte'
     | '/_authenticated/whatsapp'
     | '/auth/confirm'
     | '/auth/login'
     | '/auth/recuperar'
     | '/auth/registo'
+    | '/auth/reset-password'
     | '/api/public/email/dispatch'
     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
@@ -425,6 +461,7 @@ export interface RootRouteChildren {
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecuperarRoute: typeof AuthRecuperarRoute
   AuthRegistoRoute: typeof AuthRegistoRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   ApiPublicEmailDispatchRoute: typeof ApiPublicEmailDispatchRoute
   ApiPublicEmailWelcomeRoute: typeof ApiPublicEmailWelcomeRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
@@ -508,6 +545,13 @@ declare module '@tanstack/react-router' {
       path: '/agendamentos'
       fullPath: '/agendamentos'
       preLoaderRoute: typeof AuthenticatedAgendamentosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/assinatura': {
+      id: '/_authenticated/assinatura'
+      path: '/assinatura'
+      fullPath: '/assinatura'
+      preLoaderRoute: typeof AuthenticatedAssinaturaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/automacoes': {
@@ -594,6 +638,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedParceriasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/suporte': {
+      id: '/_authenticated/suporte'
+      path: '/suporte'
+      fullPath: '/suporte'
+      preLoaderRoute: typeof AuthenticatedSuporteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/whatsapp': {
       id: '/_authenticated/whatsapp'
       path: '/whatsapp'
@@ -629,6 +680,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRegistoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/email/dispatch': {
       id: '/api/public/email/dispatch'
       path: '/api/public/email/dispatch'
@@ -662,6 +720,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
+  AuthenticatedAssinaturaRoute: typeof AuthenticatedAssinaturaRoute
   AuthenticatedAutomacoesRoute: typeof AuthenticatedAutomacoesRoute
   AuthenticatedContactosRoute: typeof AuthenticatedContactosRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
@@ -674,11 +733,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPagamentosRoute: typeof AuthenticatedPagamentosRoute
   AuthenticatedParceriasRoute: typeof AuthenticatedParceriasRoute
+  AuthenticatedSuporteRoute: typeof AuthenticatedSuporteRoute
   AuthenticatedWhatsappRoute: typeof AuthenticatedWhatsappRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
+  AuthenticatedAssinaturaRoute: AuthenticatedAssinaturaRoute,
   AuthenticatedAutomacoesRoute: AuthenticatedAutomacoesRoute,
   AuthenticatedContactosRoute: AuthenticatedContactosRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
@@ -691,6 +752,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPagamentosRoute: AuthenticatedPagamentosRoute,
   AuthenticatedParceriasRoute: AuthenticatedParceriasRoute,
+  AuthenticatedSuporteRoute: AuthenticatedSuporteRoute,
   AuthenticatedWhatsappRoute: AuthenticatedWhatsappRoute,
 }
 
@@ -712,6 +774,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthLoginRoute: AuthLoginRoute,
   AuthRecuperarRoute: AuthRecuperarRoute,
   AuthRegistoRoute: AuthRegistoRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
   ApiPublicEmailDispatchRoute: ApiPublicEmailDispatchRoute,
   ApiPublicEmailWelcomeRoute: ApiPublicEmailWelcomeRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
