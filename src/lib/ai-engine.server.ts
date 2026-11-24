@@ -62,7 +62,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     // O webhook de entrada corre numa função HTTP com limite de execução.
     // Se o motor demorar demasiado, interrompemos a espera para o pipeline enviar
     // a resposta de recuperação ao cliente em vez de perder a resposta por 502/504.
-    signal: AbortSignal.timeout(17_000),
+    signal: AbortSignal.timeout(25_000),
   });
 
   const raw = await response.text();
