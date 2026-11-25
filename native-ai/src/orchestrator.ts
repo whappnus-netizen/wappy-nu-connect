@@ -1,7 +1,7 @@
 import {config} from "./config.js";
 import {getAgentContext,getHistory,getSettings,writeAiLog,supabase} from "./db.js";
 import {consumeCredit} from "./credits.js";
-import {evaluateResponse} from "./evaluation.js";
+import {evaluateResponse,shouldRegenerate} from "./evaluation.js";
 import {classifyIntent} from "./intent.js";
 import {formatExamples,formatKnowledge,rankKnowledge} from "./knowledge.js";
 import {buildMessages,configuredIdentityReply} from "./prompt.js";
@@ -210,6 +210,51 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
  if(response.text.includes("<WHAPPNUS_BOOKING_ACTION>")){
   response={...response,text:"Não consegui concluir essa operação de agendamento neste momento. Vou pedir à equipa para confirmar a disponibilidade e dar seguimento."};
  }
+ let regenerationAttempts=0;
+ let evaluation=evaluateResponse(messageText,response.text,ranked.length,effectiveHistory);
+ // One bounded correction attempt prevents the same opening or answer from being
+ // returned as if it addressed a new customer message.
+ if(!configuredIdentity && !response.text.includes("<WHAPPNUS_BOOKING_ACTION>") && shouldRegenerate(evaluation)){
+  const retryMessages=[...messages,
+   {role:"assistant" as const,content:response.text},
+   {role:"user" as const,content:[
+    "[CORRECÇÃO DE QUALIDADE — a resposta anterior foi rejeitada]",
+    "Falhas detectadas: "+evaluation.flags.join(", "),
+    "Lê novamente a mensagem actual e o histórico completo desta conversa.",
+    "Não repitas a saudação, apresentação, pergunta já respondida ou resposta anterior.",
+    "Reconhece a informação nova que o cliente acabou de fornecer e responde directamente.",
+    "Mensagem actual do cliente: "+messageText,
+    "Produz apenas a resposta final natural, sem explicar esta validação."
+   ].join("\n")}
+  ];
+  try{
+   response=await createProvider().generate(retryMessages,providerOptions,effectiveAttachment?[effectiveAttachment]:[]);
+   regenerationAttempts=1;
+   evaluation=evaluateResponse(messageText,response.text,ranked.length,effectiveHistory);
+  }catch(error){
+   await writeAiLog({
+    organization_id:input.organizationId,conversation_id:input.conversationId??null,message_id:safeMessageId,
+    agent_id:a.id,event_type:"generation",status:"failed",provider:response.provider,model:response.model,
+    intent:intent.intent,latency_ms:Date.now()-started,
+    metadata:{failureReason:"response_regeneration_failed",validationFlags:evaluation.flags,historyMessages:effectiveHistory.length,historySource:input.testMode?"test_payload":"database",regenerationAttempts:1}
+   });
+   throw new Error("AI_RESPONSE_REGENERATION_FAILED");
+  }
+ }
+ if(!configuredIdentity && shouldRegenerate(evaluation)){
+  await writeAiLog({
+   organization_id:input.organizationId,conversation_id:input.conversationId??null,message_id:safeMessageId,
+   agent_id:a.id,event_type:"generation",status:"failed",provider:response.provider,model:response.model,
+   intent:intent.intent,latency_ms:Date.now()-started,
+   metadata:{failureReason:"response_validation_failed",validationFlags:evaluation.flags,historyMessages:effectiveHistory.length,historySource:input.testMode?"test_payload":"database",regenerationAttempts}
+  });
+  await supabase.from("ai_evaluations").insert({
+   organization_id:input.organizationId,conversation_id:input.conversationId??null,message_id:safeMessageId,
+   agent_id:a.id,score:evaluation.score,flags:evaluation.flags
+  });
+  throw new Error("AI_RESPONSE_VALIDATION_FAILED");
+ }
+
  const reactionText = input.text.toLowerCase();
  const reactionEligible = featureConfig["reactionsEnabled"] !== false &&
   !["image","audio","video","document"].includes(input.messageType ?? "") &&
@@ -218,12 +263,20 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
   ? (/(adorei|amei|❤️|muito bom|muito boa)/i.test(reactionText) ? "❤️" : "👍")
   : null;
  const result={text:response.text,provider:response.provider,model:response.model,latencyMs:Date.now()-started,intent:intent.intent,confidence:intent.confidence,usedKnowledge:ranked.length,agentId:a.id,reactionEmoji};
- const evaluation=evaluateResponse(input.text,response.text,ranked.length);
 
  await writeAiLog({
   organization_id:input.organizationId,conversation_id:input.conversationId??null,message_id:safeMessageId,
   agent_id:a.id,event_type:"generation",status:"success",provider:response.provider,model:response.model,
-  intent:intent.intent,latency_ms:result.latencyMs,metadata:{confidence:intent.confidence,usedKnowledge:ranked.length,availableKnowledge:ctx.knowledge.length,availableExamples:ctx.examples.length,historyMessages:Math.min(history.length,6),promptChars:messages[0]?.content.length??0,evaluation,messageType:input.messageType??"text",attachmentLoaded:Boolean(attachment),attachmentEnabled:Boolean(effectiveAttachment),bookingToolCalls}
+  intent:intent.intent,latency_ms:result.latencyMs,
+  metadata:{
+   confidence:intent.confidence,usedKnowledge:ranked.length,availableKnowledge:ctx.knowledge.length,
+   availableExamples:ctx.examples.length,historyMessages:effectiveHistory.length,
+   historySource:input.testMode?"test_payload":"database",promptChars:messages[0]?.content.length??0,
+   outputChars:response.text.length,responseSource:configuredIdentity?"configured_identity_rule":"provider",
+   validationFlags:evaluation.flags,regenerationAttempts,evaluation,
+   messageType:input.messageType??"text",attachmentLoaded:Boolean(attachment),
+   attachmentEnabled:Boolean(effectiveAttachment),bookingToolCalls
+  }
  });
 
  const ev=await supabase.from("ai_evaluations").insert({
