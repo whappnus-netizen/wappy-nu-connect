@@ -10,12 +10,17 @@ let active=0;
 const waiters:Array<()=>void>=[];
 
 async function acquire():Promise<()=>void>{
- if(active===0){active++;return ()=>release();}
+ if(active<1){active++;return ()=>release();}
+ // Transfer the occupied slot directly to the next waiter. Do not decrement
+ // then increment across an await: that race can admit a second inference.
  await new Promise<void>(resolve=>waiters.push(resolve));
- active++;
  return ()=>release();
 }
-function release(){active=Math.max(0,active-1);const next=waiters.shift();if(next)next();}
+function release(){
+ const next=waiters.shift();
+ if(next){next();return;}
+ active=Math.max(0,active-1);
+}
 
 function isTransient(error:unknown):boolean{
  const m=error instanceof Error?error.message:String(error);
