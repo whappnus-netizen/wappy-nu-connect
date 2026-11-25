@@ -47,10 +47,11 @@ function isFirstTurnOnlySection(block: string): boolean {
  */
 function compactText(value: unknown, maxChars: number, query: string, hasHistory: boolean): string {
   const source = typeof value === "string" ? value.trim() : "";
-  if (!source || source.length <= maxChars) return source;
+  if (!source) return "";
 
   const blocks = source.split(/(?=^#{1,4}\s)/m).map((part) => part.trim()).filter(Boolean);
   if (blocks.length <= 1) {
+    if (source.length <= maxChars) return source;
     const head = Math.floor(maxChars * 0.72);
     const tail = maxChars - head - 28;
     return source.slice(0, head) + "\n[… conteúdo extenso abreviado …]\n" + source.slice(-Math.max(0, tail));
@@ -61,6 +62,7 @@ function compactText(value: unknown, maxChars: number, query: string, hasHistory
     .filter(({ block }) => !hasHistory || !isFirstTurnOnlySection(block));
 
   if (!eligible.length) return "";
+  if (source.length <= maxChars && eligible.length === blocks.length) return source;
   const queryTokens = new Set(tokens(query));
   const ranked = eligible.map((item) => {
     const blockTokens = new Set(tokens(item.block));
