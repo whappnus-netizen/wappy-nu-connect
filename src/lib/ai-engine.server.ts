@@ -9,6 +9,7 @@ type GenerateInput = {
   fromWaId?: string | null;
   profileName?: string | null;
   text: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
   agentId?: string | null;
   testMode?: boolean;
   mediaPath?: string | null;
