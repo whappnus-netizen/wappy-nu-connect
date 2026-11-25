@@ -13,7 +13,7 @@ function isGreeting(query: string): boolean {
 }
 
 function isGenericGreetingReply(value: string): boolean {
-  return /^(?:ol[áa][,! ]*)?.{0,70}como posso (?:te|lhe) ajudar[?! .]*$/i.test(value.trim());
+  return /^(?:ol[áa][,! ]*)?.{0,90}como posso (?:te|lhe) ajudar(?: hoje)?[?! .]*$/i.test(value.trim());
 }
 
 /**
