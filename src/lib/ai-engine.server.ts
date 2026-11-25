@@ -35,10 +35,10 @@ type GenerateResult = {
 };
 
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
-  const configuredUrl = process.env["WHAPPNUS_AI_ENGINE_URL"];
-  const secret = process.env["WHAPPNUS_AI_ENGINE_SECRET"];
-  if (!configuredUrl) throw new Error("WHAPPNUS_AI_ENGINE_URL não está configurada no servidor.");
-  if (!secret) throw new Error("WHAPPNUS_AI_ENGINE_SECRET não está configurada no servidor.");
+  const configuredUrl = process.env["WHAPPNUS_NATIVE_AI_ENGINE_URL"] || process.env["WHAPPNUS_AI_ENGINE_URL"];
+  const secret = process.env["WHAPPNUS_NATIVE_AI_ENGINE_SECRET"] || process.env["WHAPPNUS_AI_ENGINE_SECRET"];
+  if (!configuredUrl) throw new Error("WHAPPNUS_NATIVE_AI_ENGINE_URL não está configurada no servidor.");
+  if (!secret) throw new Error("WHAPPNUS_NATIVE_AI_ENGINE_SECRET não está configurada no servidor.");
 
   // Aceita tanto https://host como host para evitar o erro nativo
   // "Failed to parse URL" quando a variável foi guardada sem o esquema.
@@ -105,8 +105,8 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
   organizationId: string; whatsappNumberId: string; conversationId: string; contactId?: string | null;
   mediaPath: string; mediaMimeType: string; messageType: "image" | "document"; messageText?: string | null;
 }): Promise<PaymentProofAnalysis> {
-  const configuredUrl = process.env["WHAPPNUS_AI_ENGINE_URL"];
-  const secret = process.env["WHAPPNUS_AI_ENGINE_SECRET"];
+  const configuredUrl = process.env["WHAPPNUS_NATIVE_AI_ENGINE_URL"] || process.env["WHAPPNUS_AI_ENGINE_URL"];
+  const secret = process.env["WHAPPNUS_NATIVE_AI_ENGINE_SECRET"] || process.env["WHAPPNUS_AI_ENGINE_SECRET"];
   if (!configuredUrl || !secret) throw new Error("Motor de IA não configurado para analisar comprovativos.");
   const url = /^https?:\/\//i.test(configuredUrl) ? configuredUrl : "https://" + configuredUrl;
   const engineUrl = new URL(url);
