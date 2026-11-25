@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { buildMessages } from "../src/prompt.ts";
 import { evaluateResponse, shouldRegenerate } from "../src/evaluation.ts";
+import { mergeConversationMemory } from "../src/memory.ts";
 
 const read = (path) => readFile(new URL("../" + path, import.meta.url), "utf8");
 
@@ -84,6 +85,53 @@ test("test history observability uses the exact history sent to the model", asyn
   assert.match(orchestrator, /historyMessages:effectiveHistory\.length/);
   assert.match(orchestrator, /historySource:input\.testMode\?"test_payload":"database"/);
   assert.match(orchestrator, /regenerationAttempts/);
+});
+
+test("persistent memory stores explicit business facts with provenance", () => {
+  const memory = mergeConversationMemory(
+    null,
+    "Trabalho com formação de inglês e recebo muitos pedidos pelo WhatsApp.",
+    "Como organizas actualmente as inscrições?",
+    "wa-message-123",
+    "2026-11-25T15:00:00.000Z"
+  );
+  assert.ok(memory.summary.includes("Negócio: formação de inglês"));
+  assert.ok(memory.summary.includes("Necessidade: muitos pedidos pelo WhatsApp"));
+  assert.equal(memory.facts.every((fact) => fact.confidence === 1), true);
+  assert.equal(memory.facts.every((fact) => fact.sourceMessageId === "wa-message-123"), true);
+  assert.equal(memory.state.stage, "business_identified");
+  assert.equal(memory.state.lastAssistantQuestion, "Como organizas actualmente as inscrições?");
+});
+
+test("explicit corrections replace stale facts and unrelated sensitive statements are not stored", () => {
+  const previous = mergeConversationMemory(
+    null,
+    "Trabalho com formação de inglês.",
+    "Como posso ajudar?",
+    "message-1"
+  );
+  const corrected = mergeConversationMemory(
+    previous,
+    "Na verdade, trabalho com formação de francês.",
+    "Percebo.",
+    "message-2"
+  );
+  assert.equal(corrected.facts.filter((fact) => fact.category === "business_type").length, 1);
+  assert.ok(corrected.summary.includes("formação de francês"));
+  assert.ok(!corrected.summary.includes("formação de inglês"));
+
+  const unrelated = mergeConversationMemory(null, "Tenho uma doença crónica.", "Entendo.", "message-3");
+  assert.equal(unrelated.facts.length, 0);
+  assert.equal(unrelated.summary, "");
+});
+
+test("memory storage migration enforces tenant ownership and service-only access", async () => {
+  const sql = await read("supabase/migrations/20261125160000_ai_conversation_memory.sql");
+  assert.match(sql, /foreign key \(conversation_id, organization_id\)/i);
+  assert.match(sql, /references public\.conversations\(id, organization_id\)/i);
+  assert.match(sql, /enable row level security/i);
+  assert.match(sql, /revoke all on table public\.ai_conversation_memory from public, anon, authenticated/i);
+  assert.match(sql, /grant select, insert, update, delete on table public\.ai_conversation_memory to service_role/i);
 });
 
 test("queue serialization preserves retry-exhaustion cleanup and tenant boundaries", async () => {
