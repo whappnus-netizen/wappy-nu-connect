@@ -142,11 +142,11 @@ test("agent identity and configured instructions outrank the internal agent labe
  assert.ok(orchestrator.includes('provider:"configured_agent_instruction"'));
 });
 
-test("conversation prompt prevents repeated generic greetings and protects current-turn relevance",async()=>{
+test("conversation prompt preserves dialogue history and protects current-turn relevance",async()=>{
  const prompt=await read("src/prompt.ts");
- assert.ok(prompt.includes("isGenericGreetingReply"));
- assert.ok(prompt.includes("seenAssistant.has(normalized)"));
- assert.ok(prompt.includes("if (!currentIsGreeting && isGenericGreetingReply(rawBody)) continue;"));
+ assert.ok(prompt.includes("Preserve chronological dialogue"));
+ assert.ok(prompt.includes("history.slice(-16)"));
+ assert.ok(prompt.includes("messages.push(...recent.slice(-12))"));
  assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
  assert.ok(prompt.includes("Não reinicies a conversa nem repitas a saudação"));
 });
