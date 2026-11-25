@@ -27,7 +27,8 @@ async function syncExpiredSubscriptions(){
 void syncExpiredSubscriptions();
 const expiryTimer=setInterval(()=>{void syncExpiredSubscriptions();},60_000);
 expiryTimer.unref();
-startGenerationWorker();
+if(config.AI_WORKER_ENABLED)startGenerationWorker();
+else console.info(JSON.stringify({event:"ai_worker_disabled",service:"whappnus-native-ai-engine"}));
 
 function authorized(req:express.Request){return req.header("authorization")==="Bearer "+config.AI_INTERNAL_SECRET;}
 
