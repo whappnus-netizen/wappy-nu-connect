@@ -144,11 +144,12 @@ test("agent identity and configured instructions outrank the internal agent labe
 
 test("conversation prompt preserves dialogue history and protects current-turn relevance",async()=>{
  const prompt=await read("src/prompt.ts");
- assert.ok(prompt.includes("Preserve chronological dialogue"));
- assert.ok(prompt.includes("history.slice(-16)"));
- assert.ok(prompt.includes("messages.push(...recent.slice(-12))"));
- assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
- assert.ok(prompt.includes("Não reinicies a conversa nem repitas a saudação"));
+ assert.ok(prompt.includes("## Regras obrigatórias de continuidade"));
+ assert.ok(prompt.includes("history.slice(-40)"));
+ assert.ok(prompt.includes("messages.push(...recent.slice(-16))"));
+ assert.ok(prompt.includes("[MENSAGEM ACTUAL"));
+ assert.ok(prompt.includes("não repitas a mensagem de boas-vindas"));
+ assert.ok(prompt.includes("Memória extractiva dos turnos recentes"));
 });
 
 test("generation queue serializes jobs for the same conversation across workers",async()=>{
