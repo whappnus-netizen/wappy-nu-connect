@@ -44,6 +44,7 @@ import { Route as ApiPublicEmailDispatchRouteImport } from './routes/api/public/
 import { Route as ApiPublicEmailWelcomeRouteImport } from './routes/api/public/email.welcome'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp.webhook'
 import { Route as ApiPublicWhatsappQrEventsRouteImport } from './routes/api/public/whatsapp.qr.events'
+import { Route as ApiPublicAiGenerationCompleteRouteImport } from './routes/api/public/ai.generation-complete'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -223,6 +224,12 @@ const ApiPublicWhatsappQrEventsRoute =
     path: '/api/public/whatsapp/qr/events',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAiGenerationCompleteRoute =
+  ApiPublicAiGenerationCompleteRouteImport.update({
+    id: '/api/public/ai/generation-complete',
+    path: '/api/public/ai/generation-complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/api/public/email/welcome': typeof ApiPublicEmailWelcomeRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/whatsapp/qr/events': typeof ApiPublicWhatsappQrEventsRoute
+  '/api/public/ai/generation-complete': typeof ApiPublicAiGenerationCompleteRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -371,6 +379,7 @@ export interface FileRouteTypes {
     | '/api/public/email/welcome'
     | '/api/public/whatsapp/webhook'
     | '/api/public/whatsapp/qr/events'
+    | '/api/public/ai/generation-complete'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -466,6 +475,7 @@ export interface RootRouteChildren {
   ApiPublicEmailWelcomeRoute: typeof ApiPublicEmailWelcomeRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicWhatsappQrEventsRoute: typeof ApiPublicWhatsappQrEventsRoute
+  ApiPublicAiGenerationCompleteRoute: typeof ApiPublicAiGenerationCompleteRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -715,6 +725,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappQrEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ai/generation-complete': {
+      id: '/api/public/ai/generation-complete'
+      path: '/api/public/ai/generation-complete'
+      fullPath: '/api/public/ai/generation-complete'
+      preLoaderRoute: typeof ApiPublicAiGenerationCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -779,6 +796,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicEmailWelcomeRoute: ApiPublicEmailWelcomeRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicWhatsappQrEventsRoute: ApiPublicWhatsappQrEventsRoute,
+  ApiPublicAiGenerationCompleteRoute: ApiPublicAiGenerationCompleteRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
