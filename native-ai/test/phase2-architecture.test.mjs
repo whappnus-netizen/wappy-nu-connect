@@ -130,3 +130,32 @@ test("pending native generation does not send a premature fallback",async()=>{
  assert.match(pipeline,/errorCode === "generation_pending_retry"/);
  assert.match(pipeline,/generation_pending_delivery_queued/);
 });
+
+
+test("agent identity and configured instructions outrank the internal agent label",async()=>{
+ const prompt=await read("src/prompt.ts");
+ const orchestrator=await read("src/orchestrator.ts");
+ assert.ok(prompt.includes("FONTE OFICIAL DA IDENTIDADE"));
+ assert.ok(prompt.includes("function isIdentityQuestion"));
+ assert.ok(prompt.includes("export function configuredIdentityReply"));
+ assert.ok(orchestrator.includes("configuredIdentityReply(a,messageText)"));
+ assert.ok(orchestrator.includes('provider:"configured_agent_instruction"'));
+});
+
+test("conversation prompt preserves dialogue history and protects current-turn relevance",async()=>{
+ const prompt=await read("src/prompt.ts");
+ assert.ok(prompt.includes("Preserve chronological dialogue"));
+ assert.ok(prompt.includes("history.slice(-16)"));
+ assert.ok(prompt.includes("messages.push(...recent.slice(-12))"));
+ assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
+ assert.ok(prompt.includes("Não reinicies a conversa nem repitas a saudação"));
+});
+
+test("generation queue serializes jobs for the same conversation across workers",async()=>{
+ const sql=await read("supabase/migrations/20261125150000_serialize_ai_generation_per_conversation.sql");
+ assert.match(sql,/prior\.conversation_id=j\.conversation_id/);
+ assert.match(sql,/prior\.status in \('queued','processing'\)/);
+ assert.match(sql,/for update of j skip locked/i);
+ assert.match(sql,/organization_id=j\.organization_id/);
+ assert.match(sql,/whatsapp_number_id=j\.whatsapp_number_id/);
+});

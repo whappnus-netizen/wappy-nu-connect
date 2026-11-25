@@ -4,7 +4,7 @@ import {consumeCredit} from "./credits.js";
 import {evaluateResponse} from "./evaluation.js";
 import {classifyIntent} from "./intent.js";
 import {formatExamples,formatKnowledge,rankKnowledge} from "./knowledge.js";
-import {buildMessages} from "./prompt.js";
+import {buildMessages,configuredIdentityReply} from "./prompt.js";
 import {createProvider} from "./provider-router.js"; import {executeBookingAction} from "./booking-tools.js";
 import type {AgentConfig,GenerateRequest,GeneratedResponse,MediaAttachment} from "./types.js";
 
@@ -157,7 +157,10 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
    messages[0]={...systemMessage,content:systemMessage.content+"\n\n"+bookingInstructions};
   }
  }
- let response=await createProvider().generate(messages,providerOptions,effectiveAttachment?[effectiveAttachment]:[]);
+ const configuredIdentity=configuredIdentityReply(a,messageText);
+ let response=configuredIdentity
+  ? {text:configuredIdentity,provider:"configured_agent_instruction",model:"identity_rule"}
+  : await createProvider().generate(messages,providerOptions,effectiveAttachment?[effectiveAttachment]:[]);
  for(let turn=0;turn<3&&bookingPermissions.enabled;turn++){
   const action=parseBookingAction(response.text);
   if(!action)break;
