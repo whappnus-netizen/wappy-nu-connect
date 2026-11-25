@@ -50,6 +50,7 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
       agentId: data.agentId ?? null,
       conversationId: data.conversationId ?? null,
       text: data.message,
+      history: data.history ?? [],
       testMode: true,
     });
     return {
