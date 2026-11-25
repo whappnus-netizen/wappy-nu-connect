@@ -5,7 +5,7 @@ function words(value: string): string[] {
 }
 
 function isIdentityQuestion(query: string): boolean {
-  return /\b(como\s+(?:te|se|você\s+se)\s+cham(?:a|as)|qual\s+(?:é|e)\s+(?:o\s+)?(?:teu|seu)\s+nome|quem\s+és\s+tu|quem\s+é\s+você|diz[- ]me\s+o\s+teu\s+nome)\b/i.test(query.trim());
+  return /\b(como\s+(?:te|se|você(?:\s+se)?)\s+cham(?:a|as)|qual\s+(?:é|e)\s+(?:o\s+)?(?:teu|seu)\s+nome|quem\s+és\s+tu|quem\s+é\s+você|diz[- ]me\s+o\s+teu\s+nome)\b/i.test(query.trim());
 }
 
 function isGreeting(query: string): boolean {
