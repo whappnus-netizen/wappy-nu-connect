@@ -135,7 +135,7 @@ test("pending native generation does not send a premature fallback",async()=>{
 test("agent identity and configured instructions outrank the internal agent label",async()=>{
  const prompt=await read("src/prompt.ts");
  const orchestrator=await read("src/orchestrator.ts");
- assert.ok(prompt.includes("O nome interno do registo é apenas uma etiqueta administrativa."));
+ assert.ok(prompt.includes("Esse nome interno é apenas uma etiqueta administrativa"));
  assert.ok(prompt.includes("function isIdentityQuestion"));
  assert.ok(prompt.includes("export function configuredIdentityReply"));
  assert.ok(orchestrator.includes("configuredIdentityReply(a,messageText)"));
@@ -148,5 +148,5 @@ test("conversation prompt prevents repeated generic greetings and protects curre
  assert.ok(prompt.includes("seenAssistant.has(normalized)"));
  assert.ok(prompt.includes("if (!currentIsGreeting && isGenericGreetingReply(rawBody)) continue;"));
  assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
- assert.ok(prompt.includes("Não reinicies a conversa nem repitas uma saudação"));
+ assert.ok(prompt.includes("Não reinicies a conversa nem repitas a saudação"));
 });
