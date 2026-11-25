@@ -15,6 +15,8 @@ export interface GenerateRequest {
   fromWaId?: string | null;
   profileName?: string | null;
   text: string;
+  /** Previous turns supplied by the authenticated training playground. */
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
   metadata?: Record<string, unknown>;
   agentId?: string | null;
   /** Internal simulation: generate a preview without requiring WhatsApp auto-reply to be enabled. */
