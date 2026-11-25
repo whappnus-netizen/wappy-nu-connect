@@ -135,7 +135,7 @@ test("pending native generation does not send a premature fallback",async()=>{
 test("agent identity and configured instructions outrank the internal agent label",async()=>{
  const prompt=await read("src/prompt.ts");
  const orchestrator=await read("src/orchestrator.ts");
- assert.ok(prompt.includes("Esse nome interno é apenas uma etiqueta administrativa"));
+ assert.ok(prompt.includes("FONTE OFICIAL DA IDENTIDADE"));
  assert.ok(prompt.includes("function isIdentityQuestion"));
  assert.ok(prompt.includes("export function configuredIdentityReply"));
  assert.ok(orchestrator.includes("configuredIdentityReply(a,messageText)"));
