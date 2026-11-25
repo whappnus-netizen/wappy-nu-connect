@@ -138,7 +138,7 @@ test("explicit corrections replace stale facts and unrelated sensitive statement
 });
 
 test("memory storage migration enforces tenant ownership and service-only access", async () => {
-  const sql = await read("supabase/migrations/20261125160000_ai_conversation_memory.sql");
+  const sql = await read("supabase/migrations/20261125153924_ai_conversation_memory.sql");
   assert.match(sql, /foreign key \(conversation_id, organization_id\)/i);
   assert.match(sql, /references public\.conversations\(id, organization_id\)/i);
   assert.match(sql, /enable row level security/i);
@@ -147,7 +147,7 @@ test("memory storage migration enforces tenant ownership and service-only access
 });
 
 test("queue serialization preserves retry-exhaustion cleanup and tenant boundaries", async () => {
-  const sql = await read("supabase/migrations/20261125150000_serialize_ai_generation_per_conversation.sql");
+  const sql = await read("supabase/migrations/20261125153619_serialize_ai_generation_per_conversation.sql");
   assert.match(sql, /status='failed'/);
   assert.match(sql, /lease_expired_max_attempts/);
   assert.match(sql, /prior\.organization_id=j\.organization_id/);
