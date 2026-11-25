@@ -112,7 +112,7 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
  const testHistory = input.testMode && Array.isArray(input.history)
   ? input.history
     .filter(turn => (turn.role === "user" || turn.role === "assistant") && typeof turn.content === "string" && turn.content.trim())
-    .slice(-20)
+    .slice(-40)
     .map(turn => ({ from_me: turn.role === "assistant", direction: turn.role === "assistant" ? "outbound" : "inbound", body: turn.content.trim() }))
   : [];
  const effectiveHistory = testHistory.length ? testHistory : history;
