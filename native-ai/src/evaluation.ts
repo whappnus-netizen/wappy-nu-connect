@@ -30,7 +30,7 @@ function isExplicitRepeatRequest(value: string): boolean {
 }
 
 function isIntroductoryReply(value: string): boolean {
-  return /^(?:ol[áa][!,. ]*)?(?:seja\s+(?:muito\s+)?bem-vind[oa]|sou\s+.{1,70}\b(?:atendente|assistente)\b|vi\s+que\s+tem\s+interesse|como\s+posso\s+(?:te|lhe)\s+ajudar)/i.test(value.trim());
+  return /^(?:ol[áa][!,. ]*)?(?:seja\s+(?:muito\s+)?bem-vind[oa]|sou\s+.{1,70}\b(?:atendente|assistente)\b|vi\s+que\s+tem\s+interesse|como\s+posso\s+(?:(?:te|lhe)\s+)?ajudar)/i.test(value.trim());
 }
 
 function historyBody(turn: Record<string, unknown>): string {
