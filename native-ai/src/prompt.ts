@@ -76,7 +76,7 @@ function compactText(value: unknown, maxChars: number, query: string, hasHistory
     if (selected.size >= 4) break;
     if (item.score > 0) selected.add(item.index);
   }
-  if (selected.size === 0) {
+  if (!ranked.some((item) => item.score > 0)) {
     for (const item of ranked.slice(0, 2)) selected.add(item.index);
   }
 
@@ -169,6 +169,7 @@ export function buildMessages(
     "## Regras obrigatórias de continuidade",
     "- Responde primeiro ao conteúdo da mensagem actual. Não respondas como se cada mensagem fosse uma conversa nova.",
     "- Usa as mensagens anteriores para compreender referências curtas, respostas, confirmações, objecções e mudanças de assunto.",
+    "- Se a mensagem actual já identificar o negócio, produto, serviço ou necessidade do cliente, reconhece essa informação e avança; não perguntes novamente aquilo que já foi respondido.",
     "- Quando o cliente responde a uma pergunta tua, reconhece a informação e avança para o próximo passo. Nunca voltes a fazer a mesma pergunta depois de ela ter sido respondida.",
     "- Não copies literalmente exemplos de treino: são referências de estilo e qualidade, não respostas fixas nem macros.",
     "- Não reutilizes exemplos de primeira abordagem depois de existir histórico. Não repitas apresentações, boas-vindas ou perguntas de qualificação já respondidas.",
