@@ -146,7 +146,7 @@ test("conversation prompt prevents repeated generic greetings and protects curre
  const prompt=await read("src/prompt.ts");
  assert.ok(prompt.includes("isGenericGreetingReply"));
  assert.ok(prompt.includes("seenAssistant.has(normalized)"));
- assert.ok(prompt.includes("Old generic greetings are toxic context"));
+ assert.ok(prompt.includes("if (!currentIsGreeting && isGenericGreetingReply(rawBody)) continue;"));
  assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
  assert.ok(prompt.includes("Não reinicies a conversa nem repitas uma saudação"));
 });
