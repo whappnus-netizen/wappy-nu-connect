@@ -1006,6 +1006,16 @@ export async function processIncomingMessage(
         provider: incoming.provider,
         detail: { stage: "ai_generation", error: errorCode.slice(0, 200) },
       });
+      // A geração que excede a espera HTTP fica na fila durável e será entregue
+      // pelo callback autenticado. Não enviar fallback antes da resposta final.
+      if (errorCode === "generation_pending_retry" && process.env["WHAPPNUS_NATIVE_AI_ENGINE_URL"]) {
+        await proofFallbackPromise;
+        await logWhatsAppEvent(number.organization_id, "ai_skipped", {
+          whatsappNumberId: number.id, provider: incoming.provider,
+          detail: { reason: "generation_pending_delivery_queued" },
+        });
+        return { ...base, aiReplied: false, aiSkippedReason: "generation_pending" };
+      }
       // Não contornar limites de plano nem estados de atendimento intencionais.
       if (["AUTO_REPLY_DISABLED", "NO_ACTIVE_AGENT", "SUBSCRIPTION_REQUIRED", "ACCOUNT_SUSPENDED", "AI_CONVERSATIONS_EXHAUSTED", "PLAN_HAS_NO_AI_CONVERSATIONS"].includes(errorCode)) {
         await proofFallbackPromise;
