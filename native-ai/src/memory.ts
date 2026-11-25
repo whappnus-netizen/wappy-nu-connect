@@ -25,7 +25,7 @@ function extractFacts(text: string, sourceMessageId: string | null, observedAt: 
   const patterns: Array<{ category: MemoryFact["category"]; pattern: RegExp; businessOnly?: boolean }> = [
     {
       category: "business_type",
-      pattern: /\b(?:trabalho com|o meu neg[oó]cio [ée]|a minha empresa [ée]|minha empresa [ée]|sou (?:dono|dona|propriet[aá]rio|propriet[aá]ria) de|tenho (?:uma?|um)\s+(?:escola|centro de forma[cç][aã]o|academia|pastelaria|restaurante|hamburgueria|loja|sal[aã]o|barbearia|cl[ií]nica|imobili[aá]ria|ag[eê]ncia|hotel|hospedaria|consultoria|papelaria|oficina|lavandaria|creche|mercearia|boutique|gin[aá]sio|estofaria|farm[aá]cia|forma[cç][aã]o))\s+([^.!?\n]{3,140})/i
+      pattern: /\b(?:trabalho com|o meu neg[oó]cio [ée]|a minha empresa [ée]|minha empresa [ée]|sou (?:dono|dona|propriet[aá]rio|propriet[aá]ria) de|sou (?:professor|professora|formador|formadora) de)\s+([^.!?\n]{3,140})|\b(tenho\s+(?:uma?|um)\s+(?:escola|centro de forma[cç][aã]o|academia|pastelaria|restaurante|hamburgueria|loja|sal[aã]o|barbearia|cl[ií]nica|imobili[aá]ria|ag[eê]ncia|hotel|hospedaria|consultoria|papelaria|oficina|lavandaria|creche|mercearia|boutique|gin[aá]sio|estofaria|farm[aá]cia|forma[cç][aã]o)(?:\s+[^.!?\n]{0,100})?)/i
     },
     {
       category: "customer_need",
@@ -53,7 +53,7 @@ function extractFacts(text: string, sourceMessageId: string | null, observedAt: 
     const match = text.match(rule.pattern);
     if (!match?.[1]) continue;
     if (rule.businessOnly && !BUSINESS_TERMS.test(text)) continue;
-    const value = cleanValue(match[1]);
+    const value = cleanValue(match[1] ?? match[2] ?? "").replace(/^tenho\s+(?:uma?|um)\s+/i, "");
     if (value.length < 3) continue;
     facts.push({
       category: rule.category,
