@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
+import type { ConversationMemory } from "./memory.js";
 
 export const supabase=createClient(config.SUPABASE_URL,config.SUPABASE_SERVICE_ROLE_KEY,{auth:{autoRefreshToken:false,persistSession:false}});
 
@@ -53,6 +54,39 @@ export async function getTrainingExamples(organizationId:string){
  const r=await supabase.from("ai_training_examples").select("*").eq("organization_id",organizationId).eq("is_active",true).limit(20);
  if(r.error)throw new Error("ai_training_examples: "+r.error.message);
  return (r.data??[]) as Array<Record<string,unknown>>;
+}
+export async function getConversationMemory(organizationId:string,conversationId:string){
+ const r=await supabase.from("ai_conversation_memory")
+  .select("summary,facts,state,last_message_id,last_message_at,updated_at")
+  .eq("organization_id",organizationId)
+  .eq("conversation_id",conversationId)
+  .maybeSingle();
+ if(r.error)throw new Error("ai_conversation_memory read: "+r.error.message);
+ if(!r.data)return null;
+ return {
+  summary:String(r.data.summary??""),
+  facts:Array.isArray(r.data.facts)?r.data.facts as ConversationMemory["facts"]:[],
+  state:r.data.state&&typeof r.data.state==="object"?r.data.state as Record<string,unknown>:{}
+ };
+}
+export async function upsertConversationMemory(
+ organizationId:string,
+ conversationId:string,
+ agentId:string,
+ memory:ConversationMemory
+){
+ const r=await supabase.from("ai_conversation_memory").upsert({
+  organization_id:organizationId,
+  conversation_id:conversationId,
+  agent_id:agentId,
+  summary:memory.summary,
+  facts:memory.facts,
+  state:memory.state,
+  last_message_id:memory.lastMessageId,
+  last_message_at:memory.lastMessageAt,
+  updated_at:new Date().toISOString()
+ },{onConflict:"organization_id,conversation_id"});
+ if(r.error)throw new Error("ai_conversation_memory upsert: "+r.error.message);
 }
 export async function writeAiLog(payload:Record<string,unknown>){
  const r=await supabase.from("ai_logs").insert(payload);
