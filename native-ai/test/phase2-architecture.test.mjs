@@ -113,3 +113,20 @@ test("AI delivery outbox is durable and unique per generation job",async()=>{
  assert.match(sql,/messages_ai_generation_job_id_unique/);
  assert.match(sql,/for update skip locked/i);
 });
+
+test("slow-job delivery respects live human takeover and avoids duplicate sends",async()=>{
+ const pipeline=await read("../../src/lib/whatsapp/pipeline.server.ts");
+ const route=await read("../../src/routes/api/public/ai.generation-complete.ts");
+ assert.match(pipeline,/conversation\.status !== "open"/);
+ assert.match(pipeline,/!conversation\.ai_enabled/);
+ assert.match(pipeline,/requireActiveSubscription/);
+ assert.match(pipeline,/ai_generation_job_id/);
+ assert.match(pipeline,/AI_DELIVERY_UNCERTAIN/);
+ assert.match(route,/WHAPPNUS_NATIVE_AI_ENGINE_SECRET/);
+ assert.doesNotMatch(route,/organizationId\s*:/);
+});
+test("pending native generation does not send a premature fallback",async()=>{
+ const pipeline=await read("../../src/lib/whatsapp/pipeline.server.ts");
+ assert.match(pipeline,/errorCode === "generation_pending_retry"/);
+ assert.match(pipeline,/generation_pending_delivery_queued/);
+});
