@@ -20,7 +20,7 @@ function configuredOldIdentity(a: AgentConfig): string | null {
   const training = [a.personality, a.instructions, a.objective, a.extra_instructions]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .join("\n\n");
-  const match = training.match(/(?:o\s+teu\s+nome\s+é|chamo[- ]me)\s+([\p{Lu}][\p{L}'’-]{1,40})/u);
+  const match = training.match(/(?:o\s+teu\s+nome\s+é|chamo[- ]me)\s+([\p{Lu}][\p{L}'’-]{1,40})/iu);
   return match?.[1] ?? null;
 }
 
