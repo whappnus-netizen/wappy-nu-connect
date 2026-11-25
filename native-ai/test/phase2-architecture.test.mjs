@@ -59,3 +59,11 @@ test("conversation history is tenant-scoped and excludes the current inbound mes
  assert.match(db,/\.neq\("wa_message_id",excludeWaMessageId\)/);
  assert.match(orchestrator,/getHistory\(input\.conversationId,input\.organizationId,typeof input\.messageId==="string"\?input\.messageId:null\)/);
 });
+
+test("internal playground uses the same central generator without queue billing",async()=>{
+ const server=await read("src/server.ts");
+ const orchestrator=await read("src/orchestrator.ts");
+ assert.match(server,/if\(input\.testMode\)/);
+ assert.match(server,/generateReply\(input\)/);
+ assert.match(orchestrator,/if\(!input\.testMode\) await consumeCredit/);
+});
