@@ -1006,6 +1006,16 @@ export async function processIncomingMessage(
         provider: incoming.provider,
         detail: { stage: "ai_generation", error: errorCode.slice(0, 200) },
       });
+      // A geração que excede a espera HTTP fica na fila durável e será entregue
+      // pelo callback autenticado. Não enviar fallback antes da resposta final.
+      if (errorCode === "generation_pending_retry" && process.env["WHAPPNUS_NATIVE_AI_ENGINE_URL"]) {
+        await proofFallbackPromise;
+        await logWhatsAppEvent(number.organization_id, "ai_skipped", {
+          whatsappNumberId: number.id, provider: incoming.provider,
+          detail: { reason: "generation_pending_delivery_queued" },
+        });
+        return { ...base, aiReplied: false, aiSkippedReason: "generation_pending" };
+      }
       // Não contornar limites de plano nem estados de atendimento intencionais.
       if (["AUTO_REPLY_DISABLED", "NO_ACTIVE_AGENT", "SUBSCRIPTION_REQUIRED", "ACCOUNT_SUSPENDED", "AI_CONVERSATIONS_EXHAUSTED", "PLAN_HAS_NO_AI_CONVERSATIONS"].includes(errorCode)) {
         await proofFallbackPromise;
@@ -1103,6 +1113,7 @@ export async function sendOutgoingMessage(input: {
   isAi?: boolean;
   sentBy?: string | null;
   reaction?: { waMessageId: string; emoji: string };
+  aiGenerationJobId?: string;
 }): Promise<{ waMessageId: string | null; provider: string }> {
   const admin = serviceClient();
   const number = await loadNumber(input.whatsappNumberId);
@@ -1157,7 +1168,49 @@ export async function sendOutgoingMessage(input: {
     };
   }
 
+  let pendingAiMessageId: string | null = null;
   try {
+    if (input.aiGenerationJobId) {
+      const { data: existing, error: existingError } = await admin.from("messages")
+        .select("id,status,wa_message_id,created_at")
+        .eq("organization_id", input.organizationId)
+        .eq("ai_generation_job_id", input.aiGenerationJobId)
+        .maybeSingle();
+      if (existingError) throw new Error("Não foi possível verificar a entrega idempotente: " + existingError.message);
+      if (existing) {
+        if (["sent", "delivered", "read"].includes(String(existing.status))) {
+          return { waMessageId: typeof existing.wa_message_id === "string" ? existing.wa_message_id : null, provider: providerName };
+        }
+        if (existing.status === "queued") {
+          const ageMs = Date.now() - new Date(existing.created_at).getTime();
+          if (Number.isFinite(ageMs) && ageMs > 60_000) {
+            await admin.from("messages").update({ status: "failed" })
+              .eq("id", existing.id).eq("organization_id", input.organizationId).eq("status", "queued");
+            throw new Error("AI_DELIVERY_UNCERTAIN");
+          }
+          return { waMessageId: null, provider: providerName };
+        }
+        throw new Error("AI_DELIVERY_PREVIOUSLY_FAILED");
+      }
+      const { data: queuedMessage, error: queueInsertError } = await admin.from("messages").insert({
+        organization_id: input.organizationId,
+        conversation_id: input.conversationId,
+        whatsapp_number_id: input.whatsappNumberId,
+        direction: "outbound",
+        message_type: "text",
+        body: input.body,
+        status: "queued",
+        sent_by: null,
+        is_ai: true,
+        ai_generation_job_id: input.aiGenerationJobId,
+      }).select("id").single();
+      if (queueInsertError) {
+        if (queueInsertError.code === "23505") return { waMessageId: null, provider: providerName };
+        throw new Error("Não foi possível reservar a entrega: " + queueInsertError.message);
+      }
+      pendingAiMessageId = String(queuedMessage.id);
+    }
+
     const sent = await provider.sendMessage({
       ...ref,
       to,
@@ -1165,21 +1218,28 @@ export async function sendOutgoingMessage(input: {
       ...(outgoingMedia ? { media: outgoingMedia } : {}),
       ...(metaCreds ? { meta: metaCreds } : {}),
     });
-    const { error: messageInsertError } = await admin.from("messages").insert({
-      organization_id: input.organizationId,
-      conversation_id: input.conversationId,
-      whatsapp_number_id: input.whatsappNumberId,
-      direction: "outbound",
-      message_type: input.media?.kind ?? "text",
-      body: input.media ? (input.media.caption || ({ image: "[Imagem enviada]", audio: "[Áudio enviado]", video: "[Vídeo enviado]", document: "[Documento enviado]" } as Record<string, string>)[input.media.kind]) : input.body,
-      media_url: input.media?.storagePath ?? null,
-      status: "sent",
-      wa_message_id: sent.waMessageId,
-      sent_at: new Date().toISOString(),
-      sent_by: input.sentBy ?? null,
-      is_ai: Boolean(input.isAi),
-    });
-    if (messageInsertError) throw new Error("Mensagem enviada, mas não foi possível gravar o histórico: " + messageInsertError.message);
+    if (pendingAiMessageId) {
+      const { error: deliveryUpdateError } = await admin.from("messages").update({
+        status: "sent", wa_message_id: sent.waMessageId, sent_at: new Date().toISOString(),
+      }).eq("id", pendingAiMessageId).eq("organization_id", input.organizationId);
+      if (deliveryUpdateError) throw new Error("Mensagem enviada, mas a confirmação da entrega não foi gravada: " + deliveryUpdateError.message);
+    } else {
+      const { error: messageInsertError } = await admin.from("messages").insert({
+        organization_id: input.organizationId,
+        conversation_id: input.conversationId,
+        whatsapp_number_id: input.whatsappNumberId,
+        direction: "outbound",
+        message_type: input.media?.kind ?? "text",
+        body: input.media ? (input.media.caption || ({ image: "[Imagem enviada]", audio: "[Áudio enviado]", video: "[Vídeo enviado]", document: "[Documento enviado]" } as Record<string, string>)[input.media.kind]) : input.body,
+        media_url: input.media?.storagePath ?? null,
+        status: "sent",
+        wa_message_id: sent.waMessageId,
+        sent_at: new Date().toISOString(),
+        sent_by: input.sentBy ?? null,
+        is_ai: Boolean(input.isAi),
+      });
+      if (messageInsertError) throw new Error("Mensagem enviada, mas não foi possível gravar o histórico: " + messageInsertError.message);
+    }
     await admin
       .from("conversations")
       .update({ last_message_at: new Date().toISOString() })
@@ -1211,6 +1271,10 @@ export async function sendOutgoingMessage(input: {
     });
     return { waMessageId: sent.waMessageId, provider: providerName };
   } catch (e) {
+    if (pendingAiMessageId) {
+      await admin.from("messages").update({ status: "failed" })
+        .eq("id", pendingAiMessageId).eq("organization_id", input.organizationId);
+    }
     await logWhatsAppEvent(input.organizationId, "message_failed", {
       whatsappNumberId: number.id,
       provider: providerName,
@@ -1219,3 +1283,80 @@ export async function sendOutgoingMessage(input: {
     throw e;
   }
 }
+
+
+/**
+ * Delivery callback for a completed durable AI job. All tenant and conversation
+ * identifiers are loaded from the trusted job row, never from callback input.
+ */
+export async function deliverAiGenerationJob(jobId: string): Promise<{
+  ok: boolean; status: "sent" | "skipped" | "pending" | "failed"; reason?: string;
+}> {
+  const admin = serviceClient();
+  const { data: job, error: jobError } = await admin.from("ai_generation_jobs")
+    .select("id,organization_id,whatsapp_number_id,conversation_id,message_id,request_payload,result_payload,created_at,status")
+    .eq("id", jobId).maybeSingle();
+  if (jobError) throw new Error("AI_DELIVERY_JOB_LOOKUP_FAILED: " + jobError.message);
+  if (!job || job.status !== "succeeded") return { ok: true, status: "pending", reason: "generation_not_ready" };
+  if (!job.message_id || !job.conversation_id) return { ok: true, status: "skipped", reason: "not_a_whatsapp_message" };
+  const request = job.request_payload && typeof job.request_payload === "object"
+    ? job.request_payload as Record<string, unknown> : {};
+  if (request["testMode"] === true) return { ok: true, status: "skipped", reason: "test_mode" };
+
+  const [numberResult, conversationResult, settingsResult, inboundResult] = await Promise.all([
+    admin.from("whatsapp_numbers").select("id,organization_id,status,ai_enabled")
+      .eq("id", job.whatsapp_number_id).eq("organization_id", job.organization_id).maybeSingle(),
+    admin.from("conversations").select("id,status,assigned_to,ai_enabled,last_inbound_at")
+      .eq("id", job.conversation_id).eq("organization_id", job.organization_id).maybeSingle(),
+    admin.from("ai_settings").select("autoreply_enabled")
+      .eq("organization_id", job.organization_id).maybeSingle(),
+    admin.from("messages").select("id,created_at")
+      .eq("organization_id", job.organization_id).eq("conversation_id", job.conversation_id)
+      .eq("wa_message_id", job.message_id).eq("direction", "inbound").maybeSingle(),
+  ]);
+  for (const result of [numberResult, conversationResult, settingsResult, inboundResult]) {
+    if (result.error) throw new Error("AI_DELIVERY_STATE_LOOKUP_FAILED: " + result.error.message);
+  }
+  const number = numberResult.data;
+  const conversation = conversationResult.data;
+  const inbound = inboundResult.data;
+  if (!number || !conversation || !inbound) return { ok: true, status: "skipped", reason: "source_state_missing" };
+  if (number.status !== "connected" || !number.ai_enabled) return { ok: true, status: "skipped", reason: "whatsapp_ai_offline" };
+  if (conversation.status !== "open" || !conversation.ai_enabled || (conversation.assigned_to && !conversation.ai_enabled)) {
+    return { ok: true, status: "skipped", reason: "conversation_not_ai_eligible" };
+  }
+  if (settingsResult.data?.autoreply_enabled === false) return { ok: true, status: "skipped", reason: "auto_reply_off" };
+  if (conversation.last_inbound_at && inbound.created_at &&
+      new Date(conversation.last_inbound_at).getTime() > new Date(inbound.created_at).getTime()) {
+    return { ok: true, status: "skipped", reason: "newer_inbound_message_exists" };
+  }
+  try {
+    const { requireActiveSubscription } = await import("../whatsapp.server");
+    await requireActiveSubscription(job.organization_id);
+  } catch {
+    return { ok: true, status: "skipped", reason: "subscription_inactive" };
+  }
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const { count, error: countError } = await admin.from("messages").select("id", { count: "exact", head: true })
+    .eq("organization_id", job.organization_id).eq("conversation_id", job.conversation_id)
+    .eq("direction", "outbound").eq("is_ai", true).gte("created_at", since);
+  if (countError) throw new Error("AI_DELIVERY_RATE_LIMIT_LOOKUP_FAILED: " + countError.message);
+  if ((count ?? 0) >= 6) return { ok: true, status: "skipped", reason: "rate_limited" };
+
+  const result = job.result_payload && typeof job.result_payload === "object"
+    ? job.result_payload as Record<string, unknown> : {};
+  const text = typeof result["text"] === "string" ? result["text"].trim() : "";
+  if (!text) return { ok: true, status: "failed", reason: "empty_generation_result" };
+  const sent = await sendOutgoingMessage({
+    organizationId: job.organization_id,
+    whatsappNumberId: job.whatsapp_number_id,
+    conversationId: job.conversation_id,
+    body: text,
+    isAi: true,
+    aiGenerationJobId: job.id,
+  });
+  return sent.waMessageId
+    ? { ok: true, status: "sent" }
+    : { ok: true, status: "pending", reason: "delivery_already_claimed" };
+}
+
