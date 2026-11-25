@@ -1,4 +1,5 @@
 import {randomUUID} from "node:crypto";
+import {config} from "./config.js";
 import {supabase} from "./db.js";
 import {generateReply} from "./orchestrator.js";
 import type {GenerateRequest,GeneratedResponse} from "./types.js";
@@ -53,12 +54,14 @@ async function processOne():Promise<void>{
  if(error)throw new Error("AI_QUEUE_CLAIM_FAILED: "+error.message);
  const job=(Array.isArray(data)?data[0]:data) as JobRow|null;
  if(!job?.id)return;
+ console.info(JSON.stringify({event:"ai_job_claimed",jobId:job.id,workerId,attempt:job.attempt_count}));
  try{
   const result=await generateReply(job.request_payload);
   const {error:finishError}=await supabase.rpc("finish_ai_generation_job",{
    _job_id:job.id,_worker_id:workerId,_status:"succeeded",_result:result,_error_code:null
   });
   if(finishError)throw new Error("AI_QUEUE_FINISH_FAILED: "+finishError.message);
+  console.info(JSON.stringify({event:"ai_job_generated",jobId:job.id,workerId,provider:result.provider,model:result.model,latencyMs:result.latencyMs}));
  }catch(error){
   const message=error instanceof Error?error.message:"AI_GENERATION_FAILED";
   const status=retryable(error)?"queued":"failed";
@@ -78,7 +81,7 @@ export function startGenerationWorker():void{
   catch(error){console.error(JSON.stringify({event:"ai_queue_worker_error",error:error instanceof Error?error.message:String(error)}));}
   finally{workerBusy=false;}
  };
- const timer=setInterval(()=>{void poll();},500);
+ const timer=setInterval(()=>{void poll();},config.AI_QUEUE_POLL_MS);
  timer.unref();
  void poll();
 }
