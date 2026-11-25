@@ -37,7 +37,7 @@ export async function getHistory(
  // Keep the history tenant-scoped and exclude the inbound event currently being
  // generated: ingestion persists it before the worker starts, while buildMessages
  // appends the current user turn separately.
- let query=supabase.from("messages").select("*")
+ let query=supabase.from("messages").select("body,direction,created_at,wa_message_id")
   .eq("organization_id",organizationId)
   .eq("conversation_id",conversationId);
  if(excludeWaMessageId)query=query.neq("wa_message_id",excludeWaMessageId);
