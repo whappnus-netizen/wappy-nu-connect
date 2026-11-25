@@ -130,6 +130,7 @@ export function buildMessages(
   intent: string,
   name: string | null,
   text: string,
+  persistedMemory = "",
 ): ChatMessage[] {
   const currentName = typeof a.name === "string" && a.name.trim() ? a.name.trim() : "assistente virtual";
   const oldName = configuredOldIdentity(a);
@@ -186,7 +187,8 @@ export function buildMessages(
     section("Encaminhamento humano", a.handoff_instructions, 250, text, hasHistory),
     firstTurn ? section("Saudação configurada", a.greeting_message, 220, text, false) : "",
     section("Tom de comunicação", a.tone, 180, text, hasHistory),
-    extractiveMemory ? "## Memória extractiva da conversa\n" + extractiveMemory : "",
+    persistedMemory ? section("Memória persistente da conversa", persistedMemory, 900, text, hasHistory) : "",
+    extractiveMemory ? "## Memória extractiva dos turnos recentes\n" + extractiveMemory : "",
     "## Regras obrigatórias de continuidade",
     "- Responde primeiro ao conteúdo da mensagem actual. Não respondas como se cada mensagem fosse uma conversa nova.",
     "- Usa as mensagens anteriores para compreender referências curtas, respostas, confirmações, objecções e mudanças de assunto.",
