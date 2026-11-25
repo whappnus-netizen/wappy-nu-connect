@@ -39,11 +39,18 @@ test("twenty exchanges retain older customer facts through extractive conversati
       : index % 2 === 0 ? "Mensagem do cliente " + index : "Qual é o próximo detalhe que podemos esclarecer?"
   }));
   const messages = buildMessages(agent, history, "", "", "general", null, "E quanto aos horários?");
-  assert.match(messages[0].content, /Memória extractiva da conversa/);
+  assert.match(messages[0].content, /Memória extractiva dos turnos recentes/);
   assert.match(messages[0].content, /formação de inglês/);
   assert.match(messages[0].content, /Perguntas anteriores do atendente/);
   assert.equal(messages.length, 18);
   assert.match(messages.at(-1).content, /E quanto aos horários\?/);
+});
+
+test("persistent memory is included in the model context", () => {
+  const agent = { id: "agent-3", name: "Jonathan" };
+  const messages = buildMessages(agent, [{ role: "user", content: "Olá." }], "", "", "general", null, "Quanto custa?", "Negócio: formação de inglês");
+  assert.match(messages[0].content, /Memória persistente da conversa/);
+  assert.match(messages[0].content, /Negócio: formação de inglês/);
 });
 
 test("response evaluator rejects a repeated opening after the customer supplied new information", () => {
@@ -90,7 +97,7 @@ test("test history observability uses the exact history sent to the model", asyn
 test("persistent memory stores explicit business facts with provenance", () => {
   const memory = mergeConversationMemory(
     null,
-    "Trabalho com formação de inglês e recebo muitos pedidos pelo WhatsApp.",
+    "Trabalho com formação de inglês. Recebo muitos pedidos pelo WhatsApp.",
     "Como organizas actualmente as inscrições?",
     "wa-message-123",
     "2026-11-25T15:00:00.000Z"
