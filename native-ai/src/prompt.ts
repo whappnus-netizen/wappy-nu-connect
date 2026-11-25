@@ -114,24 +114,19 @@ export function buildMessages(
     "INTENÇÃO ESTIMADA: " + intent,
   ].filter(Boolean).join("\n\n");
 
-  const currentIsGreeting = isGreeting(text);
-  const seenAssistant = new Set<string>();
+  // Preserve chronological dialogue. Do not remove repeated assistant turns or
+  // greetings heuristically: similar messages can carry distinct conversational
+  // meaning, and deleting them can make the model lose the thread.
   const recent: ChatMessage[] = [];
-  for (const r of history.slice(-10)) {
+  for (const r of history.slice(-16)) {
     const rawBody = String(r.body ?? r.content ?? r.text ?? "").trim();
     if (!rawBody) continue;
     const role = Boolean(r.from_me ?? r.fromMe) || String(r.direction) === "outbound" ? "assistant" : "user";
-    if (role === "assistant") {
-      const normalized = rawBody.toLocaleLowerCase("pt-AO").replace(/\s+/g, " ").trim();
-      if (seenAssistant.has(normalized)) continue;
-      seenAssistant.add(normalized);
-      if (!currentIsGreeting && isGenericGreetingReply(rawBody)) continue;
-    }
-    recent.push({ role, content: rawBody.length > 500 ? "…" + rawBody.slice(-499) : rawBody });
+    recent.push({ role, content: rawBody.length > 1200 ? rawBody.slice(0, 1199) + "…" : rawBody });
   }
 
   const messages: ChatMessage[] = [{ role: "system", content: system }];
-  messages.push(...recent.slice(-4));
+  messages.push(...recent.slice(-12));
   messages.push({ role: "user", content: text });
   return messages;
 }
