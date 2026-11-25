@@ -88,3 +88,28 @@ test("expired generation leases at the retry limit become terminal failures",asy
  assert.match(sql,/status='failed'/);
  assert.match(sql,/lease_expired_max_attempts/);
 });
+
+test("slow WhatsApp generations are queued for authenticated result delivery",async()=>{
+ const server=await read("src/server.ts");
+ const queue=await read("src/generation-queue.ts");
+ const config=await read("src/config.ts");
+ const route=await read("../../src/routes/api/public/ai.generation-complete.ts");
+ const pipeline=await read("../../src/lib/whatsapp/pipeline.server.ts");
+ assert.match(server,/delivery_status:"queued"/);
+ assert.match(queue,/claim_ai_generation_delivery/);
+ assert.match(queue,/finish_ai_generation_delivery/);
+ assert.match(queue,/AI_RESULT_CALLBACK_URL/);
+ assert.match(config,/AI_RESULT_CALLBACK_URL:z\.string\(\)\.url\(\)/);
+ assert.match(route,/timingSafeEqualText/);
+ assert.match(route,/deliverAiGenerationJob\(jobId\)/);
+ assert.match(pipeline,/aiGenerationJobId/);
+ assert.match(pipeline,/export async function deliverAiGenerationJob/);
+});
+test("AI delivery outbox is durable and unique per generation job",async()=>{
+ const sql=await read("supabase/migrations/20261125080000_ai_generation_delivery_outbox.sql");
+ assert.match(sql,/delivery_status/);
+ assert.match(sql,/claim_ai_generation_delivery/);
+ assert.match(sql,/finish_ai_generation_delivery/);
+ assert.match(sql,/messages_ai_generation_job_id_unique/);
+ assert.match(sql,/for update skip locked/i);
+});
