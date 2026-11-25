@@ -97,7 +97,7 @@ begin
       end,
       delivery_available_at=case
         when _status='queued' and delivery_attempts<5
-          then now()+make_interval(secs=>least(60,2^least(delivery_attempts,5)))
+          then now()+make_interval(secs=>least(60,power(2::numeric,least(delivery_attempts,5)))::double precision)
         else delivery_available_at
       end,
       delivery_error=case when _status in ('queued','failed') then left(coalesce(_error_code,'delivery_failed'),180) else null end,
