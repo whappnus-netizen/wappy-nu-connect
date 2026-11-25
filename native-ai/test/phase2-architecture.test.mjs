@@ -150,3 +150,12 @@ test("conversation prompt preserves dialogue history and protects current-turn r
  assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
  assert.ok(prompt.includes("Não reinicies a conversa nem repitas a saudação"));
 });
+
+test("generation queue serializes jobs for the same conversation across workers",async()=>{
+ const sql=await read("supabase/migrations/20261125150000_serialize_ai_generation_per_conversation.sql");
+ assert.match(sql,/prior\.conversation_id=j\.conversation_id/);
+ assert.match(sql,/prior\.status in \('queued','processing'\)/);
+ assert.match(sql,/for update of j skip locked/i);
+ assert.match(sql,/organization_id=j\.organization_id/);
+ assert.match(sql,/whatsapp_number_id=j\.whatsapp_number_id/);
+});
