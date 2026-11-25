@@ -153,7 +153,7 @@ test("conversation prompt preserves dialogue history and protects current-turn r
 });
 
 test("generation queue serializes jobs for the same conversation across workers",async()=>{
- const sql=await read("supabase/migrations/20261125150000_serialize_ai_generation_per_conversation.sql");
+ const sql=await read("supabase/migrations/20261125153619_serialize_ai_generation_per_conversation.sql");
  assert.match(sql,/prior\.conversation_id=j\.conversation_id/);
  assert.match(sql,/prior\.status in \('queued','processing'\)/);
  assert.match(sql,/for update of j skip locked/i);
