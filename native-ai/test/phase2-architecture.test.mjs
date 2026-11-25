@@ -65,7 +65,7 @@ test("internal playground uses the same central generator without queue billing"
  const orchestrator=await read("src/orchestrator.ts");
  assert.match(server,/if\(input\.testMode\)/);
  assert.match(server,/generateReply\(input\)/);
- assert.match(orchestrator,/if\\s*\\(\\s*!input\\.testMode\\s*\\)\\s*await\\s+consumeCredit/);
+ assert.match(orchestrator,/if\s*\(\s*!input\.testMode\s*\)\s*await\s+consumeCredit/);
 });
 
 test("native worker can be held inactive during blue/green validation",async()=>{
