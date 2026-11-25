@@ -33,7 +33,11 @@ export const Route = createFileRoute("/api/public/ai/generation-complete")({
           const result = await deliverAiGenerationJob(jobId);
           return Response.json(result, { status: result.status === "pending" ? 202 : 200 });
         } catch (error) {
-          console.error("[whappnus] AI delivery callback failed:", error instanceof Error ? error.message : "unknown");
+          const message = error instanceof Error ? error.message : "unknown";
+          console.error("[whappnus] AI delivery callback failed:", message);
+          if (message === "AI_DELIVERY_PREVIOUSLY_FAILED" || message === "AI_DELIVERY_UNCERTAIN") {
+            return Response.json({ ok: false, status: "failed", error: message });
+          }
           return Response.json({ ok: false, status: "failed", error: "ai_delivery_failed" }, { status: 500 });
         }
       },
