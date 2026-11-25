@@ -4,6 +4,7 @@ import {z} from "zod";
 const schema=z.object({
  NODE_ENV:z.string().default("development"),
  AI_WORKER_ENABLED:z.enum(["true","false"]).default("true").transform(v=>v==="true"),
+ AI_RESULT_CALLBACK_URL:z.string().url(),
  PORT:z.coerce.number().default(8080),
  SUPABASE_URL:z.string().url(),
  SUPABASE_SERVICE_ROLE_KEY:z.string().min(1),
