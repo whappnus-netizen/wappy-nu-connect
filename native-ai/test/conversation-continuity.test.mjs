@@ -103,6 +103,11 @@ test("persistent memory stores explicit business facts with provenance", () => {
   assert.equal(memory.state.lastAssistantQuestion, "Como organizas actualmente as inscrições?");
 });
 
+test("memory recognises a direct business statement without requiring extra words", () => {
+  const memory = mergeConversationMemory(null, "Tenho uma pastelaria.", "Como recebes as encomendas?", "message-pastelaria");
+  assert.equal(memory.summary, "Negócio: pastelaria");
+});
+
 test("explicit corrections replace stale facts and unrelated sensitive statements are not stored", () => {
   const previous = mergeConversationMemory(
     null,
