@@ -49,7 +49,16 @@ app.post("/v1/generate",async(req,res)=>{
   const jobId=await enqueueGeneration(input);
   const outcome=await waitForGeneration(jobId,config.AI_QUEUE_WAIT_MS);
   if(outcome.status==="succeeded")return res.json({ok:true,...outcome.result});
-  if(outcome.status==="pending")return res.status(503).json({ok:false,error:"generation_pending_retry",jobId});
+  if(outcome.status==="pending"){
+   const {error:deliveryError}=await supabase.from("ai_generation_jobs")
+    .update({delivery_status:"queued",delivery_available_at:new Date().toISOString()})
+    .eq("id",jobId);
+   if(deliveryError){
+    console.error(JSON.stringify({event:"ai_delivery_enqueue_failed",jobId,error:deliveryError.message}));
+    return res.status(503).json({ok:false,error:"generation_pending_delivery_enqueue_failed"});
+   }
+   return res.status(503).json({ok:false,error:"generation_pending_retry",jobId});
+  }
   const m=outcome.error;
   if(m==="AUTO_REPLY_DISABLED"||m==="NO_ACTIVE_AGENT")return res.status(409).json({ok:false,error:m});
   if(["SUBSCRIPTION_REQUIRED","ACCOUNT_SUSPENDED","AI_CONVERSATIONS_EXHAUSTED","PLAN_HAS_NO_AI_CONVERSATIONS"].includes(m))return res.status(402).json({ok:false,error:m});
