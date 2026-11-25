@@ -4,7 +4,7 @@ import {generateReply} from "./orchestrator.js";
 import type {GenerateRequest,GeneratedResponse} from "./types.js";
 
 type JobRow={id:string;idempotency_key:string;request_payload:GenerateRequest;attempt_count:number;max_attempts:number};
-const workerId="ai-worker-"+randomUUID();
+const workerId="native-ai-worker-"+randomUUID();
 let workerBusy=false;
 
 function retryable(error:unknown):boolean{
