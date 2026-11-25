@@ -144,15 +144,16 @@ test("agent identity and configured instructions outrank the internal agent labe
 
 test("conversation prompt preserves dialogue history and protects current-turn relevance",async()=>{
  const prompt=await read("src/prompt.ts");
- assert.ok(prompt.includes("Preserve chronological dialogue"));
- assert.ok(prompt.includes("history.slice(-16)"));
- assert.ok(prompt.includes("messages.push(...recent.slice(-12))"));
- assert.ok(prompt.includes('messages.push({ role: "user", content: text })'));
- assert.ok(prompt.includes("Não reinicies a conversa nem repitas a saudação"));
+ assert.ok(prompt.includes("## Regras obrigatórias de continuidade"));
+ assert.ok(prompt.includes("history.slice(-40)"));
+ assert.ok(prompt.includes("messages.push(...recent.slice(-16))"));
+ assert.ok(prompt.includes("[MENSAGEM ACTUAL"));
+ assert.ok(prompt.includes("não repitas a mensagem de boas-vindas"));
+ assert.ok(prompt.includes("Memória extractiva dos turnos recentes"));
 });
 
 test("generation queue serializes jobs for the same conversation across workers",async()=>{
- const sql=await read("supabase/migrations/20261125150000_serialize_ai_generation_per_conversation.sql");
+ const sql=await read("supabase/migrations/20261125153619_serialize_ai_generation_per_conversation.sql");
  assert.match(sql,/prior\.conversation_id=j\.conversation_id/);
  assert.match(sql,/prior\.status in \('queued','processing'\)/);
  assert.match(sql,/for update of j skip locked/i);

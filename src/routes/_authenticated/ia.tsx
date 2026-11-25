@@ -1404,7 +1404,7 @@ function TestPanel({ orgId, agentId, agentName, canTest }: { orgId: string; agen
 
   const ask = useMutation({
     mutationFn: async (text: string) =>
-      testOrgAiAgent({ data: { organizationId: orgId, agentId, conversationId: testConversationId.current, message: text, history: turns.slice(-10) } }),
+      testOrgAiAgent({ data: { organizationId: orgId, agentId, conversationId: testConversationId.current, message: text, history: turns.slice(-40) } }),
     onSuccess: (res, text) => {
       setTurns((t) => [...t, { role: "user", content: text }, { role: "assistant", content: res.reply }]);
       setMessage("");

@@ -15,7 +15,7 @@ export const testOrgAiAgent = createServerFn({ method: "POST" })
         agentId: z.string().uuid().optional(),
         conversationId: z.string().uuid().optional(),
         message: z.string().trim().min(1).max(2000),
-        history: z.array(turn).max(20).optional(),
+        history: z.array(turn).max(40).optional(),
       })
       .parse(input),
   )
