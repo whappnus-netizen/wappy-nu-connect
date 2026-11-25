@@ -136,16 +136,34 @@ export function buildMessages(
   const identityText = (value: unknown) => normalizeIdentityText(value, oldName, currentName);
 
   const recent: ChatMessage[] = [];
-  for (const turn of history.slice(-16)) {
+  for (const turn of history.slice(-40)) {
     const rawBody = String(turn.body ?? turn.content ?? turn.text ?? "").trim();
     if (!rawBody) continue;
     const role = Boolean(turn.from_me ?? turn.fromMe) || String(turn.direction) === "outbound" || turn.role === "assistant"
       ? "assistant"
       : "user";
-    recent.push({ role, content: rawBody.length > 1200 ? rawBody.slice(0, 1199) + "…" : rawBody });
+    recent.push({ role, content: rawBody.length > 320 ? rawBody.slice(0, 319) + "…" : rawBody });
   }
 
   const hasHistory = recent.length > 0;
+  const olderTurns = recent.slice(0, -16);
+  const olderCustomerStatements = olderTurns
+    .filter((turn) => turn.role === "user" && !isGreeting(turn.content) && turn.content.length > 8)
+    .slice(-8)
+    .map((turn) => turn.content.length > 140 ? turn.content.slice(0, 139) + "…" : turn.content);
+  const olderAssistantQuestions = olderTurns
+    .filter((turn) => turn.role === "assistant")
+    .flatMap((turn) => turn.content.match(/[^.!?]{4,120}\?/g) ?? [])
+    .slice(-4)
+    .map((question) => question.trim());
+  const extractiveMemory = [
+    olderCustomerStatements.length
+      ? "Declarações anteriores do cliente (texto resumido; não acrescentes inferências):\n- " + olderCustomerStatements.join("\n- ")
+      : "",
+    olderAssistantQuestions.length
+      ? "Perguntas anteriores do atendente que não devem ser repetidas sem necessidade:\n- " + olderAssistantQuestions.join("\n- ")
+      : "",
+  ].filter(Boolean).join("\n\n");
   const firstTurn = !hasHistory;
   const greetingInstructions = firstTurn
     ? "- Este é o primeiro turno: se o cliente apenas cumprimentar, responde ao cumprimento e faz uma única pergunta inicial adequada à missão do agente."
@@ -168,6 +186,7 @@ export function buildMessages(
     section("Encaminhamento humano", a.handoff_instructions, 250, text, hasHistory),
     firstTurn ? section("Saudação configurada", a.greeting_message, 220, text, false) : "",
     section("Tom de comunicação", a.tone, 180, text, hasHistory),
+    extractiveMemory ? "## Memória extractiva da conversa\n" + extractiveMemory : "",
     "## Regras obrigatórias de continuidade",
     "- Responde primeiro ao conteúdo da mensagem actual. Não respondas como se cada mensagem fosse uma conversa nova.",
     "- Usa as mensagens anteriores para compreender referências curtas, respostas, confirmações, objecções e mudanças de assunto.",
@@ -194,7 +213,7 @@ export function buildMessages(
   ].filter(Boolean).join("\n\n");
 
   const messages: ChatMessage[] = [{ role: "system", content: system }];
-  messages.push(...recent.slice(-12));
+  messages.push(...recent.slice(-16));
   messages.push({
     role: "user",
     content: "[MENSAGEM ACTUAL — responde a esta mensagem considerando o histórico]\n" + text,
