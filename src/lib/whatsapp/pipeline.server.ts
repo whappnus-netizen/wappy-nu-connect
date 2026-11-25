@@ -1172,7 +1172,7 @@ export async function sendOutgoingMessage(input: {
   try {
     if (input.aiGenerationJobId) {
       const { data: existing, error: existingError } = await admin.from("messages")
-        .select("id,status,wa_message_id")
+        .select("id,status,wa_message_id,created_at")
         .eq("organization_id", input.organizationId)
         .eq("ai_generation_job_id", input.aiGenerationJobId)
         .maybeSingle();
@@ -1181,7 +1181,15 @@ export async function sendOutgoingMessage(input: {
         if (["sent", "delivered", "read"].includes(String(existing.status))) {
           return { waMessageId: typeof existing.wa_message_id === "string" ? existing.wa_message_id : null, provider: providerName };
         }
-        if (existing.status === "queued") return { waMessageId: null, provider: providerName };
+        if (existing.status === "queued") {
+          const ageMs = Date.now() - new Date(existing.created_at).getTime();
+          if (Number.isFinite(ageMs) && ageMs > 60_000) {
+            await admin.from("messages").update({ status: "failed" })
+              .eq("id", existing.id).eq("organization_id", input.organizationId).eq("status", "queued");
+            throw new Error("AI_DELIVERY_UNCERTAIN");
+          }
+          return { waMessageId: null, provider: providerName };
+        }
         throw new Error("AI_DELIVERY_PREVIOUSLY_FAILED");
       }
       const { data: queuedMessage, error: queueInsertError } = await admin.from("messages").insert({
