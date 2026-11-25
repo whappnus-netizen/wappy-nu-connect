@@ -93,8 +93,8 @@ test("slow WhatsApp generations are queued for authenticated result delivery",as
  const server=await read("src/server.ts");
  const queue=await read("src/generation-queue.ts");
  const config=await read("src/config.ts");
- const route=await read("../../src/routes/api/public/ai.generation-complete.ts");
- const pipeline=await read("../../src/lib/whatsapp/pipeline.server.ts");
+ const route=await read("../src/routes/api/public/ai.generation-complete.ts");
+ const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
  assert.match(server,/delivery_status:"queued"/);
  assert.match(queue,/claim_ai_generation_delivery/);
  assert.match(queue,/finish_ai_generation_delivery/);
@@ -115,8 +115,8 @@ test("AI delivery outbox is durable and unique per generation job",async()=>{
 });
 
 test("slow-job delivery respects live human takeover and avoids duplicate sends",async()=>{
- const pipeline=await read("../../src/lib/whatsapp/pipeline.server.ts");
- const route=await read("../../src/routes/api/public/ai.generation-complete.ts");
+ const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
+ const route=await read("../src/routes/api/public/ai.generation-complete.ts");
  assert.match(pipeline,/conversation\.status !== "open"/);
  assert.match(pipeline,/!conversation\.ai_enabled/);
  assert.match(pipeline,/requireActiveSubscription/);
@@ -126,7 +126,7 @@ test("slow-job delivery respects live human takeover and avoids duplicate sends"
  assert.doesNotMatch(route,/organizationId\s*:/);
 });
 test("pending native generation does not send a premature fallback",async()=>{
- const pipeline=await read("../../src/lib/whatsapp/pipeline.server.ts");
+ const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
  assert.match(pipeline,/errorCode === "generation_pending_retry"/);
  assert.match(pipeline,/generation_pending_delivery_queued/);
 });
