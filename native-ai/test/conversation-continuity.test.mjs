@@ -29,6 +29,22 @@ test("follow-up turns omit first-contact scripts and preserve the current messag
   assert.match(messages.at(-1).content, /Como assim\?/);
 });
 
+test("twenty exchanges retain older customer facts through extractive conversation memory", () => {
+  const agent = { id: "agent-2", name: "Jonathan", personality: "Atendente comercial." };
+  const history = Array.from({ length: 40 }, (_, index) => ({
+    role: index % 2 === 0 ? "user" : "assistant",
+    content: index === 16
+      ? "Trabalho com formação de inglês e preciso organizar as inscrições."
+      : index % 2 === 0 ? "Mensagem do cliente " + index : "Qual é o próximo detalhe que podemos esclarecer?"
+  }));
+  const messages = buildMessages(agent, history, "", "", "general", null, "E quanto aos horários?");
+  assert.match(messages[0].content, /Memória extractiva da conversa/);
+  assert.match(messages[0].content, /formação de inglês/);
+  assert.match(messages[0].content, /Perguntas anteriores do atendente/);
+  assert.equal(messages.length, 18);
+  assert.match(messages.at(-1).content, /E quanto aos horários\?/);
+});
+
 test("response evaluator rejects a repeated opening after the customer supplied new information", () => {
   const greeting = "Olá! Seja muito bem-vindo à WHAPPNUS. Sou Jonathan, atendente comercial. Qual é o seu negócio?";
   const history = [
