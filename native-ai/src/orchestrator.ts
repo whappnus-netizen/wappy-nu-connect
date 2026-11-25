@@ -106,7 +106,17 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
  };
  const intent=classifyIntent(messageText);
  const ranked=rankKnowledge(messageText,ctx.knowledge);
- let messages=buildMessages(a,history,formatKnowledge(ranked),formatExamples(ctx.examples),intent.intent,input.profileName??null,messageText);
+ // The test playground keeps its transcript in client state rather than the
+ // production messages table. The server function must forward those turns;
+ // otherwise every test request is treated as a fresh conversation.
+ const testHistory = input.testMode && Array.isArray(input.history)
+  ? input.history
+    .filter(turn => (turn.role === "user" || turn.role === "assistant") && typeof turn.content === "string" && turn.content.trim())
+    .slice(-20)
+    .map(turn => ({ from_me: turn.role === "assistant", direction: turn.role === "assistant" ? "outbound" : "inbound", body: turn.content.trim() }))
+  : [];
+ const effectiveHistory = testHistory.length ? testHistory : history;
+ let messages=buildMessages(a,effectiveHistory,formatKnowledge(ranked),formatExamples(ctx.examples),intent.intent,input.profileName??null,messageText);
  const providerOptions={
   model:a.model??String((settings as Record<string,unknown>|null)?.default_model??config.AI_MODEL),
   temperature:a.temperature??config.AI_TEMPERATURE,
