@@ -23,3 +23,16 @@ jobs:
         run: npx tsc --noEmit
       - name: Build frontend
         run: npm run build
+
+      - name: Install native AI dependencies
+        run: npm install --no-audit --no-fund
+        working-directory: native-ai
+      - name: Native AI architecture tests
+        run: npm test
+        working-directory: native-ai
+      - name: Native AI typecheck
+        run: npm run typecheck
+        working-directory: native-ai
+      - name: Native AI production build
+        run: npm run build
+        working-directory: native-ai
