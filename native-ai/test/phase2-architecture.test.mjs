@@ -67,3 +67,16 @@ test("internal playground uses the same central generator without queue billing"
  assert.match(server,/generateReply\(input\)/);
  assert.match(orchestrator,/if\(!input\.testMode\) await consumeCredit/);
 });
+
+test("native worker can be held inactive during blue/green validation",async()=>{
+ const config=await read("src/config.ts");
+ const server=await read("src/server.ts");
+ assert.match(config,/AI_WORKER_ENABLED:z\.enum\(\["true","false"\]\)/);
+ assert.match(server,/if\(config\.AI_WORKER_ENABLED\)startGenerationWorker\(\)/);
+});
+test("Ollama concurrency semaphore transfers slots without a race",async()=>{
+ const router=await read("src/provider-router.ts");
+ assert.match(router,/if\(active<1\)/);
+ assert.match(router,/if\(next\)\{next\(\);return;\}/);
+ assert.doesNotMatch(router,/active\+\+;\s*return\s*\(\)=>release\(\);\s*\}\s*active\+\+/);
+});
