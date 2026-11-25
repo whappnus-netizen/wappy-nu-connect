@@ -80,3 +80,11 @@ test("Ollama concurrency semaphore transfers slots without a race",async()=>{
  assert.match(router,/if\(next\)\{next\(\);return;\}/);
  assert.doesNotMatch(router,/active\+\+;\s*return\s*\(\)=>release\(\);\s*\}\s*active\+\+/);
 });
+
+test("expired generation leases at the retry limit become terminal failures",async()=>{
+ const sql=await read("supabase/migrations/20261125073000_fail_expired_ai_leases_after_max_attempts.sql");
+ assert.match(sql,/status='processing'/);
+ assert.match(sql,/attempt_count >= max_attempts/);
+ assert.match(sql,/status='failed'/);
+ assert.match(sql,/lease_expired_max_attempts/);
+});
