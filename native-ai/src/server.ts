@@ -39,6 +39,12 @@ app.post("/v1/generate",async(req,res)=>{
  if(!allow(key,config.AI_RATE_LIMIT_PER_MINUTE))return res.status(429).json({ok:false,error:"rate_limited"});
  try{
   const input={...b,text:b.text.trim()} as GenerateRequest;
+  // Playground requests use the exact same generateReply orchestrator/context,
+  // but do not consume a production queue slot or billable conversation.
+  if(input.testMode){
+   const result=await generateReply(input);
+   return res.json({ok:true,...result});
+  }
   const jobId=await enqueueGeneration(input);
   const outcome=await waitForGeneration(jobId,config.AI_QUEUE_WAIT_MS);
   if(outcome.status==="succeeded")return res.json({ok:true,...outcome.result});
