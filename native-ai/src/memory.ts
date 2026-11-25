@@ -14,7 +14,7 @@ export interface ConversationMemory {
   lastMessageAt: string;
 }
 
-const BUSINESS_TERMS = /(neg[oó]cio|empresa|cliente|whatsapp|mensagen|pedido|venda|atendimento|respost|inscri[cç][aã]o|curso|aluno|encomend|agend|agenda|marketing|publicidade|an[uú]ncio|site|loja|produto|servi[cç]o|pre[cç]o|pagamento|or[cç]amento|pastelaria|restaurante|hamburgueria|sal[aã]o|barbearia|cl[ií]nica|escola|forma[cç][aã]o|imobili[aá]ria|academia|hotel|hospedaria|papelaria|oficina|lavandaria|consultoria)/i;
+const BUSINESS_TERMS = /(neg[oó]cio|empresa|cliente|whatsapp|mensagen|pedido|venda|atendimento|respost|inscri[cç][aã]o|curso|aluno|encomend|agend|agenda|marketing|publicidade|an[uú]ncio|site|loja|produto|servi[cç]o|pre[cç]o|pagamento|or[cç]amento|pastelaria|restaurante|hamburgueria|sal[aã]o|barbearia|cl[ií]nica|escola|forma[cç][aã]o|imobili[aá]ria|academia|hotel|hospedaria|papelaria|oficina|lavandaria|consultoria|fotografia|eventos|costura|design|constru[cç][aã]o|limpeza|transporte|log[ií]stica|entrega|delivery|contabilidade|advocacia|impress[aã]o|gr[aá]fica|dentista|odontologia|veterin[aá]ria)/i;
 
 function cleanValue(value: string): string {
   return value.replace(/\s+/g, " ").replace(/^[,;:\s]+|[,;:\s]+$/g, "").trim().slice(0, 140);
@@ -25,7 +25,8 @@ function extractFacts(text: string, sourceMessageId: string | null, observedAt: 
   const patterns: Array<{ category: MemoryFact["category"]; pattern: RegExp; businessOnly?: boolean }> = [
     {
       category: "business_type",
-      pattern: /\b(?:trabalho com|o meu neg[oó]cio [ée]|a minha empresa [ée]|minha empresa [ée]|sou (?:dono|dona|propriet[aá]rio|propriet[aá]ria) de|sou (?:professor|professora|formador|formadora) de)\s+([^.!?\n]{3,140})|\b(tenho\s+(?:uma?|um)\s+(?:escola|centro de forma[cç][aã]o|academia|pastelaria|restaurante|hamburgueria|loja|sal[aã]o|barbearia|cl[ií]nica|imobili[aá]ria|ag[eê]ncia|hotel|hospedaria|consultoria|papelaria|oficina|lavandaria|creche|mercearia|boutique|gin[aá]sio|estofaria|farm[aá]cia|forma[cç][aã]o)(?:\s+[^.!?\n]{0,100})?)/i
+      pattern: /\b(?:trabalho com|o meu neg[oó]cio [ée]|a minha empresa [ée]|minha empresa [ée]|sou (?:dono|dona|propriet[aá]rio|propriet[aá]ria) de|sou (?:professor|professora|formador|formadora) de)\s+([^.!?\n]{3,140})|\b(tenho\s+(?:uma?|um)\s+(?:escola|centro de forma[cç][aã]o|academia|pastelaria|restaurante|hamburgueria|loja|sal[aã]o|barbearia|cl[ií]nica|imobili[aá]ria|ag[eê]ncia|hotel|hospedaria|consultoria|papelaria|oficina|lavandaria|creche|mercearia|boutique|gin[aá]sio|estofaria|farm[aá]cia|forma[cç][aã]o)(?:\s+[^.!?\n]{0,100})?)/i,
+      businessOnly: true
     },
     {
       category: "customer_need",
