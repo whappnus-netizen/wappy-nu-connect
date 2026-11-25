@@ -52,7 +52,7 @@ function extractFacts(text: string, sourceMessageId: string | null, observedAt: 
 
   for (const rule of patterns) {
     const match = text.match(rule.pattern);
-    if (!match?.[1]) continue;
+    if (!match || (!match[1] && !match[2])) continue;
     if (rule.businessOnly && !BUSINESS_TERMS.test(text)) continue;
     const value = cleanValue(match[1] ?? match[2] ?? "").replace(/^tenho\s+(?:uma?|um)\s+/i, "");
     if (value.length < 3) continue;
