@@ -20,5 +20,5 @@ The legacy service remains available for rollback. Both runtimes can share the e
 
 ## Known limitations pending completion
 
-- A durable generation result is not yet equivalent to a WhatsApp delivery receipt; an explicit delivery outbox/callback must be completed before slow jobs are considered reliable.
+- Slow WhatsApp generations now use a durable delivery outbox, authenticated callback, and unique `ai_generation_job_id` on outbound messages. This still requires production migration and end-to-end delivery validation before it can be considered approved.
 - Qwen2.5-VL supports image understanding, but audio requires a local transcription service and PDFs/documents require extraction before model invocation.
