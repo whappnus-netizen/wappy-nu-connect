@@ -163,9 +163,39 @@ function routerConfig(): { endpoint: string; apiKey: string } {
   return { endpoint: parsed.toString().replace(/\/$/, "") + "/v1/chat/completions", apiKey };
 }
 
+async function resolveIncomingText(input: GenerateInput): Promise<string> {
+  if (input.messageType !== "audio") return cleanText(input.text, 6000) || "[Mensagem sem texto]";
+  const path = input.mediaPath ?? "";
+  const expectedPrefix = input.organizationId + "/" + input.whatsappNumberId + "/";
+  if (!path.startsWith(expectedPrefix) || path.includes("..")) {
+    return "O cliente enviou uma nota de voz, mas o ficheiro não está disponível para transcrição. Pede-lhe, com cordialidade, que escreva a mensagem.";
+  }
+  const { data: audio, error } = await serviceClient().storage.from("whatsapp-incoming-media").download(path);
+  if (error || !audio) throw new Error("AUDIO_MEDIA_DOWNLOAD_FAILED");
+  const mime = input.mediaMimeType || audio.type || "audio/ogg";
+  const form = new FormData();
+  form.append("file", new Blob([await audio.arrayBuffer()], { type: mime }), "whatsapp-audio");
+  form.append("language", "pt");
+  const router = routerConfig();
+  const endpoint = router.endpoint.replace(/\\/v1\\/chat\\/completions$/, "/v1/audio/transcriptions");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { authorization: "Bearer " + router.apiKey },
+    body: form,
+    signal: AbortSignal.timeout(30_000),
+  });
+  const raw = await response.text();
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(raw) as Record<string, unknown>; } catch { /* handled below */ }
+  if (!response.ok) throw new Error("AUDIO_TRANSCRIPTION_FAILED (HTTP " + response.status + ")");
+  const transcript = cleanText(data["text"], 6000);
+  if (!transcript) throw new Error("AUDIO_TRANSCRIPTION_EMPTY");
+  return "Transcrição da nota de voz do cliente: " + transcript;
+}
+
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
   const started = Date.now();
-  const [ctx, history] = await Promise.all([loadTenantContext(input), loadConversationHistory(input)]);
+  const [ctx, history, effectiveText] = await Promise.all([loadTenantContext(input), loadConversationHistory(input), resolveIncomingText(input)]);
   const systemPrompt = buildTenantSystemPrompt(ctx, input.profileName);
   const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
     .slice(-MAX_HISTORY_MESSAGES);
@@ -183,7 +213,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
       messages: [
         { role: "system", content: systemPrompt },
         ...recent,
-        { role: "user", content: cleanText(input.text, 6000) || "[Mensagem sem texto]" },
+        { role: "user", content: effectiveText },
       ],
       temperature: 0.35,
       max_tokens: 700,
