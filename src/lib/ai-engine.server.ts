@@ -210,7 +210,7 @@ function orchestratorConfig(): { endpoint: string; apiKey: string; tenantSigning
   if (!configured) throw new Error("WHAPPNUS_ORCHESTRATOR_URL_NOT_CONFIGURED");
   if (!apiKey || apiKey.length < 32) throw new Error("WHAPPNUS_ORCHESTRATOR_API_KEY_NOT_CONFIGURED");
   if (!tenantSigningSecret || tenantSigningSecret.length < 32) throw new Error("WHAPPNUS_TENANT_SIGNING_SECRET_NOT_CONFIGURED");
-  const url = /^https?:\\/\\//i.test(configured) ? configured : "https://" + configured;
+  const url = /^https?:\/\//i.test(configured) ? configured : "https://" + configured;
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error("WHAPPNUS_ORCHESTRATOR_URL_INVALID"); }
   if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
