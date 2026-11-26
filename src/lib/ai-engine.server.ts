@@ -131,7 +131,7 @@ function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null,
     "- Faz no máximo uma pergunta por resposta. Evita questionários, frases de enchimento e CTAs repetidos.",
     "- Usa a última resposta do assistente como contexto, não como texto para copiar. Se já explicaste algo, aprofunda ou avança; não reformules a mesma explicação.",
     "- Se não souberes o próximo passo, esclarece a intenção actual sem reiniciar a apresentação."
-  ].join("\\n"));
+  ].join("\n"));
 
   return sections.filter(Boolean).join("\n\n");
 }
@@ -166,6 +166,7 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
     .limit(MAX_HISTORY_MESSAGES + 1);
   if (error) throw new Error("AI_HISTORY_LOAD_FAILED: " + error.message);
   const currentWaMessageId = cleanText(input.messageId, 200);
+  const currentMessageWasFound = Boolean(currentWaMessageId && (data ?? []).some((row) => row.wa_message_id === currentWaMessageId));
   const rows = (data ?? []).filter((row) => {
     // Exclude this exact inbound event by provider message ID. Do not blindly
     // remove the newest row: timestamp ties can otherwise drop the previous AI turn.
@@ -176,8 +177,8 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
     role: row.direction === "inbound" ? "user" as const : "assistant" as const,
     content: cleanText(row.body, 2500),
   })).filter((turn) => turn.content);
-  // Compatibility fallback for providers/events without a persisted message ID.
-  if (!currentWaMessageId && turns.length &&
+  // Compatibility fallback if the current event has no persisted provider ID.
+  if ((!currentWaMessageId || !currentMessageWasFound) && turns.length &&
       turns[turns.length - 1]?.role === "user" &&
       turns[turns.length - 1]?.content === cleanText(input.text, 2500)) {
     turns.pop();
@@ -291,7 +292,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const systemPrompt = buildTenantSystemPrompt(
     ctx,
     input.profileName,
-    [effectiveText, ...history.slice(-4).map((turn) => turn.content)].join("\\n"),
+    [effectiveText, ...history.slice(-4).map((turn) => turn.content)].join("\n"),
     history,
   );
   const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
