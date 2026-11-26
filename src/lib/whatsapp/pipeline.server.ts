@@ -1008,7 +1008,7 @@ export async function processIncomingMessage(
       });
       // A geração que excede a espera HTTP fica na fila durável e será entregue
       // pelo callback autenticado. Não enviar fallback antes da resposta final.
-      if (errorCode === "generation_pending_retry" && process.env["WHAPPNUS_NATIVE_AI_ENGINE_URL"]) {
+      if (errorCode === "generation_pending_retry" && process.env["WHAPPNUS_ROUTER_URL"]) {
         await proofFallbackPromise;
         await logWhatsAppEvent(number.organization_id, "ai_skipped", {
           whatsappNumberId: number.id, provider: incoming.provider,
