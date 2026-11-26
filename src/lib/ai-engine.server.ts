@@ -51,7 +51,7 @@ function cleanText(value: unknown, max: number): string {
 }
 
 function relevanceScore(value: string, query: string): number {
-  const tokens = [...new Set((query.toLocaleLowerCase("pt-AO").match(/[\\p{L}\\p{N}]{3,}/gu) ?? []).filter((token) => !["para", "com", "que", "uma", "uns", "das", "dos", "por", "como", "qual"].includes(token)))];
+  const tokens = [...new Set((query.toLocaleLowerCase("pt-AO").match(/[\p{L}\p{N}]{3,}/gu) ?? []).filter((token) => !["para", "com", "que", "uma", "uns", "das", "dos", "por", "como", "qual"].includes(token)))];
   const haystack = value.toLocaleLowerCase("pt-AO");
   return tokens.reduce((score, token) => score + (haystack.includes(token) ? (haystack.split(token).length - 1) : 0), 0);
 }
