@@ -150,3 +150,24 @@ export async function getOllamaHealth():Promise<{ok:boolean;model:string;status:
   return {ok:response.ok,model:config.AI_OLLAMA_MODEL,status:response.ok?"ready":"unavailable"};
  }catch{return {ok:false,model:config.AI_OLLAMA_MODEL,status:"unreachable"};}
 }
+
+
+export async function getProviderHealth():Promise<{ok:boolean;provider:string;model:string;status:string}>{
+ if(config.AI_PROVIDER==="intelligence-router"){
+  if(!config.AI_ROUTER_BASE_URL||!config.AI_ROUTER_API_KEY){
+   return {ok:false,provider:"whappnus-intelligence-router",model:"local",status:"not_configured"};
+  }
+  try{
+   const response=await fetch(config.AI_ROUTER_BASE_URL.replace(/\/$/,"")+"/ready",{signal:AbortSignal.timeout(5000)});
+   const raw=await response.text();
+   let data:{status?:string;main_model_available?:boolean}={};
+   try{data=JSON.parse(raw) as typeof data;}catch{}
+   const ok=response.ok&&data.status==="ready"&&data.main_model_available===true;
+   return {ok,provider:"whappnus-intelligence-router",model:"main-model",status:ok?"ready":"unavailable"};
+  }catch{
+   return {ok:false,provider:"whappnus-intelligence-router",model:"main-model",status:"unreachable"};
+  }
+ }
+ const ollama=await getOllamaHealth();
+ return {...ollama,provider:"ollama"};
+}

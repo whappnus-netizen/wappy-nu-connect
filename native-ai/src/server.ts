@@ -2,7 +2,7 @@ import express from "express";
 import {config} from "./config.js";
 import {generateReply} from "./orchestrator.js";
 import {analyzePaymentProof} from "./payment-proof.js";
-import {createProvider,getOllamaHealth} from "./provider-router.js";
+import {createProvider,getProviderHealth} from "./provider-router.js";
 import {supabase,writeAiLog} from "./db.js";
 import {allow} from "./rate-limit.js";
 import {enqueueGeneration,startGenerationWorker,waitForGeneration} from "./generation-queue.js";
@@ -11,8 +11,8 @@ import type {GenerateRequest} from "./types.js";
 const app=express();app.disable("x-powered-by");app.use(express.json({limit:"256kb"}));
 app.get("/live",(_req,res)=>res.status(200).json({ok:true,service:"whappnus-native-ai-engine"}));
 app.get("/health",async(_req,res)=>{
- const ollama=await getOllamaHealth();
- return res.status(ollama.ok?200:503).json({ok:ollama.ok,service:"whappnus-native-ai-engine",provider:"ollama",model:ollama.model,ollamaStatus:ollama.status,queue:"supabase"});
+ const provider=await getProviderHealth();
+ return res.status(provider.ok?200:503).json({ok:provider.ok,service:"whappnus-native-ai-engine",provider:provider.provider,model:provider.model,providerStatus:provider.status,queue:"supabase"});
 });
 
 // Expire trials/subscriptions even when no new WhatsApp messages arrive.
