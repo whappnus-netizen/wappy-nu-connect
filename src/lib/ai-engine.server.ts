@@ -175,7 +175,7 @@ function routerConfig(): { endpoint: string; apiKey: string } {
 async function resolveIncomingText(input: GenerateInput): Promise<string> {
   if (input.messageType === "image" || input.messageType === "document" || input.messageType === "video") {
     const caption = cleanText(input.text, 4000);
-    return "O cliente enviou um anexo do tipo " + input.messageType + ". O conteúdo visual/documental não foi disponibilizado ao modelo nesta configuração; não afirmes que o analisaste. Se a resposta depender do conteúdo, pede ao cliente que o descreva ou encaminha para a equipa." + (caption && !caption.startsWith("[O cliente enviou") ? "\\nLegenda/mensagem do cliente: " + caption : "");
+    return "O cliente enviou um anexo do tipo " + input.messageType + ". O conteúdo visual/documental não foi disponibilizado ao modelo nesta configuração; não afirmes que o analisaste. Se a resposta depender do conteúdo, pede ao cliente que o descreva ou encaminha para a equipa." + (caption && !caption.startsWith("[O cliente enviou") ? "\nLegenda/mensagem do cliente: " + caption : "");
   }
   if (input.messageType !== "audio") return cleanText(input.text, 6000) || "[Mensagem sem texto]";
   const path = input.mediaPath ?? "";
