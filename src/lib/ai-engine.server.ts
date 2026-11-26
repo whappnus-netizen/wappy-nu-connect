@@ -50,7 +50,13 @@ function cleanText(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
 
-function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null): string {
+function relevanceScore(value: string, query: string): number {
+  const tokens = [...new Set((query.toLocaleLowerCase("pt-AO").match(/[\\p{L}\\p{N}]{3,}/gu) ?? []).filter((token) => !["para", "com", "que", "uma", "uns", "das", "dos", "por", "como", "qual"].includes(token)))];
+  const haystack = value.toLocaleLowerCase("pt-AO");
+  return tokens.reduce((score, token) => score + (haystack.includes(token) ? (haystack.split(token).length - 1) : 0), 0);
+}
+
+function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null, query = ""): string {
   const a = ctx.agent ?? {};
   const field = (key: string, max = 1800) => cleanText(a[key], max);
   const sections: string[] = [
@@ -87,7 +93,9 @@ function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null)
   if (profileName?.trim()) sections.push("NOME DE PERFIL DO CLIENTE: " + profileName.trim().slice(0, 100));
 
   let knowledgeChars = 0;
-  const knowledge = ctx.knowledge.map((item) => {
+  const rankedKnowledge = [...ctx.knowledge].map((item, index) => ({ item, index, score: relevanceScore([item.title, item.category, item.content].filter(Boolean).join(" "), query) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 24).map((entry) => entry.item);
+  const knowledge = rankedKnowledge.map((item) => {
     const line = `[ ${cleanText(item.category, 80)} ] ${cleanText(item.title, 180)}: ${cleanText(item.content, 2500)}`;
     if (knowledgeChars + line.length > MAX_KNOWLEDGE_CHARS) return "";
     knowledgeChars += line.length;
@@ -96,7 +104,9 @@ function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null)
   if (knowledge.length) sections.push("BASE DE CONHECIMENTO (factos da empresa; respeita os limites acima)\n" + knowledge.join("\n"));
 
   let exampleChars = 0;
-  const examples = ctx.examples.map((item) => {
+  const rankedExamples = [...ctx.examples].map((item, index) => ({ item, index, score: relevanceScore([item.input, item.output].filter(Boolean).join(" "), query) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 8).map((entry) => entry.item);
+  const examples = rankedExamples.map((item) => {
     const line = `Tipo: ${cleanText(item.type, 50)}\nCliente: ${cleanText(item.input, 700)}\nResposta de referência: ${cleanText(item.output, 900)}`;
     if (exampleChars + line.length > MAX_EXAMPLES_CHARS) return "";
     exampleChars += line.length;
@@ -245,7 +255,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     }
     throw error;
   }
-  const systemPrompt = buildTenantSystemPrompt(ctx, input.profileName);
+  const systemPrompt = buildTenantSystemPrompt(ctx, input.profileName, [effectiveText, ...history.slice(-4).map((turn) => turn.content)].join("\\n"));
   const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
     .slice(-MAX_HISTORY_MESSAGES);
   let totalHistory = recent.reduce((sum, turn) => sum + turn.content.length, 0);
