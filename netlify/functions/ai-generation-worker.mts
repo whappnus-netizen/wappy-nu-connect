@@ -13,7 +13,7 @@ export default async (_request: Request, context: ScheduledContext): Promise<Res
   }
 
   try {
-    const response = await fetch(new URL("/api/internal/ai-generation-worker", siteUrl), {
+    const response = await fetch(new URL("/api/public/ai/generation-complete", siteUrl), {
       method: "POST",
       headers: { authorization: "Bearer " + secret, "content-type": "application/json" },
       body: "{}",
