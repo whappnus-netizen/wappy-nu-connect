@@ -273,7 +273,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
       messages: [
         { role: "system", content: systemPrompt },
         ...recent,
-        { role: "user", content: (input.profileName?.trim() ? "Nome exibido no WhatsApp: " + input.profileName.trim().slice(0, 100) + "\\n" : "") + effectiveText },
+        { role: "user", content: (input.profileName?.trim() ? "Nome exibido no WhatsApp: " + input.profileName.trim().slice(0, 100) + "\n" : "") + effectiveText },
       ],
       temperature: 0.35,
       max_tokens: 700,
