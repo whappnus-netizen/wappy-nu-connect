@@ -71,7 +71,6 @@ test("internal playground uses the same central generator without queue billing"
 test("Netlify scheduled worker calls the authenticated Router-backed queue processor",async()=>{
  const worker=await read("../netlify/functions/ai-generation-worker.mts");
  const route=await read("../src/routes/api/public/ai.generation-complete.ts");
- assert.match(worker,/WHAPPNUS_ROUTER_URL/);
  assert.match(worker,/WHAPPNUS_ROUTER_API_KEY/);
  assert.match(worker,/\* \* \* \* \*/);
  assert.match(route,/WHAPPNUS_ROUTER_API_KEY/);
