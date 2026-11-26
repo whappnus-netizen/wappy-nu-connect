@@ -35,6 +35,7 @@ async function ollamaGenerate(messages:ChatMessage[],options:{model:string;tempe
  if(halfOpen)circuit.halfOpen=true;
  const unlock=await acquire();
  try{
+  if(!config.AI_OLLAMA_BASE_URL||!config.AI_OLLAMA_API_KEY)throw new Error("OLLAMA_CONFIGURATION_MISSING");
   if(attachments.some(a=>a.type!=="image"))throw new Error("OLLAMA_UNSUPPORTED_ATTACHMENT_TYPE");
   const lastUser=messages.map(m=>m.role).lastIndexOf("user");
   const ollamaMessages=messages.map((m,index)=>index===lastUser&&attachments.length>0
@@ -143,6 +144,7 @@ export function createProvider():AIProvider{
 }
 
 export async function getOllamaHealth():Promise<{ok:boolean;model:string;status:string}>{
+ if(!config.AI_OLLAMA_BASE_URL||!config.AI_OLLAMA_API_KEY)return {ok:false,model:config.AI_OLLAMA_MODEL,status:"not_configured"};
  try{
   const response=await fetch(config.AI_OLLAMA_BASE_URL.replace(/\/$/,"")+"/health",{headers:{authorization:"Bearer "+config.AI_OLLAMA_API_KEY},signal:AbortSignal.timeout(4000)});
   return {ok:response.ok,model:config.AI_OLLAMA_MODEL,status:response.ok?"ready":"unavailable"};
