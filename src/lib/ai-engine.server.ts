@@ -177,7 +177,7 @@ async function resolveIncomingText(input: GenerateInput): Promise<string> {
   form.append("file", new Blob([await audio.arrayBuffer()], { type: mime }), "whatsapp-audio");
   form.append("language", "pt");
   const router = routerConfig();
-  const endpoint = router.endpoint.replace(/\\/v1\\/chat\\/completions$/, "/v1/audio/transcriptions");
+  const endpoint = router.endpoint.replace(/\/v1\/chat\/completions$/, "/v1/audio/transcriptions");
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { authorization: "Bearer " + router.apiKey },
@@ -195,7 +195,7 @@ async function resolveIncomingText(input: GenerateInput): Promise<string> {
 
 function isRetryableGenerationError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /AbortError|TimeoutError|timed out|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\\d\\d)/i.test(message);
+  return /AbortError|TimeoutError|timed out|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\d\d)/i.test(message);
 }
 
 async function enqueueGenerationForRetry(input: GenerateInput): Promise<void> {
