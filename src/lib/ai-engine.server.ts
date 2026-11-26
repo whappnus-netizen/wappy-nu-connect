@@ -134,6 +134,11 @@ function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null,
     "- Se não souberes o próximo passo, esclarece a intenção actual sem reiniciar a apresentação."
   ].join("\n"));
 
+  sections.push([
+    "PROTOCOLO DE ENCAMINHAMENTO HUMANO",
+    "Se o cliente pedir explicitamente para falar com uma pessoa, funcionário ou supervisor, ou apresentar uma reclamação grave/disputa sensível que exija intervenção humana, inicia a resposta com o marcador técnico [[WHAPPNUS_HANDOFF]] numa linha isolada. Não mostres nem expliques o marcador ao cliente. Não afirmes que a equipa já foi notificada. O backend irá pausar a IA nesta conversa.",
+    "Não uses o marcador em situações normais, nem apenas porque não sabes uma resposta factual."
+  ].join("\n"));
   return sections.filter(Boolean).join("\n\n");
 }
 
@@ -439,10 +444,12 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null;
   const confidence = 0;
   const reactionEmoji = null;
-  let safeAnswer = answer;
+  const handoffMarker = "[[WHAPPNUS_HANDOFF]]";
+  const handoffRequired = meta["handoff_required"] === true || answer.includes(handoffMarker);
+  let safeAnswer = answer.replaceAll(handoffMarker, "").trim();
 
   // A human route is a real backend state change, not just a promise in model text.
-  if (meta["handoff_required"] === true) {
+  if (handoffRequired) {
     if (input.conversationId && !input.testMode) {
       const admin = serviceClient();
       const { data: conversation, error: handoffError } = await admin.from("conversations")
