@@ -56,7 +56,7 @@ function relevanceScore(value: string, query: string): number {
   return tokens.reduce((score, token) => score + (haystack.includes(token) ? (haystack.split(token).length - 1) : 0), 0);
 }
 
-function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null, query = ""): string {
+function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null, query = "", history: Array<{ role: "user" | "assistant"; content: string }> = []): string {
   const a = ctx.agent ?? {};
   const field = (key: string, max = 1800) => cleanText(a[key], max);
   const sections: string[] = [
@@ -113,6 +113,26 @@ function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null,
   }).filter(Boolean);
   if (examples.length) sections.push("EXEMPLOS DE ESTILO E PROCEDIMENTO (não substituem factos nem permissões)\n" + examples.join("\n\n"));
 
+
+  const previousAssistantTurns = history.filter((turn) => turn.role === "assistant" && turn.content.trim());
+  const hasPreviousAssistantTurn = previousAssistantTurns.length > 0;
+  sections.push([
+    "PROTOCOLO OBRIGATÓRIO DE CONTINUIDADE DA CONVERSA",
+    hasPreviousAssistantTurn
+      ? "- Esta conversa JÁ COMEÇOU. Não voltes a cumprimentar, apresentar o teu nome/cargo/empresa ou repetir a mensagem de boas-vindas. Só te identifiques novamente se o cliente perguntar explicitamente quem és ou pedir essa informação."
+      : "- Esta é a primeira resposta registada nesta conversa. Faz uma saudação breve e apresenta-te uma única vez, se isso fizer sentido para o contexto.",
+    "- Antes de responder, identifica o que o cliente já explicou, o que já lhe respondeste, a última pergunta/oferta e o próximo passo lógico.",
+    "- Nunca reinicies o atendimento. Não uses novamente frases genéricas como \"Como posso ajudar hoje?\" quando já existe um assunto em curso.",
+    "- Não repitas perguntas, apresentações, explicações, benefícios ou blocos de texto já transmitidos. Cada resposta deve acrescentar informação ou avançar a conversa.",
+    "- Interpreta \"sim\", \"podes\", \"claro\", \"gostaria\" e \"ok\" em relação à pergunta/oferta imediatamente anterior. Se o cliente aceitar uma oferta, entrega o conteúdo prometido em vez de voltar a perguntar como podes ajudar.",
+    "- Se o cliente responder \"normal\" ou \"bem\" a uma pergunta social, reconhece brevemente e avança com uma pergunta comercial específica, sem repetir a pergunta inicial.",
+    "- Se o cliente fizer uma pergunta directa, responde primeiro e directamente. Só depois, se for útil, faz uma única pergunta de seguimento.",
+    "- Em atendimento comercial, conduz um passo de cada vez: compreender o negócio, descobrir uma dificuldade concreta, relacioná-la com uma solução adequada e propor um próximo passo. Não forces esta sequência se o cliente tiver outra necessidade.",
+    "- Faz no máximo uma pergunta por resposta. Evita questionários, frases de enchimento e CTAs repetidos.",
+    "- Usa a última resposta do assistente como contexto, não como texto para copiar. Se já explicaste algo, aprofunda ou avança; não reformules a mesma explicação.",
+    "- Se não souberes o próximo passo, esclarece a intenção actual sem reiniciar a apresentação."
+  ].join("\n"));
+
   return sections.filter(Boolean).join("\n\n");
 }
 
@@ -138,18 +158,29 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
   if (input.history?.length) return input.history.slice(-MAX_HISTORY_MESSAGES);
   if (!input.conversationId) return [];
   const { data, error } = await serviceClient().from("messages")
-    .select("direction,body")
+    .select("direction,body,wa_message_id,created_at,id")
     .eq("organization_id", input.organizationId)
     .eq("conversation_id", input.conversationId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(MAX_HISTORY_MESSAGES + 1);
   if (error) throw new Error("AI_HISTORY_LOAD_FAILED: " + error.message);
-  const turns = (data ?? []).reverse().map((row) => ({
+  const currentWaMessageId = cleanText(input.messageId, 200);
+  const currentMessageWasFound = Boolean(currentWaMessageId && (data ?? []).some((row) => row.wa_message_id === currentWaMessageId));
+  const rows = (data ?? []).filter((row) => {
+    // Exclude this exact inbound event by provider message ID. Do not blindly
+    // remove the newest row: timestamp ties can otherwise drop the previous AI turn.
+    if (currentWaMessageId && row.wa_message_id === currentWaMessageId) return false;
+    return true;
+  });
+  const turns = rows.reverse().map((row) => ({
     role: row.direction === "inbound" ? "user" as const : "assistant" as const,
     content: cleanText(row.body, 2500),
   })).filter((turn) => turn.content);
-  // The webhook persists the inbound message before generation; avoid appending it twice.
-  if (turns.length && turns[turns.length - 1]?.role === "user" && turns[turns.length - 1]?.content === cleanText(input.text, 2500)) {
+  // Compatibility fallback if the current event has no persisted provider ID.
+  if ((!currentWaMessageId || !currentMessageWasFound) && turns.length &&
+      turns[turns.length - 1]?.role === "user" &&
+      turns[turns.length - 1]?.content === cleanText(input.text, 2500)) {
     turns.pop();
   }
   return turns.slice(-MAX_HISTORY_MESSAGES);
@@ -258,7 +289,12 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     }
     throw error;
   }
-  const systemPrompt = buildTenantSystemPrompt(ctx, input.profileName, [effectiveText, ...history.slice(-4).map((turn) => turn.content)].join("\\n"));
+  const systemPrompt = buildTenantSystemPrompt(
+    ctx,
+    input.profileName,
+    [effectiveText, ...history.slice(-4).map((turn) => turn.content)].join("\n"),
+    history,
+  );
   const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
     .slice(-MAX_HISTORY_MESSAGES);
   let totalHistory = recent.reduce((sum, turn) => sum + turn.content.length, 0);
