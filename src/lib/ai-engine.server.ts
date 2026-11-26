@@ -193,9 +193,58 @@ async function resolveIncomingText(input: GenerateInput): Promise<string> {
   return "Transcrição da nota de voz do cliente: " + transcript;
 }
 
+function isRetryableGenerationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /AbortError|TimeoutError|timed out|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\\d\\d)/i.test(message);
+}
+
+async function enqueueGenerationForRetry(input: GenerateInput): Promise<void> {
+  if (input.testMode || !input.conversationId || !input.messageId) {
+    throw new Error("AI_GENERATION_RETRY_CANNOT_BE_QUEUED");
+  }
+  const admin = serviceClient();
+  const { data: conversation, error: conversationError } = await admin.from("conversations")
+    .select("id")
+    .eq("id", input.conversationId)
+    .eq("organization_id", input.organizationId)
+    .eq("whatsapp_number_id", input.whatsappNumberId)
+    .maybeSingle();
+  if (conversationError || !conversation?.id) {
+    throw new Error("AI_QUEUE_CONVERSATION_LOOKUP_FAILED");
+  }
+  const idempotencyKey = "whatsapp:" + input.organizationId + ":" + input.whatsappNumberId + ":" + input.messageId;
+  const { error: insertError } = await admin.from("ai_generation_jobs").upsert({
+    idempotency_key: idempotencyKey,
+    organization_id: input.organizationId,
+    whatsapp_number_id: input.whatsappNumberId,
+    conversation_id: input.conversationId,
+    message_id: input.messageId,
+    request_payload: input,
+    status: "queued",
+    available_at: new Date().toISOString(),
+  }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+  if (insertError) throw new Error("AI_QUEUE_ENQUEUE_FAILED: " + insertError.message);
+  const { data: job, error: lookupError } = await admin.from("ai_generation_jobs")
+    .select("id,status")
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+  if (lookupError || !job?.id) throw new Error("AI_QUEUE_LOOKUP_FAILED");
+  if (job.status === "failed") throw new Error("AI_GENERATION_JOB_PREVIOUSLY_FAILED");
+}
+
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
   const started = Date.now();
-  const [ctx, history, effectiveText] = await Promise.all([loadTenantContext(input), loadConversationHistory(input), resolveIncomingText(input)]);
+  const [ctx, history] = await Promise.all([loadTenantContext(input), loadConversationHistory(input)]);
+  let effectiveText: string;
+  try {
+    effectiveText = await resolveIncomingText(input);
+  } catch (error) {
+    if (isRetryableGenerationError(error)) {
+      await enqueueGenerationForRetry(input);
+      throw new Error("generation_pending_retry");
+    }
+    throw error;
+  }
   const systemPrompt = buildTenantSystemPrompt(ctx, input.profileName);
   const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
     .slice(-MAX_HISTORY_MESSAGES);
@@ -206,7 +255,9 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   }
 
   const router = routerConfig();
-  const response = await fetch(router.endpoint, {
+  let response: Response;
+  try {
+    response = await fetch(router.endpoint, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + router.apiKey },
     body: JSON.stringify({
@@ -226,14 +277,26 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
       },
     }),
     signal: AbortSignal.timeout(25_000),
-  });
+    });
+  } catch (error) {
+    if (isRetryableGenerationError(error)) {
+      await enqueueGenerationForRetry(input);
+      throw new Error("generation_pending_retry");
+    }
+    throw error;
+  }
 
   const raw = await response.text();
   let data: Record<string, unknown> = {};
   try { data = JSON.parse(raw) as Record<string, unknown>; } catch { /* parsed below as invalid response */ }
   if (!response.ok) {
     const detail = typeof data["detail"] === "string" ? data["detail"] : "ROUTER_REQUEST_FAILED";
-    throw new Error(detail + " (HTTP " + response.status + ")");
+    const failure = new Error(detail + " (HTTP " + response.status + ")");
+    if (isRetryableGenerationError(failure)) {
+      await enqueueGenerationForRetry(input);
+      throw new Error("generation_pending_retry");
+    }
+    throw failure;
   }
   const choices = Array.isArray(data["choices"]) ? data["choices"] as Array<Record<string, unknown>> : [];
   const message = choices[0]?.["message"] as Record<string, unknown> | undefined;
