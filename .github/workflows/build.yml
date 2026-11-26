@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main, "feat/whappnus-intelligence-router-integration"]
+    branches: [main, "feat/whappnus-intelligence-router-integration", "fix/ai-conversation-continuity"]
   workflow_dispatch:
 
 jobs:
