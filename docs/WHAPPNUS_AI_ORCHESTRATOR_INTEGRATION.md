@@ -1,0 +1,75 @@
+# WHAPPNUS AI Orchestrator — integração segura
+
+## Arquitectura preservada
+
+- Supabase continua a ser a fonte de verdade para organizações, utilizadores, agentes, conhecimento, exemplos de treino, histórico, créditos, conversas e operações.
+- O WhatsApp Engine no Railway continua responsável pelas sessões QR Code, recepção e envio de mensagens. A integração não altera o serviço nem o volume de sessões.
+- O backend WHAPPNUS continua a carregar o contexto do tenant e a validar regras de negócio.
+- O AI Orchestrator é um serviço independente de geração: escolhe Gemini, OpenAI ou Anthropic e devolve texto normalizado.
+- Redis é utilizado pelo Orchestrator apenas para rate limits partilhados e protecção anti-replay. Não armazena memória, treino, histórico ou sessões WhatsApp.
+
+## Variáveis server-only na Netlify
+
+Configurar no site `whappnus`, em context `all`, com scopes Builds e Functions:
+
+- `WHAPPNUS_ORCHESTRATOR_URL=https://whappnus-ai-orchestrator-production.up.railway.app`
+- `WHAPPNUS_ORCHESTRATOR_API_KEY=<segredo partilhado com ORCHESTRATOR_API_KEY no Railway>`
+- `WHAPPNUS_TENANT_SIGNING_SECRET=<segredo partilhado com TENANT_SIGNING_SECRET no Railway>`
+- `WHAPPNUS_AI_WORKER_SECRET=<segredo interno exclusivo para o worker agendado>`
+
+Não usar prefixo `VITE_`, não colocar estes segredos no browser e não os versionar. As variáveis server-side do TanStack Start são injectadas durante o build; depois de as alterar é necessário novo deploy.
+
+No Railway, o serviço WHAPPNUS-AI-ORCHESTRATOR recebe:
+- `ORCHESTRATOR_API_KEY`
+- `TENANT_SIGNING_SECRET`
+- `REDIS_URL` (referência ao serviço Redis já provisionado)
+- Uma ou mais credenciais dos provedores, configuradas separadamente.
+
+Os dois primeiros segredos têm de coincidir exactamente com os valores correspondentes da Netlify. O segredo do worker é independente e não é enviado ao Orchestrator.
+
+## Contrato de autenticação
+
+O backend faz server-to-server `POST /v1/chat/completions`:
+- `X-Orchestrator-Key`: segredo de acesso ao serviço.
+- `X-Tenant-Timestamp`: Unix timestamp em segundos.
+- `X-Tenant-Nonce`: valor aleatório novo em cada pedido.
+- `X-Tenant-Signature`: HMAC-SHA256 de `organization_id:timestamp:nonce`.
+
+O backend autentica o utilizador e confirma que a organização pertence à sessão antes de chamar `generateViaWhappNusAI`. O Orchestrator valida assinatura, validade temporal e reutilização de nonce, e aplica quota Redis por organização.
+
+O corpo inclui `organization_id`, `conversation_id`, `system_instructions`, mensagens recentes e metadados mínimos. Não envia credenciais Supabase, tokens WhatsApp nem dados de outras organizações.
+
+## Multimodalidade
+
+O backend descarrega anexos exclusivamente do bucket privado `whatsapp-incoming-media`, validando prefixo de organização/número, MIME e tamanho, e envia os bytes em base64 apenas no pedido:
+- Imagem: JPEG, PNG, WebP, GIF (máximo 5 MB).
+- Áudio: MPEG, WAV, OGG, MP4, WebM, FLAC (máximo 15 MB).
+- Documento: PDF (máximo 10 MB).
+- Vídeo e formatos não suportados: não são enviados ao modelo; o agente é instruído a não fingir que analisou o anexo.
+
+O Orchestrator faz routing por capacidades: imagem nos três provedores; áudio no Gemini; PDF no Gemini e Anthropic.
+
+## Worker de geração e entrega
+
+O worker agendado da Netlify continua a consumir a fila durável existente no Supabase e a executar a mesma função de geração. A autenticação do callback interno usa `WHAPPNUS_AI_WORKER_SECRET`, separado das credenciais do Orchestrator. O estado de geração e entrega continua no Supabase, com idempotência e outbox; o WhatsApp Engine continua a executar o envio.
+
+## Segurança e operação
+
+- O browser nunca chama directamente o Orchestrator.
+- O backend carrega agente, conhecimento e histórico com filtros de `organization_id`.
+- A chave HMAC é gerada por nós e guardada apenas em variáveis privadas.
+- Os logs não devem conter mensagens, payloads binários ou segredos.
+- Não remover as antigas variáveis do Router até a nova versão estar publicada e validada. Depois, confirmar que nenhum outro serviço as utiliza e retirar as variáveis obsoletas numa alteração separada.
+- As chaves Gemini/OpenAI/Anthropic são colocadas apenas no serviço Orchestrator no Railway, nunca na Netlify.
+
+## Testes obrigatórios antes de activar atendimento real
+
+1. Deploy Preview do backend e verificação de build.
+2. Health/readiness do Orchestrator e autenticação com assinatura válida.
+3. Rejeição de assinatura inválida, timestamp expirado e nonce repetido.
+4. Testes com duas organizações e contextos de conhecimento distintos.
+5. Testes de texto, imagem, áudio e PDF com dados de teste.
+6. Teste de fallback e falha de provedor.
+7. Teste do worker, idempotência e entrega pelo WhatsApp Engine.
+8. Teste de atendimento manual, IA desligada e handoff humano.
+9. Teste final com um número de teste antes de activar tráfego de clientes.
