@@ -24,8 +24,8 @@ function release(){
 
 function isTransient(error:unknown):boolean{
  const m=error instanceof Error?error.message:String(error);
- if(/HTTP (400|401|403|404)\\b|model .*not found|unsupported/i.test(m))return false;
- return /HTTP (408|409|425|429|5\\d\\d)\\b|timeout|abort|ECONN|fetch failed|socket|network/i.test(m);
+ if(/HTTP (400|401|403|404)\b|model .*not found|unsupported/i.test(m))return false;
+ return /HTTP (408|409|425|429|5\d\d)\b|timeout|abort|ECONN|fetch failed|socket|network/i.test(m);
 }
 
 async function ollamaGenerate(messages:ChatMessage[],options:{model:string;temperature:number;maxTokens:number},attachments:MediaAttachment[]=[]):Promise<ProviderResponse>{
@@ -40,7 +40,7 @@ async function ollamaGenerate(messages:ChatMessage[],options:{model:string;tempe
   const ollamaMessages=messages.map((m,index)=>index===lastUser&&attachments.length>0
    ? {...m,images:attachments.map(a=>a.data)}
    : m);
-  const response=await fetch(config.AI_OLLAMA_BASE_URL.replace(/\\/$/,"")+"/api/chat",{
+  const response=await fetch(config.AI_OLLAMA_BASE_URL.replace(/\/$/,"")+"/api/chat",{
    method:"POST",
    headers:{"content-type":"application/json",authorization:"Bearer "+config.AI_OLLAMA_API_KEY},
    body:JSON.stringify({
@@ -82,7 +82,7 @@ async function intelligenceRouterGenerate(
  const base=config.AI_ROUTER_BASE_URL;
  const key=config.AI_ROUTER_API_KEY;
  if(!base||!key)throw new Error("AI_ROUTER_CONFIGURATION_MISSING");
- const response=await fetch(base.replace(/\\/$/,"")+"/v1/chat/completions",{
+ const response=await fetch(base.replace(/\/$/,"")+"/v1/chat/completions",{
   method:"POST",
   headers:{"content-type":"application/json",authorization:"Bearer "+key},
   body:JSON.stringify({
@@ -144,7 +144,7 @@ export function createProvider():AIProvider{
 
 export async function getOllamaHealth():Promise<{ok:boolean;model:string;status:string}>{
  try{
-  const response=await fetch(config.AI_OLLAMA_BASE_URL.replace(/\\/$/,"")+"/health",{headers:{authorization:"Bearer "+config.AI_OLLAMA_API_KEY},signal:AbortSignal.timeout(4000)});
+  const response=await fetch(config.AI_OLLAMA_BASE_URL.replace(/\/$/,"")+"/health",{headers:{authorization:"Bearer "+config.AI_OLLAMA_API_KEY},signal:AbortSignal.timeout(4000)});
   return {ok:response.ok,model:config.AI_OLLAMA_MODEL,status:response.ok?"ready":"unavailable"};
  }catch{return {ok:false,model:config.AI_OLLAMA_MODEL,status:"unreachable"};}
 }
