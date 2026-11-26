@@ -1,3 +1,4 @@
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { serviceClient } from "./whatsapp.server";
 
 type GenerateInput = {
@@ -186,55 +187,113 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
   return turns.slice(-MAX_HISTORY_MESSAGES);
 }
 
-function routerConfig(): { endpoint: string; apiKey: string } {
-  const configured = process.env["WHAPPNUS_ROUTER_URL"];
-  const apiKey = process.env["WHAPPNUS_ROUTER_API_KEY"];
-  if (!configured) throw new Error("WHAPPNUS_ROUTER_URL_NOT_CONFIGURED");
-  if (!apiKey) throw new Error("WHAPPNUS_ROUTER_API_KEY_NOT_CONFIGURED");
-  const url = /^https?:\/\//i.test(configured) ? configured : "https://" + configured;
+type OrchestratorMediaPart = {
+  type: "image" | "audio" | "document";
+  mime_type: string;
+  data: string;
+};
+
+type ResolvedIncomingContent = {
+  text: string;
+  mediaPart?: OrchestratorMediaPart;
+};
+
+function orchestratorConfig(): { endpoint: string; apiKey: string; tenantSigningSecret: string } {
+  const configured = process.env["WHAPPNUS_ORCHESTRATOR_URL"];
+  const apiKey = process.env["WHAPPNUS_ORCHESTRATOR_API_KEY"];
+  const tenantSigningSecret = process.env["WHAPPNUS_TENANT_SIGNING_SECRET"];
+  if (!configured) throw new Error("WHAPPNUS_ORCHESTRATOR_URL_NOT_CONFIGURED");
+  if (!apiKey || apiKey.length < 32) throw new Error("WHAPPNUS_ORCHESTRATOR_API_KEY_NOT_CONFIGURED");
+  if (!tenantSigningSecret || tenantSigningSecret.length < 32) throw new Error("WHAPPNUS_TENANT_SIGNING_SECRET_NOT_CONFIGURED");
+  const url = /^https?:\\/\\//i.test(configured) ? configured : "https://" + configured;
   let parsed: URL;
-  try { parsed = new URL(url); } catch { throw new Error("WHAPPNUS_ROUTER_URL_INVALID"); }
+  try { parsed = new URL(url); } catch { throw new Error("WHAPPNUS_ORCHESTRATOR_URL_INVALID"); }
   if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
-    throw new Error("WHAPPNUS_ROUTER_HTTPS_REQUIRED");
+    throw new Error("WHAPPNUS_ORCHESTRATOR_HTTPS_REQUIRED");
   }
-  parsed.pathname = parsed.pathname.replace(/\/$/, "");
+  parsed.pathname = "/v1/chat/completions";
   parsed.search = "";
   parsed.hash = "";
-  return { endpoint: parsed.toString().replace(/\/$/, "") + "/v1/chat/completions", apiKey };
+  return { endpoint: parsed.toString(), apiKey, tenantSigningSecret };
 }
 
-async function resolveIncomingText(input: GenerateInput): Promise<string> {
-  if (input.messageType === "image" || input.messageType === "document" || input.messageType === "video") {
-    const caption = cleanText(input.text, 4000);
-    return "O cliente enviou um anexo do tipo " + input.messageType + ". O conteúdo visual/documental não foi disponibilizado ao modelo nesta configuração; não afirmes que o analisaste. Se a resposta depender do conteúdo, pede ao cliente que o descreva ou encaminha para a equipa." + (caption && !caption.startsWith("[O cliente enviou") ? "\nLegenda/mensagem do cliente: " + caption : "");
+function tenantSignatureHeaders(organizationId: string, secret: string): Record<string, string> {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const nonce = randomBytes(24).toString("base64url");
+  const signature = createHmac("sha256", secret)
+    .update(organizationId + ":" + timestamp + ":" + nonce)
+    .digest("hex");
+  return {
+    "X-Tenant-Timestamp": timestamp,
+    "X-Tenant-Nonce": nonce,
+    "X-Tenant-Signature": signature,
+  };
+}
+
+async function resolveIncomingContent(input: GenerateInput): Promise<ResolvedIncomingContent> {
+  const messageType = input.messageType;
+  const caption = cleanText(input.text, 4000);
+  if (messageType === "video") {
+    return {
+      text: "O cliente enviou um vídeo, mas a análise de vídeo ainda não está disponível. Não afirmes que viste o vídeo. " +
+        (caption && !caption.startsWith("[O cliente enviou") ? "Legenda/mensagem do cliente: " + caption : "Pede uma descrição ou encaminha para a equipa."),
+    };
   }
-  if (input.messageType !== "audio") return cleanText(input.text, 6000) || "[Mensagem sem texto]";
+  if (messageType !== "image" && messageType !== "audio" && messageType !== "document") {
+    return { text: cleanText(input.text, 6000) || "[Mensagem sem texto]" };
+  }
+
   const path = input.mediaPath ?? "";
   const expectedPrefix = input.organizationId + "/" + input.whatsappNumberId + "/";
   if (!path.startsWith(expectedPrefix) || path.includes("..")) {
-    return "O cliente enviou uma nota de voz, mas o ficheiro não está disponível para transcrição. Pede-lhe, com cordialidade, que escreva a mensagem.";
+    return { text: "O cliente enviou um anexo, mas o ficheiro não está disponível. Pede que volte a enviar ou descreva o conteúdo." };
   }
-  const { data: audio, error } = await serviceClient().storage.from("whatsapp-incoming-media").download(path);
-  if (error || !audio) throw new Error("AUDIO_MEDIA_DOWNLOAD_FAILED");
-  const mime = input.mediaMimeType || audio.type || "audio/ogg";
-  const form = new FormData();
-  form.append("file", new Blob([await audio.arrayBuffer()], { type: mime }), "whatsapp-audio");
-  form.append("language", "pt");
-  const router = routerConfig();
-  const endpoint = router.endpoint.replace(/\/v1\/chat\/completions$/, "/v1/audio/transcriptions");
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { authorization: "Bearer " + router.apiKey },
-    body: form,
-    signal: AbortSignal.timeout(30_000),
-  });
-  const raw = await response.text();
-  let data: Record<string, unknown> = {};
-  try { data = JSON.parse(raw) as Record<string, unknown>; } catch { /* handled below */ }
-  if (!response.ok) throw new Error("AUDIO_TRANSCRIPTION_FAILED (HTTP " + response.status + ")");
-  const transcript = cleanText(data["text"], 6000);
-  if (!transcript) throw new Error("AUDIO_TRANSCRIPTION_EMPTY");
-  return "Transcrição da nota de voz do cliente: " + transcript;
+
+  const { data: file, error } = await serviceClient().storage.from("whatsapp-incoming-media").download(path);
+  if (error || !file) throw new Error("INCOMING_MEDIA_DOWNLOAD_FAILED");
+
+  const rawMime = input.mediaMimeType || file.type || "";
+  const mime = rawMime.split(";")[0]?.trim().toLowerCase() ?? "";
+  const allowed: Record<string, Set<string>> = {
+    image: new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+    audio: new Set(["audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4", "audio/webm", "audio/flac"]),
+    document: new Set(["application/pdf"]),
+  };
+  const maxBytes: Record<string, number> = {
+    image: 5 * 1024 * 1024,
+    audio: 15 * 1024 * 1024,
+    document: 10 * 1024 * 1024,
+  };
+  if (!allowed[messageType].has(mime)) {
+    return {
+      text: "O cliente enviou um anexo do tipo " + messageType + " com formato não suportado para análise automática. Não afirmes que o analisaste. " +
+        (caption ? "Legenda/mensagem do cliente: " + caption : "Pede que envie um formato compatível ou descreva o conteúdo."),
+    };
+  }
+
+  const bytes = await file.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > maxBytes[messageType]) {
+    return {
+      text: "O anexo enviado excede o limite de tamanho para análise automática. Não afirmes que o analisaste. Pede uma versão mais pequena ou uma descrição do conteúdo.",
+    };
+  }
+
+  const instruction = messageType === "image"
+    ? "Analisa a imagem recebida e responde apenas com elementos que consigas realmente observar."
+    : messageType === "audio"
+      ? "Ouve e compreende o áudio recebido. Responde ao que a pessoa disse; não inventes palavras que não consigas compreender."
+      : "Lê o documento PDF recebido e responde com base apenas no conteúdo que conseguires extrair.";
+  const text = instruction + (caption && !caption.startsWith("[O cliente enviou")
+    ? "\\nLegenda/mensagem do cliente: " + caption
+    : "");
+  return {
+    text,
+    mediaPart: {
+      type: messageType,
+      mime_type: mime,
+      data: Buffer.from(bytes).toString("base64"),
+    },
+  };
 }
 
 function isRetryableGenerationError(error: unknown): boolean {
@@ -279,9 +338,9 @@ async function enqueueGenerationForRetry(input: GenerateInput): Promise<void> {
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
   const started = Date.now();
   const [ctx, history] = await Promise.all([loadTenantContext(input), loadConversationHistory(input)]);
-  let effectiveText: string;
+  let resolvedContent: ResolvedIncomingContent;
   try {
-    effectiveText = await resolveIncomingText(input);
+    resolvedContent = await resolveIncomingContent(input);
   } catch (error) {
     if (isRetryableGenerationError(error)) {
       await enqueueGenerationForRetry(input);
@@ -289,6 +348,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     }
     throw error;
   }
+  const effectiveText = resolvedContent.text;
   const systemPrompt = buildTenantSystemPrompt(
     ctx,
     input.profileName,
@@ -303,29 +363,42 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     totalHistory -= removed?.content.length ?? 0;
   }
 
-  const router = routerConfig();
+  const orchestrator = orchestratorConfig();
+  const profilePrefix = input.profileName?.trim()
+    ? "Nome exibido no WhatsApp: " + input.profileName.trim().slice(0, 100) + "\\n"
+    : "";
+  const userText = profilePrefix + effectiveText;
+  const userContent = resolvedContent.mediaPart
+    ? [{ type: "text" as const, text: userText }, resolvedContent.mediaPart]
+    : userText;
   let response: Response;
   try {
-    response = await fetch(router.endpoint, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: "Bearer " + router.apiKey },
-    body: JSON.stringify({
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...recent,
-        { role: "user", content: (input.profileName?.trim() ? "Nome exibido no WhatsApp: " + input.profileName.trim().slice(0, 100) + "\n" : "") + effectiveText },
-      ],
-      temperature: 0.35,
-      max_tokens: 700,
-      stream: false,
-      metadata: {
-        organization_id: input.organizationId,
-        whatsapp_number_id: input.whatsappNumberId,
-        agent_id: typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null,
-        test_mode: Boolean(input.testMode),
+    response = await fetch(orchestrator.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Orchestrator-Key": orchestrator.apiKey,
+        ...tenantSignatureHeaders(input.organizationId, orchestrator.tenantSigningSecret),
       },
-    }),
-    signal: AbortSignal.timeout(25_000),
+      body: JSON.stringify({
+        request_id: randomUUID(),
+        organization_id: input.organizationId,
+        conversation_id: input.conversationId ?? null,
+        task_type: "customer_support",
+        messages: [
+          ...recent,
+          { role: "user", content: userContent },
+        ],
+        system_instructions: systemPrompt,
+        temperature: 0.35,
+        max_tokens: 700,
+        metadata: {
+          whatsapp_number_id: input.whatsappNumberId,
+          agent_id: typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null,
+          test_mode: Boolean(input.testMode),
+        },
+      }),
+      signal: AbortSignal.timeout(25_000),
     });
   } catch (error) {
     if (isRetryableGenerationError(error)) {
@@ -339,22 +412,30 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   let data: Record<string, unknown> = {};
   try { data = JSON.parse(raw) as Record<string, unknown>; } catch { /* parsed below as invalid response */ }
   if (!response.ok) {
-    const detail = typeof data["detail"] === "string" ? data["detail"] : "ROUTER_REQUEST_FAILED";
-    const failure = new Error(detail + " (HTTP " + response.status + ")");
+    const detailValue = data["detail"];
+    const detailObject = detailValue && typeof detailValue === "object"
+      ? detailValue as Record<string, unknown>
+      : {};
+    const detail = typeof detailValue === "string"
+      ? detailValue
+      : typeof detailObject["code"] === "string"
+        ? detailObject["code"]
+        : "ORCHESTRATOR_REQUEST_FAILED";
+    const retryAfter = response.headers.get("retry-after");
+    const failure = new Error(detail + " (HTTP " + response.status + ")" +
+      (retryAfter ? " Retry-After: " + retryAfter : ""));
     if (isRetryableGenerationError(failure)) {
       await enqueueGenerationForRetry(input);
       throw new Error("generation_pending_retry");
     }
     throw failure;
   }
-  const choices = Array.isArray(data["choices"]) ? data["choices"] as Array<Record<string, unknown>> : [];
-  const message = choices[0]?.["message"] as Record<string, unknown> | undefined;
-  const answer = typeof message?.["content"] === "string" ? message["content"].trim() : "";
-  if (!answer) throw new Error("ROUTER_EMPTY_COMPLETION");
+  const answer = typeof data["content"] === "string" ? data["content"].trim() : "";
+  if (!answer) throw new Error("ORCHESTRATOR_EMPTY_COMPLETION");
 
   const meta = data["whappnus"] && typeof data["whappnus"] === "object"
     ? data["whappnus"] as Record<string, unknown> : {};
-  const selectedPath = typeof meta["selected_path"] === "string" ? meta["selected_path"] : "simple";
+  const selectedPath = typeof meta["selected_path"] === "string" ? meta["selected_path"] : (typeof data["provider"] === "string" ? data["provider"] : "unknown");
   const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null;
   const confidence = 0;
   const reactionEmoji = null;
@@ -387,8 +468,8 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
 
   return {
     text: safeAnswer,
-    provider: "whappnus-intelligence-router",
-    model: typeof data["model"] === "string" ? data["model"] : "configured-router-model",
+    provider: typeof data["provider"] === "string" ? data["provider"] : "whappnus-ai-orchestrator",
+    model: typeof data["model"] === "string" ? data["model"] : "configured-model",
     intent: selectedPath,
     confidence,
     latencyMs: Date.now() - started,
