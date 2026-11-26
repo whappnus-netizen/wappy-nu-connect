@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/public/ai/generation-complete")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env["WHAPPNUS_ROUTER_API_KEY"];
+        const secret = process.env["WHAPPNUS_AI_WORKER_SECRET"];
         const authorization = request.headers.get("authorization") ?? "";
         const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
         if (!secret) return Response.json({ ok: false, error: "worker_secret_not_configured" }, { status: 503 });
