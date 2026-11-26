@@ -1303,6 +1303,9 @@ export async function deliverAiGenerationJob(jobId: string): Promise<{
     ? job.request_payload as Record<string, unknown> : {};
   if (request["testMode"] === true) return { ok: true, status: "skipped", reason: "test_mode" };
 
+  const result = job.result_payload && typeof job.result_payload === "object"
+    ? job.result_payload as Record<string, unknown> : {};
+  const isHumanHandoff = result["intent"] === "human";
   const [numberResult, conversationResult, settingsResult, inboundResult] = await Promise.all([
     admin.from("whatsapp_numbers").select("id,organization_id,status,ai_enabled")
       .eq("id", job.whatsapp_number_id).eq("organization_id", job.organization_id).maybeSingle(),
@@ -1322,7 +1325,7 @@ export async function deliverAiGenerationJob(jobId: string): Promise<{
   const inbound = inboundResult.data;
   if (!number || !conversation || !inbound) return { ok: true, status: "skipped", reason: "source_state_missing" };
   if (number.status !== "connected" || !number.ai_enabled) return { ok: true, status: "skipped", reason: "whatsapp_ai_offline" };
-  if (conversation.status !== "open" || !conversation.ai_enabled || (conversation.assigned_to && !conversation.ai_enabled)) {
+  if (conversation.status !== "open" || (!conversation.ai_enabled && !isHumanHandoff) || (conversation.assigned_to && !conversation.ai_enabled && !isHumanHandoff)) {
     return { ok: true, status: "skipped", reason: "conversation_not_ai_eligible" };
   }
   if (settingsResult.data?.autoreply_enabled === false) return { ok: true, status: "skipped", reason: "auto_reply_off" };
@@ -1343,8 +1346,6 @@ export async function deliverAiGenerationJob(jobId: string): Promise<{
   if (countError) throw new Error("AI_DELIVERY_RATE_LIMIT_LOOKUP_FAILED: " + countError.message);
   if ((count ?? 0) >= 6) return { ok: true, status: "skipped", reason: "rate_limited" };
 
-  const result = job.result_payload && typeof job.result_payload === "object"
-    ? job.result_payload as Record<string, unknown> : {};
   const text = typeof result["text"] === "string" ? result["text"].trim() : "";
   if (!text) return { ok: true, status: "failed", reason: "empty_generation_result" };
   const sent = await sendOutgoingMessage({
