@@ -282,7 +282,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
       metadata: {
         organization_id: input.organizationId,
         whatsapp_number_id: input.whatsappNumberId,
-        agent_id: typeof ctx.agent?.["id"] === "string" ? ctx.agent.id : null,
+        agent_id: typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null,
         test_mode: Boolean(input.testMode),
       },
     }),
@@ -316,7 +316,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const meta = data["whappnus"] && typeof data["whappnus"] === "object"
     ? data["whappnus"] as Record<string, unknown> : {};
   const selectedPath = typeof meta["selected_path"] === "string" ? meta["selected_path"] : "simple";
-  const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent.id : null;
+  const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null;
   const confidence = 0;
   const reactionEmoji = null;
   let safeAnswer = answer;
