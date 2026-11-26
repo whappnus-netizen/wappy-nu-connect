@@ -899,9 +899,8 @@ export async function processIncomingMessage(
   }
 
   const showTypingIndicator = async () => {
-    // QR/Baileys already emits "composing" while sending. Cloud API supports
-    // the official read + typing indicator request while the model prepares a reply.
-    if (number.provider === "qr") return;
+    // Both providers expose their own typing/presence implementation. The QR
+    // bridge must be notified before inference, not only when sending the reply.
     try {
       await replyProvider.showTypingIndicator?.({
         organizationId: number.organization_id,
@@ -970,9 +969,8 @@ export async function processIncomingMessage(
   }
 
   try {
-    // Só mostramos "a escrever" quando existe uma decisão válida de gerar resposta.
-    // Na Cloud API o indicador acompanha a preparação; no QR o provider trata disso no envio.
-    if (number.provider !== "qr") await showTypingIndicator();
+    // Start typing before model inference for both Cloud API and QR/Baileys.
+    await showTypingIndicator();
 
     // Quando o contexto recente indica uma transacção, analisa o anexo em paralelo
     // com a resposta normal. A resposta multimodal principal também pode devolver
