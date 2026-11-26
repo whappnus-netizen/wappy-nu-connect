@@ -90,7 +90,6 @@ function buildTenantSystemPrompt(ctx: AgentContext, profileName?: string | null,
       }, []).join("\n"),
   ];
 
-  if (profileName?.trim()) sections.push("NOME DE PERFIL DO CLIENTE: " + profileName.trim().slice(0, 100));
 
   let knowledgeChars = 0;
   const rankedKnowledge = [...ctx.knowledge].map((item, index) => ({ item, index, score: relevanceScore([item.title, item.category, item.content].filter(Boolean).join(" "), query) }))
@@ -274,7 +273,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
       messages: [
         { role: "system", content: systemPrompt },
         ...recent,
-        { role: "user", content: effectiveText },
+        { role: "user", content: (input.profileName?.trim() ? "Nome exibido no WhatsApp: " + input.profileName.trim().slice(0, 100) + "\\n" : "") + effectiveText },
       ],
       temperature: 0.35,
       max_tokens: 700,
@@ -322,24 +321,28 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   let safeAnswer = answer;
 
   // A human route is a real backend state change, not just a promise in model text.
-  if (meta["handoff_required"] === true && input.conversationId && !input.testMode) {
-    const admin = serviceClient();
-    const { data: conversation, error: handoffError } = await admin.from("conversations")
-      .update({ ai_enabled: false })
-      .eq("organization_id", input.organizationId)
-      .eq("id", input.conversationId)
-      .select("id")
-      .maybeSingle();
-    if (handoffError || !conversation?.id) {
-      throw new Error("HUMAN_HANDOFF_STATE_UPDATE_FAILED");
+  if (meta["handoff_required"] === true) {
+    if (input.conversationId && !input.testMode) {
+      const admin = serviceClient();
+      const { data: conversation, error: handoffError } = await admin.from("conversations")
+        .update({ ai_enabled: false })
+        .eq("organization_id", input.organizationId)
+        .eq("id", input.conversationId)
+        .select("id")
+        .maybeSingle();
+      if (handoffError || !conversation?.id) {
+        throw new Error("HUMAN_HANDOFF_STATE_UPDATE_FAILED");
+      }
+      await admin.from("whatsapp_events").insert({
+        organization_id: input.organizationId,
+        whatsapp_number_id: input.whatsappNumberId,
+        event_type: "ai_skipped",
+        detail: { reason: "human_handoff_requested", conversation_id: input.conversationId },
+      });
+      safeAnswer = "Entendi. Este assunto precisa de acompanhamento humano. Pausei as respostas automáticas nesta conversa para que a equipa possa continuar o atendimento por aqui.";
+    } else {
+      safeAnswer = "Este pedido foi classificado para acompanhamento humano. No modo de teste, nenhuma transferência nem alteração da conversa foi efectuada.";
     }
-    await admin.from("whatsapp_events").insert({
-      organization_id: input.organizationId,
-      whatsapp_number_id: input.whatsappNumberId,
-      event_type: "ai_skipped",
-      detail: { reason: "human_handoff_requested", conversation_id: input.conversationId },
-    });
-    safeAnswer = "Entendi. Este assunto precisa de acompanhamento humano. Pausei as respostas automáticas nesta conversa para que a equipa possa continuar o atendimento por aqui.";
   }
 
   return {
