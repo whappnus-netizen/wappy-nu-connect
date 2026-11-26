@@ -117,6 +117,7 @@ async function loadTenantContext(input: GenerateInput): Promise<AgentContext> {
   if (error) throw new Error("AI_CONTEXT_LOAD_FAILED: " + error.message);
   const value = (data ?? {}) as Partial<AgentContext>;
   if (!value.agent || typeof value.agent !== "object") throw new Error("NO_ACTIVE_AGENT");
+  if (value.agent["is_active"] === false) throw new Error("NO_ACTIVE_AGENT");
   return {
     agent: value.agent,
     knowledge: Array.isArray(value.knowledge) ? value.knowledge : [],
@@ -134,10 +135,15 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
     .order("created_at", { ascending: false })
     .limit(MAX_HISTORY_MESSAGES + 1);
   if (error) throw new Error("AI_HISTORY_LOAD_FAILED: " + error.message);
-  return (data ?? []).reverse().map((row) => ({
+  const turns = (data ?? []).reverse().map((row) => ({
     role: row.direction === "inbound" ? "user" as const : "assistant" as const,
     content: cleanText(row.body, 2500),
-  })).filter((turn) => turn.content).slice(-MAX_HISTORY_MESSAGES);
+  })).filter((turn) => turn.content);
+  // The webhook persists the inbound message before generation; avoid appending it twice.
+  if (turns.length && turns[turns.length - 1]?.role === "user" && turns[turns.length - 1]?.content === cleanText(input.text, 2500)) {
+    turns.pop();
+  }
+  return turns.slice(-MAX_HISTORY_MESSAGES);
 }
 
 function routerConfig(): { endpoint: string; apiKey: string } {
@@ -163,8 +169,11 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const systemPrompt = buildTenantSystemPrompt(ctx, input.profileName);
   const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
     .slice(-MAX_HISTORY_MESSAGES);
-  const totalHistory = recent.reduce((sum, turn) => sum + turn.content.length, 0);
-  while (recent.length && totalHistory > MAX_HISTORY_CHARS) recent.shift();
+  let totalHistory = recent.reduce((sum, turn) => sum + turn.content.length, 0);
+  while (recent.length && totalHistory > MAX_HISTORY_CHARS) {
+    const removed = recent.shift();
+    totalHistory -= removed?.content.length ?? 0;
+  }
 
   const router = routerConfig();
   const response = await fetch(router.endpoint, {
