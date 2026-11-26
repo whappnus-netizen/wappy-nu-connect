@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, "feat/whappnus-intelligence-router-integration"]
   workflow_dispatch:
 
 jobs:
