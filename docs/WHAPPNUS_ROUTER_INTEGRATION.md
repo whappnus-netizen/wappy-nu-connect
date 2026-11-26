@@ -15,7 +15,7 @@ O browser nunca deve chamar o Router directamente nem receber a chave privada.
 Configurar nos scopes de Functions/Runtime (e Build quando a aplicação precisar durante o build):
 
 - `WHAPPNUS_ROUTER_URL=https://whappnus-intelligence-router-production.up.railway.app`
-- `WHAPPNUS_ROUTER_API_KEY=<mesmo segredo configurado como ROUTER_API_KEY no Railway>`
+- `WHAPPNUS_ROUTER_API_KEY=<mesmo segredo configurado como ROUTER_API_KEY no Railway>`\n\nA função agendada da Netlify reutiliza esta variável server-only para autenticar o endpoint interno do worker; não é necessária uma terceira chave.
 
 Não usar prefixo `VITE_` nestas variáveis. Não colocar a chave em código, ficheiros versionados, logs ou variáveis expostas ao browser.
 
@@ -44,10 +44,10 @@ A geração nesta branch é síncrona, com timeout de 25 segundos para texto e 3
 
 1. Confirmar as duas variáveis server-only na Netlify.
 2. Confirmar `GET /ready` HTTP 200 no Router.
-3. Fazer deploy de preview e testar agente com dados fictícios.
-4. Testar duas organizações com preços e regras diferentes.
-5. Testar prompt injection, pergunta fora do conhecimento, pedido de humano e nota de voz.
-6. Confirmar que nenhum pedido de operação é apresentado como concluído sem validação do backend.
-7. Medir latência e verificar logs sem conteúdo privado nem segredos.
-8. Só depois activar para números reais, gradualmente.
+3. Fazer deploy de preview e testar agente com dados fictícios.\n4. Depois de publicar, confirmar que a função agendada `ai-generation-worker` executa e que o endpoint interno responde apenas com o segredo server-side.
+5. Testar duas organizações com preços e regras diferentes.
+6. Testar prompt injection, pergunta fora do conhecimento, pedido de humano e nota de voz.
+7. Confirmar que nenhum pedido de operação é apresentado como concluído sem validação do backend.
+8. Medir latência e verificar logs sem conteúdo privado nem segredos.
+9. Só depois activar para números reais, gradualmente.
 
