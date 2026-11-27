@@ -61,6 +61,8 @@ test("agent media toggles are enforced before sending attachments to providers",
  assert.match(adapter,/mediaUnderstandingEnabled/);
  assert.match(adapter,/config\["imageUnderstanding"\] !== false/);
  assert.match(adapter,/config\["audioUnderstanding"\] !== false/);
+ assert.match(adapter,/webm: "audio\/webm"/);
+ assert.match(adapter,/12 \* 1024 \* 1024/);
 });
 
 test("conversation history excludes the current WhatsApp provider message id",async()=>{
@@ -81,7 +83,7 @@ test("video MP4 is not misclassified as an audio attachment",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/messageType === "video"/);
  assert.doesNotMatch(adapter,/mp4: "audio\/mp4"/);
- assert.match(adapter,/m4a: "audio\/mp4"/);
+ assert.match(adapter,/m4a: "audio\/m4a"/);
 });
 
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
