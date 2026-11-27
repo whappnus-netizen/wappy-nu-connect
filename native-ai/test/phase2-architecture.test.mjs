@@ -4,14 +4,18 @@ import {readFile} from "node:fs/promises";
 
 const read=(path)=>readFile(new URL("../"+path,import.meta.url),"utf8");
 
-test("frontend AI adapter uses the authenticated WHAPPNUS Intelligence Router",async()=>{
+test("frontend AI adapter uses authenticated Orchestrator requests with tenant HMAC",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
- assert.match(adapter,/WHAPPNUS_ROUTER_URL/);
- assert.match(adapter,/WHAPPNUS_ROUTER_API_KEY/);
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_URL/);
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_API_KEY/);
+ assert.match(adapter,/WHAPPNUS_TENANT_SIGNING_SECRET/);
  assert.match(adapter,/\/v1\/chat\/completions/);
- assert.match(adapter,/authorization:\s*"Bearer "\s*\+/);
- assert.match(adapter,/whappnus-intelligence-router/);
- assert.doesNotMatch(adapter,/NATIVE_AI_ENGINE_URL|AI_OLLAMA_BASE_URL/);
+ assert.match(adapter,/"X-Orchestrator-Key"/);
+ assert.match(adapter,/createHmac\("sha256", secret\)/);
+ assert.match(adapter,/X-Tenant-Timestamp/);
+ assert.match(adapter,/X-Tenant-Nonce/);
+ assert.match(adapter,/X-Tenant-Signature/);
+ assert.doesNotMatch(adapter,/WHAPPNUS_ROUTER_URL|WHAPPNUS_ROUTER_API_KEY|NATIVE_AI_ENGINE_URL|AI_OLLAMA_BASE_URL/);
 });
 
 test("generation endpoint uses durable queue and idempotency",async()=>{
@@ -41,14 +45,17 @@ test("queue migration protects tenants and uses SKIP LOCKED",async()=>{
  assert.match(sql,/service_role/i);
 });
 
-test("Router integration uses configured server endpoint and secure readiness contract",async()=>{
+test("Orchestrator integration uses configured endpoint and signed tenant readiness contract",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
- const docs=await read("../docs/WHAPPNUS_ROUTER_INTEGRATION.md");
- assert.match(adapter,/WHAPPNUS_ROUTER_URL/);
- assert.match(adapter,/WHAPPNUS_ROUTER_API_KEY/);
- assert.match(adapter,/WHAPPNUS_ROUTER_HTTPS_REQUIRED/);
+ const docs=await read("../docs/WHAPPNUS_AI_ORCHESTRATOR_INTEGRATION.md");
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_URL/);
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_API_KEY/);
+ assert.match(adapter,/WHAPPNUS_TENANT_SIGNING_SECRET/);
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_HTTPS_REQUIRED/);
+ assert.match(adapter,/X-Tenant-Signature/);
  assert.match(docs,/\/ready/);
- assert.match(docs,/WHAPPNUS_ROUTER_API_KEY/);
+ assert.match(docs,/WHAPPNUS_ORCHESTRATOR_API_KEY/);
+ assert.match(docs,/WHAPPNUS_TENANT_SIGNING_SECRET/);
 });
 
 test("conversation history is tenant-scoped and excludes the current inbound message",async()=>{
@@ -68,14 +75,18 @@ test("internal playground uses the same central generator without queue billing"
  assert.match(orchestrator,/if\s*\(\s*!input\.testMode\s*\)\s*await\s+consumeCredit/);
 });
 
-test("Netlify scheduled worker calls the authenticated Router-backed queue processor",async()=>{
+test("Netlify scheduled worker invokes the authenticated Orchestrator queue processor",async()=>{
  const worker=await read("../netlify/functions/ai-generation-worker.mts");
  const route=await read("../src/routes/api/public/ai.generation-complete.ts");
- assert.match(worker,/WHAPPNUS_ROUTER_API_KEY/);
+ assert.match(worker,/WHAPPNUS_AI_WORKER_SECRET/);
  assert.match(worker,/\* \* \* \* \*/);
- assert.match(route,/WHAPPNUS_ROUTER_API_KEY/);
+ assert.match(route,/WHAPPNUS_AI_WORKER_SECRET/);
+ assert.match(route,/safeEqual\(bearer, secret\)/);
  assert.match(route,/claim_ai_generation_job/);
+ assert.match(route,/generateViaWhappNusAI/);
+ assert.match(route,/claim_ai_generation_delivery/);
 });
+
 test("Ollama concurrency semaphore transfers slots without a race",async()=>{
  const router=await read("src/provider-router.ts");
  assert.match(router,/if\(active<1\)/);
@@ -91,7 +102,7 @@ test("expired generation leases at the retry limit become terminal failures",asy
  assert.match(sql,/lease_expired_max_attempts/);
 });
 
-test("slow WhatsApp generations are queued for authenticated Router-backed result delivery",async()=>{
+test("slow WhatsApp generations are queued for authenticated Orchestrator-backed result delivery",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  const route=await read("../src/routes/api/public/ai.generation-complete.ts");
  const worker=await read("../netlify/functions/ai-generation-worker.mts");
@@ -102,10 +113,11 @@ test("slow WhatsApp generations are queued for authenticated Router-backed resul
  assert.match(route,/claim_ai_generation_job/);
  assert.match(route,/claim_ai_generation_delivery/);
  assert.match(route,/deliverAiGenerationJob\(deliveryJob\.id\)/);
- assert.match(worker,/WHAPPNUS_ROUTER_API_KEY/);
+ assert.match(worker,/WHAPPNUS_AI_WORKER_SECRET/);
  assert.match(pipeline,/aiGenerationJobId/);
  assert.match(pipeline,/export async function deliverAiGenerationJob/);
 });
+
 test("AI delivery outbox is durable and unique per generation job",async()=>{
  const sql=await read("supabase/migrations/20261125080000_ai_generation_delivery_outbox.sql");
  assert.match(sql,/delivery_status/);
@@ -123,15 +135,16 @@ test("slow-job delivery respects live human takeover and avoids duplicate sends"
  assert.match(pipeline,/requireActiveSubscription/);
  assert.match(pipeline,/ai_generation_job_id/);
  assert.match(pipeline,/AI_DELIVERY_UNCERTAIN/);
- assert.match(route,/WHAPPNUS_ROUTER_API_KEY/);
+ assert.match(route,/WHAPPNUS_AI_WORKER_SECRET/);
+ assert.match(route,/safeEqual\(bearer, secret\)/);
  assert.doesNotMatch(route,/organizationId\s*:/);
 });
+
 test("pending native generation does not send a premature fallback",async()=>{
  const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
  assert.match(pipeline,/errorCode === "generation_pending_retry"/);
  assert.match(pipeline,/generation_pending_delivery_queued/);
 });
-
 
 test("agent identity and configured instructions outrank the internal agent label",async()=>{
  const prompt=await read("src/prompt.ts");
