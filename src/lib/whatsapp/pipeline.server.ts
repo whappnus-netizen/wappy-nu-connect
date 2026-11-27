@@ -828,7 +828,8 @@ export async function processIncomingMessage(
             detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type, steps: executionSteps.length },
           });
           if (selectedReason !== "welcome_automation") {
-            if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+            if (res.conversation_id && ["image", "document"].includes(incoming.messageType)
+                && await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body)) {
               await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
             }
             return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
@@ -866,7 +867,8 @@ export async function processIncomingMessage(
   if (skip) {
     // A validação documental é uma tarefa de backoffice: pode ocorrer mesmo
     // quando a IA de atendimento está desligada nesta conversa.
-    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)
+      && await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body)) {
       await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
     }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
