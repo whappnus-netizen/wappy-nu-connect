@@ -77,6 +77,13 @@ test("payment proof inference is credit-gated and limited to payment-related mes
  assert.match(pipeline,/hasRecentPaymentContext\(number\.organization_id/);
 });
 
+test("video MP4 is not misclassified as an audio attachment",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/messageType === "video"/);
+ assert.doesNotMatch(adapter,/mp4: "audio\/mp4"/);
+ assert.match(adapter,/m4a: "audio\/mp4"/);
+});
+
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/loadIncomingAttachment/);
