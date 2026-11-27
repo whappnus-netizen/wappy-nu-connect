@@ -117,7 +117,7 @@ test("direct backend adapter validates and forwards image audio and PDF attachme
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/loadIncomingAttachment/);
  assert.match(adapter,/capabilities_required:/);
- assert.match(adapter,/AI_MEDIA_SIZE_INVALID/);
+ assert.match(adapter,/if \(!bytes\.length \|\| bytes\.length > maxBytes\) return null/);
  assert.ok(adapter.includes('"image/jpeg"'));
  assert.ok(adapter.includes('"audio/ogg"'));
  assert.ok(adapter.includes('"application/pdf"'));
@@ -159,15 +159,14 @@ test("backend retains tenant context, idempotent conversation billing and human-
  assert.doesNotMatch(adapter,/WHAPPNUS_NATIVE_AI_URL|WHAPPNUS_NATIVE_AI_SECRET|WHAPPNUS_ROUTER_URL/);
 });
 
-test("generation endpoint uses durable queue and idempotency",async()=>{
- const server=await read("src/server.ts");
- const queue=await read("src/generation-queue.ts");
- assert.match(server,/enqueueGeneration\(input\)/);
- assert.match(server,/waitForGeneration\(jobId/);
- assert.match(queue,/idempotency_key/);
- assert.match(queue,/claim_ai_generation_job/);
- assert.match(queue,/finish_ai_generation_job/);
- assert.match(queue,/ORCHESTRATOR/);
+test("main backend generation path uses the durable Supabase queue and idempotency",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ const worker=await read("../src/routes/api/public/ai.generation-complete.ts");
+ assert.match(adapter,/enqueueGenerationForRetry/);
+ assert.match(adapter,/idempotency_key/);
+ assert.match(worker,/claim_ai_generation_job/);
+ assert.match(worker,/finish_ai_generation_job/);
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_URL|ORCHESTRATOR_API_KEY/);
 });
 
 test("queue safely detaches stale or cross-tenant conversation references",async()=>{
