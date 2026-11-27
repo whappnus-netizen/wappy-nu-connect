@@ -256,10 +256,10 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   if (!input.mediaPath || !["image", "audio", "document"].includes(input.messageType ?? "")) return null;
   const expectedPrefix = input.organizationId + "/" + input.whatsappNumberId + "/";
   const path = input.mediaPath.trim();
-  if (!path.startsWith(expectedPrefix) || path.includes("..")) throw new Error("INVALID_AI_MEDIA_PATH");
+  if (!path.startsWith(expectedPrefix) || path.includes("..")) return null;
 
   const { data: blob, error } = await serviceClient().storage.from("whatsapp-incoming-media").download(path);
-  if (error || !blob) throw new Error("AI_MEDIA_DOWNLOAD_FAILED");
+  if (error || !blob) return null;
 
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
   const extensionMime: Record<string, string> = {
@@ -280,19 +280,19 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   ];
   let mimeType = candidates.find((candidate) => allowedMime.has(candidate)) ?? "";
   if (mimeType === "audio/mpeg") mimeType = "audio/mp3";
-  if (!mimeType) throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
+  if (!mimeType) return null;
 
   if (input.messageType === "video") throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
 
   const mediaType: OrchestratorAttachment["type"] = mimeType.startsWith("image/")
     ? "image" : mimeType.startsWith("audio/") ? "audio" : "document";
-  if (input.messageType === "image" && mediaType !== "image") throw new Error("AI_MEDIA_TYPE_MISMATCH");
-  if (input.messageType === "audio" && mediaType !== "audio") throw new Error("AI_MEDIA_TYPE_MISMATCH");
+  if (input.messageType === "image" && mediaType !== "image") return null;
+  if (input.messageType === "audio" && mediaType !== "audio") return null;
 
   const bytes = Buffer.from(await blob.arrayBuffer());
   const maxBytes = mediaType === "image" ? 5 * 1024 * 1024
     : mediaType === "audio" ? 12 * 1024 * 1024 : 10 * 1024 * 1024;
-  if (!bytes.length || bytes.length > maxBytes) throw new Error("AI_MEDIA_SIZE_INVALID");
+  if (!bytes.length || bytes.length > maxBytes) return null;
 
   return { type: mediaType, mime_type: mimeType, data: bytes.toString("base64") };
 }
