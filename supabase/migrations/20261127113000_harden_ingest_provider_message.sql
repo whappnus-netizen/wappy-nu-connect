@@ -65,7 +65,7 @@ BEGIN
   END IF;
 
   phone := '+' || regexp_replace(coalesce(_from_wa_id, ''), '[^0-9]', '', 'g');
-  IF phone !~ '^\\+[1-9][0-9]{6,15}$' THEN
+  IF phone !~ '^\+[1-9][0-9]{6,15}$' THEN
     RETURN json_build_object('ok', false, 'reason', 'invalid_phone');
   END IF;
 
