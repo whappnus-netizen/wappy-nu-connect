@@ -205,7 +205,9 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
 
 function assertOrchestratorContextAllowed(): void {
   const context = cleanText(process.env["CONTEXT"], 40).toLowerCase();
-  if (context && context !== "production" && context !== "dev") {
+  const isNetlify = process.env["NETLIFY"] === "true";
+  if ((isNetlify && context !== "production" && context !== "dev") ||
+      (context && context !== "production" && context !== "dev")) {
     throw new Error("AI_ORCHESTRATOR_DISABLED_OUTSIDE_PRODUCTION_CONTEXT");
   }
 }
