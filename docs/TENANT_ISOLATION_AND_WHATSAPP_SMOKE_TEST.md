@@ -89,3 +89,25 @@ Do not merge the backend Orchestrator integration or enable customer traffic unt
 - at least one dedicated test number passes Test D;
 - manual takeover, AI-disabled behavior and idempotent delivery are verified;
 - unresolved provider quota/fallback behavior is understood.
+
+## Production HMAC v2 configuration
+
+The production backend and WHAPPNUS AI Orchestrator must use the exact same
+`TENANT_SIGNING_SECRET`. The backend signs each request with the v2 canonical
+message:
+
+`METHOD:PATH:ORGANIZATION_ID:TIMESTAMP:NONCE:BODY_SHA256`
+
+The Orchestrator validates the raw request body hash and then verifies that
+signature. A `TENANT_SIGNATURE_INVALID` response means the shared signing
+secret or canonical request fields do not match; it is not a provider/model
+failure. Never log or copy the secret into source control, chat, or application
+logs. After rotating it, update the production secret on both services and
+redeploy both services before sending live WhatsApp traffic.
+
+The API key and tenant signing secret are separate credentials:
+- `ORCHESTRATOR_API_KEY` authenticates the backend to the Orchestrator.
+- `TENANT_SIGNING_SECRET` signs the organization-scoped request.
+
+Do not enable `TENANT_BODY_SIGNATURE_REQUIRED` until all production callers
+have been verified to send the v2 body-hash header.
