@@ -14,7 +14,7 @@ const schema=z.object({
  ORCHESTRATOR_URL:z.preprocess(blankToUndefined,z.string().url().optional()),
  ORCHESTRATOR_API_KEY:z.preprocess(blankToUndefined,z.string().min(32).optional()),
  TENANT_SIGNING_SECRET:z.preprocess(blankToUndefined,z.string().min(32).optional()),
- ORCHESTRATOR_TIMEOUT_MS:z.preprocess(blankToUndefined,z.coerce.number().int().min(5000).max(60000).default(25000)),
+ ORCHESTRATOR_TIMEOUT_MS:z.preprocess(blankToUndefined,z.coerce.number().int().min(5000).max(60000).default(20000)),
  AI_MODEL:z.preprocess(blankToUndefined,z.string().default("gemini-3.8-flash")),
  AI_MAX_OUTPUT_TOKENS:z.preprocess(blankToUndefined,z.coerce.number().int().positive().max(16384).default(700)),
  AI_TEMPERATURE:z.preprocess(blankToUndefined,z.coerce.number().min(0).max(2).default(0.35)),
