@@ -327,7 +327,7 @@ test("main backend loads tenant agent context and conversation history with orga
 });
 
 test("AI conversation quota consumption serializes distinct conversations within one organization",async()=>{
- const sql=await read("../supabase/migrations/20261127110000_serialize_ai_conversation_usage_per_organization.sql");
+ const sql=await read("../supabase/migrations/20261127113015_serialize_ai_conversation_usage_per_organization.sql");
  assert.match(sql,/pg_advisory_xact_lock\([\s\S]*p_organization_id::text\s*\|\|\s*':ai_conversations'/);
  assert.match(sql,/count\(DISTINCT\(metadata->>'conversation_id'\)\)/i);
  assert.match(sql,/INSERT INTO public\.ai_credit_ledger/);
@@ -350,7 +350,7 @@ test("Meta Cloud API webhook dispatches inbound messages through the shared back
 });
 
 test("provider message ingestion is idempotent and keeps conversations scoped to a WhatsApp number",async()=>{
- const sql=await read("../supabase/migrations/20261127113000_harden_ingest_provider_message.sql");
+ const sql=await read("../supabase/migrations/20261127113019_harden_ingest_provider_message.sql");
  assert.match(sql,/wa-message:/);
  assert.match(sql,/ON CONFLICT \(wa_message_id\) DO NOTHING/);
  assert.match(sql,/whatsapp_number_id = num\.id/);
