@@ -203,7 +203,15 @@ async function loadConversationHistory(input: GenerateInput): Promise<Array<{ ro
   return turns.slice(-MAX_HISTORY_MESSAGES);
 }
 
+function assertOrchestratorContextAllowed(): void {
+  const context = cleanText(process.env["CONTEXT"], 40).toLowerCase();
+  if (context && context !== "production" && context !== "dev") {
+    throw new Error("AI_ORCHESTRATOR_DISABLED_OUTSIDE_PRODUCTION_CONTEXT");
+  }
+}
+
 function orchestratorConfig(): { endpoint: string; apiKey: string; tenantSecret: string } {
+  assertOrchestratorContextAllowed();
   const configured = process.env["WHAPPNUS_ORCHESTRATOR_URL"] ?? process.env["ORCHESTRATOR_URL"];
   const apiKey = process.env["WHAPPNUS_ORCHESTRATOR_API_KEY"] ?? process.env["ORCHESTRATOR_API_KEY"];
   const tenantSecret = process.env["WHAPPNUS_TENANT_SIGNING_SECRET"] ?? process.env["TENANT_SIGNING_SECRET"];
@@ -520,6 +528,7 @@ async function consumeAiConversation(input: GenerateInput): Promise<void> {
 }
 
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
+  assertOrchestratorContextAllowed();
   const started = Date.now();
   const [ctx, history] = await Promise.all([
     loadTenantContext(input),
@@ -745,6 +754,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
   organizationId: string; whatsappNumberId: string; conversationId: string; contactId?: string | null; messageId?: string | null;
   mediaPath: string; mediaMimeType: string; messageType: "image" | "document"; messageText?: string | null;
 }): Promise<PaymentProofAnalysis> {
+  assertOrchestratorContextAllowed();
   const request: GenerateInput = {
     organizationId: input.organizationId,
     whatsappNumberId: input.whatsappNumberId,
