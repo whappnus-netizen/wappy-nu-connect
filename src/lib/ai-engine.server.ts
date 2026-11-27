@@ -741,7 +741,7 @@ function normalizePaymentMethod(value: unknown): PaymentProofAnalysis["paymentMe
 }
 
 export async function analyzePaymentProofViaWhappNusAI(input: {
-  organizationId: string; whatsappNumberId: string; conversationId: string; contactId?: string | null;
+  organizationId: string; whatsappNumberId: string; conversationId: string; contactId?: string | null; messageId?: string | null;
   mediaPath: string; mediaMimeType: string; messageType: "image" | "document"; messageText?: string | null;
 }): Promise<PaymentProofAnalysis> {
   const request: GenerateInput = {
@@ -749,6 +749,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     whatsappNumberId: input.whatsappNumberId,
     conversationId: input.conversationId,
     contactId: input.contactId ?? null,
+    messageId: input.messageId ?? null,
     text: cleanText(input.messageText, 3000),
     mediaPath: input.mediaPath,
     mediaMimeType: input.mediaMimeType,
