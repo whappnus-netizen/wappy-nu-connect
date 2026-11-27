@@ -77,6 +77,7 @@ test("conversation history excludes the current WhatsApp provider message id",as
 test("deploy previews cannot call the production Orchestrator with production secrets",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/process\.env\["CONTEXT"\]/);
+ assert.match(adapter,/process\.env\["NETLIFY"\]/);
  assert.match(adapter,/context !== "production" && context !== "dev"/);
  assert.match(adapter,/AI_ORCHESTRATOR_DISABLED_OUTSIDE_PRODUCTION_CONTEXT/);
 });
