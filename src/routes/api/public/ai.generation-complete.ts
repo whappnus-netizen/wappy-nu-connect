@@ -78,33 +78,33 @@ export const Route = createFileRoute("/api/public/ai/generation-complete")({
           } else {
             try {
               const result = await generateViaWhappNusAI(job.request_payload as Parameters<typeof generateViaWhappNusAI>[0]);
-            const deliveryStatus = job.conversation_id && job.request_payload["testMode"] !== true ? "queued" : "skipped";
-            const deliveryUpdate = await admin.from("ai_generation_jobs").update({
-              delivery_status: deliveryStatus,
-              delivery_available_at: new Date().toISOString(),
-            }).eq("id", job.id).eq("status", "processing").eq("locked_by", workerId);
-            if (deliveryUpdate.error) throw new Error("delivery_enqueue_failed: " + deliveryUpdate.error.message);
+              const deliveryStatus = job.conversation_id && job.request_payload["testMode"] !== true ? "queued" : "skipped";
+              const deliveryUpdate = await admin.from("ai_generation_jobs").update({
+                delivery_status: deliveryStatus,
+                delivery_available_at: new Date().toISOString(),
+              }).eq("id", job.id).eq("status", "processing").eq("locked_by", workerId);
+              if (deliveryUpdate.error) throw new Error("delivery_enqueue_failed: " + deliveryUpdate.error.message);
 
-            const finish = await admin.rpc("finish_ai_generation_job", {
-              _job_id: job.id,
-              _worker_id: workerId,
-              _status: "succeeded",
-              _result: result,
-              _error_code: null,
-            });
-            if (finish.error) throw new Error("generation_finish_failed: " + finish.error.message);
-            generated = "succeeded";
-          } catch (error) {
-            const message = error instanceof Error ? error.message : "AI_GENERATION_FAILED";
-            const finish = await admin.rpc("finish_ai_generation_job", {
-              _job_id: job.id,
-              _worker_id: workerId,
-              _status: retryable(error) ? "queued" : "failed",
-              _result: null,
-              _error_code: message.slice(0, 120),
-            });
-            if (finish.error) console.error("[ai-worker] generation finish failed:", finish.error.message);
-            generated = retryable(error) ? "retry_queued" : "failed";
+              const finish = await admin.rpc("finish_ai_generation_job", {
+                _job_id: job.id,
+                _worker_id: workerId,
+                _status: "succeeded",
+                _result: result,
+                _error_code: null,
+              });
+              if (finish.error) throw new Error("generation_finish_failed: " + finish.error.message);
+              generated = "succeeded";
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "AI_GENERATION_FAILED";
+              const finish = await admin.rpc("finish_ai_generation_job", {
+                _job_id: job.id,
+                _worker_id: workerId,
+                _status: retryable(error) ? "queued" : "failed",
+                _result: null,
+                _error_code: message.slice(0, 120),
+              });
+              if (finish.error) console.error("[ai-worker] generation finish failed:", finish.error.message);
+              generated = retryable(error) ? "retry_queued" : "failed";
               console.error("[ai-worker] generation job failed:", { jobId: job.id, error: message.slice(0, 180) });
             }
           }
