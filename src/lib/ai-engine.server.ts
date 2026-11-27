@@ -514,8 +514,8 @@ async function consumeAiConversation(input: GenerateInput): Promise<void> {
   });
   if (error) throw new Error("AI_CONVERSATION_LIMIT_CHECK_FAILED");
   const result = data && typeof data === "object" ? data as Record<string, unknown> : {};
-  if (result["allowed"] === false) {
-    throw new Error(typeof result["reason"] === "string" ? result["reason"] : "AI_CONVERSATIONS_EXHAUSTED");
+  if (result["allowed"] !== true) {
+    throw new Error(typeof result["reason"] === "string" ? result["reason"] : "AI_CONVERSATION_LIMIT_CHECK_FAILED");
   }
 }
 
