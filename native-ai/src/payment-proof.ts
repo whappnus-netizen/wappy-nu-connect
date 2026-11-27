@@ -36,7 +36,13 @@ function nullableText(value: unknown, max = 180): string | null {
 
 function parseAmount(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
-  const parsed = typeof value === "number" ? value : Number(value.replace(/[^0-9,.-]/g, "").replace(",", "."));
+  let normalized = typeof value === "number" ? String(value) : value.replace(/[^0-9,.-]/g, "");
+  if (typeof value === "string" && normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/\\./g, "").replace(",", ".");
+  } else if (typeof value === "string" && normalized.includes(",")) {
+    normalized = normalized.replace(",", ".");
+  }
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : null;
 }
 
@@ -73,7 +79,8 @@ export async function analyzePaymentProof(input: PaymentProofInput): Promise<Pay
     .from("whatsapp-incoming-media").download(input.mediaPath);
   if (downloadError || !blob) throw new Error("PAYMENT_PROOF_DOWNLOAD_FAILED");
   const bytes = Buffer.from(await blob.arrayBuffer());
-  if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("PAYMENT_PROOF_TOO_LARGE");
+  const maxBytes = isImage ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (!bytes.length || bytes.length > maxBytes) throw new Error("PAYMENT_PROOF_TOO_LARGE");
 
   const attachment: MediaAttachment = {
     type: input.messageType,
