@@ -21,17 +21,22 @@ export type BookingToolContext = {
 };
 
 function localToUtc(date:string,time:string,timezone:string):Date {
- const [y,m,d]=date.split("-").map(Number); const [h,min]=time.split(":").map(Number);
+ const dateParts=date.split("-").map(Number);
+ const timeParts=time.split(":").map(Number);
+ const y=dateParts[0] ?? NaN, m=dateParts[1] ?? NaN, d=dateParts[2] ?? NaN;
+ const h=timeParts[0] ?? NaN, min=timeParts[1] ?? NaN;
+ if (![y,m,d,h,min].every(Number.isFinite) || m<1 || m>12 || d<1 || d>31 || h<0 || h>23 || min<0 || min>59) {
+  throw new Error("INVALID_LOCAL_BOOKING_DATETIME");
+ }
  const desired=Date.UTC(y,m-1,d,h,min);
- const parts=new Intl.DateTimeFormat("en-GB",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(desired));
- const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));
- const represented=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute));
+ const parts=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(desired)).map(x=>[x.type,x.value])) as Record<string,string>;
+ const represented=Date.UTC(Number(parts["year"]),Number(parts["month"])-1,Number(parts["day"]),Number(parts["hour"]),Number(parts["minute"]));
  return new Date(desired-(represented-desired));
 }
 function localParts(date:Date,timezone:string) {
- const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date).map(x=>[x.type,x.value]));
- const weekday=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(String(p.weekday));
- return {date:String(p.year)+"-"+String(p.month)+"-"+String(p.day),weekday,time:String(p.hour)+":"+String(p.minute)};
+ const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:timezone,year:"numeric",month:"2-digit",day:"2-digit",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date).map(x=>[x.type,x.value])) as Record<string,string>;
+ const weekday=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(String(p["weekday"]));
+ return {date:String(p["year"])+"-"+String(p["month"])+"-"+String(p["day"]),weekday,time:String(p["hour"])+":"+String(p["minute"])};
 }
 function overlaps(aStart:Date,aEnd:Date,bStart:string,bEnd:string) {
  return aStart.getTime()<new Date(bEnd).getTime() && aEnd.getTime()>new Date(bStart).getTime();
@@ -81,7 +86,8 @@ async function getAvailability(ctx:BookingToolContext,serviceId:string,date:stri
  if(staffRows.error||resourceRows.error||staffRules.error||resourceRules.error)throw new Error("BOOKING_AVAILABILITY_LOOKUP_FAILED");
  const activeStaff=(staffRows.data??[]).filter(x=>x.is_active);
  const activeResources=(resourceRows.data??[]).filter(x=>x.is_active);
- const slots:Array<Record<string,unknown>>=[];
+ type AvailabilitySlot = { starts_at:string; ends_at:string; local_time:string; staff_id:string|null; staff_name:string; resource_id:string|null; resource_name:string };
+ const slots:AvailabilitySlot[]=[];
  const activeBookings=existing??[];
  const existingServiceIds=[...new Set(activeBookings.map(b=>b.service_id))];
  const existingServices=existingServiceIds.length
@@ -100,8 +106,10 @@ async function getAvailability(ctx:BookingToolContext,serviceId:string,date:stri
   });
  };
  for(const orgRule of orgRules??[]){
-  const [startHour,startMinute]=String(orgRule.starts_at).slice(0,5).split(":").map(Number);
-  const [endHour,endMinute]=String(orgRule.ends_at).slice(0,5).split(":").map(Number);
+  const startParts=String(orgRule.starts_at).slice(0,5).split(":").map(Number);
+  const endParts=String(orgRule.ends_at).slice(0,5).split(":").map(Number);
+  const startHour=startParts[0] ?? 0, startMinute=startParts[1] ?? 0;
+  const endHour=endParts[0] ?? 0, endMinute=endParts[1] ?? 0;
   const startTotal=startHour*60+startMinute; const endTotal=endHour*60+endMinute;
   for(let minute=startTotal;minute+service.duration_minutes<=endTotal;minute+=15){
    const hh=String(Math.floor(minute/60)).padStart(2,"0"); const mm=String(minute%60).padStart(2,"0");
@@ -171,7 +179,7 @@ export async function executeBookingAction(raw:unknown,ctx:BookingToolContext) {
   if(orgError||!org)throw new Error("ORGANIZATION_NOT_FOUND");
   const timezone=org.timezone||"Africa/Luanda";
   let start:Date;
-  let slot:Record<string,unknown>|undefined;
+  let slot:AvailabilitySlot|undefined;
   if(action.arguments.date&&action.arguments.time){
    // Customer-facing booking times are local wall-clock times. Resolve the exact
    // requested slot on the server; never ask the model to calculate a UTC offset.
