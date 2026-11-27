@@ -22,8 +22,12 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 function retryable(error: unknown): boolean {
+  if (error && typeof error === "object" && "retryable" in error &&
+      typeof (error as { retryable?: unknown }).retryable === "boolean") {
+    return (error as { retryable: boolean }).retryable;
+  }
   const message = error instanceof Error ? error.message : String(error);
-  return /generation_pending_retry|AbortError|TimeoutError|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\d\d)/i.test(message);
+  return /generation_pending_retry|AbortError|TimeoutError|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\\d\\d)/i.test(message);
 }
 
 export const Route = createFileRoute("/api/public/ai/generation-complete")({
