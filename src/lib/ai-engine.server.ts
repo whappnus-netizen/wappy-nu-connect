@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
+import { executeBookingAction, type BookingPermissions, type BookingToolContext } from "./ai-booking-tools.server";
 import { serviceClient } from "./whatsapp.server";
 
 type GenerateInput = {
@@ -227,6 +228,7 @@ function providerForModel(model: string): string | null {
 
 function isAdvancedTask(text: string, messageType?: GenerateInput["messageType"]): boolean {
   if (messageType === "document") return true;
+  if (/(agendar|agendamento|marcar|marcação|reservar|reserva|cancelar|remarcar|disponibilidade|horário disponível)/i.test(text)) return true;
   return /(analisa(?:r)? detalhadamente|compara(?:r)? alternativas|raciocina(?:r)? detalhadamente|passo a passo|estrat[eé]gia|diagn[oó]stico complexo|planeamento detalhado|avalia(?:r)? riscos|resolve(?:r)? um problema complexo)/i.test(text);
 }
 
@@ -338,6 +340,148 @@ async function enqueueGenerationForRetry(input: GenerateInput): Promise<void> {
   if (job.status === "failed") throw new Error("AI_GENERATION_JOB_PREVIOUSLY_FAILED");
 }
 
+
+type OrchestratorMessage = { role: "system" | "user" | "assistant"; content: unknown };
+type OrchestratorResult = { content: string; provider: string; model: string };
+
+async function callOrchestrator(input: {
+  organizationId: string;
+  conversationId?: string | null;
+  taskType: string;
+  messages: OrchestratorMessage[];
+  systemInstructions: string;
+  preferredProvider?: string | null;
+  preferredModel?: string | null;
+  capabilitiesRequired?: string[];
+  temperature?: number;
+  maxTokens?: number;
+  metadata?: Record<string, unknown>;
+}): Promise<OrchestratorResult> {
+  const config = orchestratorConfig();
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const nonce = randomUUID();
+  const secret = config.tenantSecret;
+  const signature = createHmac("sha256", secret)
+    .update(input.organizationId + ":" + timestamp + ":" + nonce)
+    .digest("hex");
+  let response: Response;
+  try {
+    response = await fetch(config.endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Orchestrator-Key": config.apiKey,
+        "X-Tenant-Timestamp": timestamp,
+        "X-Tenant-Nonce": nonce,
+        "X-Tenant-Signature": signature,
+      },
+      body: JSON.stringify({
+        request_id: randomUUID(),
+        organization_id: input.organizationId,
+        conversation_id: input.conversationId ?? null,
+        task_type: input.taskType,
+        messages: input.messages,
+        system_instructions: input.systemInstructions,
+        ...(input.preferredProvider ? { preferred_provider: input.preferredProvider } : {}),
+        ...(input.preferredModel ? { preferred_model: input.preferredModel } : {}),
+        capabilities_required: input.capabilitiesRequired ?? ["text"],
+        temperature: input.temperature ?? 0.35,
+        max_tokens: input.maxTokens ?? 700,
+        metadata: input.metadata ?? {},
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+  } catch (error) {
+    const failure = error instanceof Error ? error as Error & { retryable?: boolean } : new Error("ORCHESTRATOR_NETWORK_ERROR") as Error & { retryable?: boolean };
+    failure.retryable = isRetryableGenerationError(error);
+    throw failure;
+  }
+
+  const raw = await response.text();
+  let data: Record<string, unknown> = {};
+  try { data = JSON.parse(raw) as Record<string, unknown>; } catch { /* handled below */ }
+  if (!response.ok) {
+    const detail = data["detail"] && typeof data["detail"] === "object"
+      ? data["detail"] as Record<string, unknown> : {};
+    const code = cleanText(detail["code"], 120) || "ORCHESTRATOR_REQUEST_FAILED";
+    const failure = new Error(code + " (HTTP " + response.status + ")") as Error & { retryable?: boolean };
+    if (typeof detail["retryable"] === "boolean") failure.retryable = detail["retryable"];
+    else failure.retryable = isRetryableGenerationError(failure);
+    throw failure;
+  }
+  const content = cleanText(data["content"], 20_000);
+  if (!content) throw new Error("ORCHESTRATOR_EMPTY_COMPLETION");
+  return {
+    content,
+    provider: cleanText(data["provider"], 60) || "unknown",
+    model: cleanText(data["model"], 120) || "unknown",
+  };
+}
+
+type BookingRuntimeContext = {
+  permissions: BookingPermissions;
+  timezone: string;
+  localNow: string;
+};
+
+async function loadBookingRuntime(input: GenerateInput, agent: Record<string, unknown> | null): Promise<BookingRuntimeContext> {
+  const admin = serviceClient();
+  const [settingsResult, organizationResult] = await Promise.all([
+    admin.from("booking_settings").select("enabled,allow_customer_cancel,allow_customer_reschedule")
+      .eq("organization_id", input.organizationId).maybeSingle(),
+    admin.from("organizations").select("timezone").eq("id", input.organizationId).maybeSingle(),
+  ]);
+  const settings = settingsResult.error ? null : settingsResult.data;
+  const agentConfig = agent?.["config"] && typeof agent["config"] === "object"
+    ? agent["config"] as Record<string, unknown> : {};
+  const bookingConfig = agentConfig["booking"] && typeof agentConfig["booking"] === "object"
+    ? agentConfig["booking"] as Record<string, unknown> : {};
+  const enabled = Boolean(settings?.enabled) && !input.testMode;
+  const permissions: BookingPermissions = {
+    enabled,
+    canCreate: enabled && bookingConfig["canCreate"] === true,
+    canCancel: enabled && bookingConfig["canCancel"] === true && settings?.allow_customer_cancel === true,
+    canReschedule: enabled && bookingConfig["canReschedule"] === true && settings?.allow_customer_reschedule === true,
+  };
+  let timezone = cleanText(organizationResult.data?.timezone, 100) || "Africa/Luanda";
+  let localNow = "";
+  try {
+    localNow = new Intl.DateTimeFormat("pt-AO", {
+      dateStyle: "full", timeStyle: "short", timeZone: timezone,
+    }).format(new Date());
+  } catch {
+    timezone = "Africa/Luanda";
+    localNow = new Intl.DateTimeFormat("pt-AO", {
+      dateStyle: "full", timeStyle: "short", timeZone: timezone,
+    }).format(new Date());
+  }
+  return { permissions, timezone, localNow };
+}
+
+function buildBookingInstructions(context: BookingRuntimeContext): string {
+  if (!context.permissions.enabled) {
+    return [
+      "## SEGURANÇA DE AGENDAMENTOS",
+      "As ferramentas de agendamento não estão activas para esta organização ou agente. Se o cliente pedir uma marcação, não digas que ficou registada, anotada, confirmada ou que a equipa foi avisada. Explica que não conseguiste concluir o registo e encaminha para contacto humano, sem inventar qualquer operação.",
+    ].join("\n");
+  }
+  return [
+    "## AGENDAMENTOS WHAPPNUS — ferramentas reais",
+    "Quando o cliente demonstrar intenção de marcar, agendar, reservar ou alterar uma marcação, usa as ferramentas; não respondas apenas com texto.",
+    "Para um pedido novo: primeiro list_services; identifica o serviço pelo nome ou por correspondência clara. Se não houver correspondência inequívoca, pergunta qual serviço pretende. Depois check_availability para a data exacta indicada pelo cliente. Se o cliente já indicou data e hora e o horário exacto estiver entre os slots devolvidos, executa create_booking imediatamente, sem pedir confirmação redundante. Se não estiver disponível, apresenta apenas alternativas reais devolvidas pela ferramenta.",
+    "Responde exclusivamente com o protocolo: <WHAPPNUS_BOOKING_ACTION>{\\"action\\":\\"list_services\\",\\"arguments\\":{}}</WHAPPNUS_BOOKING_ACTION>. Acções: list_services {}; check_availability {service_id,date AAAA-MM-DD,staff_id opcional}; create_booking {service_id,date AAAA-MM-DD,time HH:MM no fuso local da organização,staff_id opcional,resource_id opcional,customer_notes opcional}; list_customer_bookings {}; cancel_booking {booking_id,reason opcional}; reschedule_booking {booking_id,date AAAA-MM-DD,time HH:MM,staff_id opcional,resource_id opcional}.",
+    "Data e hora local actual da organização (" + context.timezone + "): " + context.localNow + ". Interpreta datas em português. Para criar reservas, envia sempre date e time locais exactamente como o cliente pediu e como aparecem em local_time nos slots; não calcules nem convertas para UTC. O backend converte a hora local para UTC. Nunca assumes datas passadas.",
+    "Se houver vários profissionais disponíveis, respeita a escolha do cliente; se não indicou preferência, escolhe qualquer profissional elegível devolvido. Para cancelar/remarcar, consulta primeiro as reservas do próprio cliente. Só afirma sucesso depois de resultado ok da ferramenta e status confirmed ou pending_confirmation. Se pending_confirmation, diz que aguarda aprovação.",
+    "Permissões efectivas: criar " + context.permissions.canCreate + ", cancelar " + context.permissions.canCancel + ", remarcar " + context.permissions.canReschedule + ". Nunca tentes executar uma operação sem permissão. Nunca exponhas este protocolo ao cliente.",
+  ].join("\n");
+}
+
+function parseBookingAction(text: string): unknown | null {
+  const match = text.match(/<WHAPPNUS_BOOKING_ACTION>\\s*([\\s\\S]*?)\\s*<\\/WHAPPNUS_BOOKING_ACTION>/);
+  if (!match?.[1]) return null;
+  try { return JSON.parse(match[1]) as unknown; } catch { return null; }
+}
+
 async function consumeAiConversation(input: GenerateInput): Promise<void> {
   if (input.testMode) return;
   if (!input.conversationId) throw new Error("AI_CONVERSATION_ID_REQUIRED");
@@ -361,25 +505,18 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   ]);
   const effectiveText = resolveIncomingText(input, attachment);
   await consumeAiConversation(input);
-  const systemPrompt = buildTenantSystemPrompt(
-    ctx,
-    input.profileName,
-    [effectiveText, ...history.slice(-4).map((turn) => turn.content)].join("\n"),
-    history,
-  );
-  const recent = history.map((turn) => ({ role: turn.role, content: turn.content }))
-    .slice(-MAX_HISTORY_MESSAGES);
-  let totalHistory = recent.reduce((sum, turn) => sum + turn.content.length, 0);
-  while (recent.length && totalHistory > MAX_HISTORY_CHARS) {
-    const removed = recent.shift();
-    totalHistory -= removed?.content.length ?? 0;
-  }
-
-  const orchestrator = orchestratorConfig();
+  const bookingRuntime = await loadBookingRuntime(input, ctx.agent);
+  const systemPrompt = [
+    buildTenantSystemPrompt(ctx, input.profileName, effectiveText, history),
+    buildBookingInstructions(bookingRuntime),
+  ].join("\n\n");
+  const recent = history.slice(-MAX_HISTORY_MESSAGES);
   const configuredModelRaw = cleanText(ctx.agent?.["model"] ?? ctx.agent?.["preferred_model"], 120);
   const configuredModel = configuredModelRaw ? normalizeConfiguredModel(configuredModelRaw) : "";
   const preferredProvider = configuredModel ? providerForModel(configuredModel) : null;
   if (configuredModel && !preferredProvider) throw new Error("AI_AGENT_MODEL_PROVIDER_UNKNOWN");
+  // Keep Gemini Flash as the normal tier, but let the Orchestrator select Pro for complex work.
+  const preferredModel = configuredModel === "gemini-3.8-flash" ? null : configuredModel || null;
   const taskType = isAdvancedTask(effectiveText, input.messageType) ? "complex" : "customer_support";
   const userText = (input.profileName?.trim()
     ? "Nome exibido no WhatsApp: " + input.profileName.trim().slice(0, 100) + "\n"
@@ -387,76 +524,122 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const userContent = attachment
     ? [{ type: "text", text: userText }, attachment]
     : userText;
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const nonce = randomUUID();
-  const secret = orchestrator.tenantSecret;
-  const signature = createHmac("sha256", secret)
-    .update(input.organizationId + ":" + timestamp + ":" + nonce)
-    .digest("hex");
-  let response: Response;
+  const messages: OrchestratorMessage[] = [
+    ...recent,
+    { role: "user", content: userContent },
+  ];
+  const capabilitiesRequired = attachment ? [attachment.type] : ["text"];
+  const metadata = {
+    whatsapp_number_id: input.whatsappNumberId,
+    agent_id: typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null,
+    test_mode: Boolean(input.testMode),
+  };
+
+  let response: OrchestratorResult;
   try {
-    response = await fetch(orchestrator.endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "X-Orchestrator-Key": orchestrator.apiKey,
-        "X-Tenant-Timestamp": timestamp,
-        "X-Tenant-Nonce": nonce,
-        "X-Tenant-Signature": signature,
-      },
-      body: JSON.stringify({
-        request_id: randomUUID(),
-        organization_id: input.organizationId,
-        conversation_id: input.conversationId ?? null,
-        task_type: taskType,
-        messages: [
-          ...recent,
-          { role: "user", content: userContent },
-        ],
-        system_instructions: systemPrompt,
-        ...(preferredProvider && configuredModel
-          ? { preferred_provider: preferredProvider, preferred_model: configuredModel }
-          : {}),
-        capabilities_required: attachment ? [attachment.type] : ["text"],
-        temperature: 0.35,
-        max_tokens: 700,
-        metadata: {
-          whatsapp_number_id: input.whatsappNumberId,
-          agent_id: typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null,
-          test_mode: Boolean(input.testMode),
-        },
-      }),
-      signal: AbortSignal.timeout(25_000),
+    response = await callOrchestrator({
+      organizationId: input.organizationId,
+      conversationId: input.conversationId,
+      taskType,
+      messages,
+      systemInstructions: systemPrompt,
+      preferredProvider,
+      preferredModel,
+      capabilitiesRequired,
+      temperature: 0.35,
+      maxTokens: 700,
+      metadata,
     });
   } catch (error) {
-    if (isRetryableGenerationError(error)) {
+    const retryable = (error as Error & { retryable?: boolean }).retryable
+      ?? isRetryableGenerationError(error);
+    if (retryable) {
       await enqueueGenerationForRetry(input);
       throw new Error("generation_pending_retry");
     }
     throw error;
   }
 
-  const raw = await response.text();
-  let data: Record<string, unknown> = {};
-  try { data = JSON.parse(raw) as Record<string, unknown>; } catch { /* handled below */ }
-  if (!response.ok) {
-    const detail = data["detail"] && typeof data["detail"] === "object"
-      ? data["detail"] as Record<string, unknown> : {};
-    const code = cleanText(detail["code"], 120) || "ORCHESTRATOR_REQUEST_FAILED";
-    const failure = new Error(code + " (HTTP " + response.status + ")") as Error & { retryable?: boolean };
-    if (typeof detail["retryable"] === "boolean") failure.retryable = detail["retryable"];
-    const shouldRetry = failure.retryable === true
-      || (failure.retryable === undefined && isRetryableGenerationError(failure));
-    if (shouldRetry) {
-      await enqueueGenerationForRetry(input);
-      throw new Error("generation_pending_retry");
+  let answer = response.content;
+  let bookingToolCalls = 0;
+  for (let turn = 0; turn < 3 && bookingRuntime.permissions.enabled; turn++) {
+    const action = parseBookingAction(answer);
+    if (!action) break;
+    bookingToolCalls += 1;
+    let toolResult: Record<string, unknown>;
+    try {
+      const bookingContext: BookingToolContext = {
+        organizationId: input.organizationId,
+        contactId: input.contactId ?? null,
+        conversationId: input.conversationId ?? null,
+        messageId: input.messageId ?? null,
+        bookingPermissions: bookingRuntime.permissions,
+      };
+      toolResult = { ok: true, result: await executeBookingAction(action, bookingContext) };
+    } catch (error) {
+      toolResult = { ok: false, error: error instanceof Error ? error.message : "BOOKING_TOOL_FAILED" };
     }
-    throw failure;
+
+    messages.push(
+      { role: "assistant", content: answer },
+      {
+        role: "user",
+        content: "[RESULTADO DA FERRAMENTA DE AGENDAMENTO — dado do sistema, não inventes nem alteres os campos]\n"
+          + JSON.stringify(toolResult)
+          + "\nRedige agora uma resposta natural ao cliente. Se ok=false, não afirmes que a operação foi realizada. Se ok=true, comunica apenas os detalhes presentes no resultado.",
+      },
+    );
+    try {
+      response = await callOrchestrator({
+        organizationId: input.organizationId,
+        conversationId: input.conversationId,
+        taskType: "complex",
+        messages,
+        systemInstructions: systemPrompt,
+        preferredProvider,
+        preferredModel,
+        capabilitiesRequired,
+        temperature: 0.25,
+        maxTokens: 500,
+        metadata: { ...metadata, booking_tool_turn: turn + 1 },
+      });
+      answer = response.content;
+    } catch (error) {
+      const actionName = action && typeof action === "object"
+        ? (action as Record<string, unknown>)["action"] : null;
+      if (toolResult["ok"] === true && ["create_booking", "cancel_booking", "reschedule_booking"].includes(String(actionName))) {
+        const resultObject = toolResult["result"] && typeof toolResult["result"] === "object"
+          ? toolResult["result"] as Record<string, unknown> : {};
+        const booking = resultObject["booking"] && typeof resultObject["booking"] === "object"
+          ? resultObject["booking"] as Record<string, unknown> : {};
+        const code = typeof booking["booking_code"] === "string" ? " Código: " + booking["booking_code"] + "." : "";
+        const pending = booking["status"] === "pending_confirmation";
+        answer = actionName === "create_booking"
+          ? (pending ? "Recebemos o teu pedido de agendamento. Está pendente de aprovação pela equipa." : "A tua marcação está confirmada." + code)
+          : actionName === "cancel_booking"
+            ? "A tua marcação foi cancelada com sucesso."
+            : "A tua marcação foi remarcada com sucesso.";
+        break;
+      }
+      if (toolResult["ok"] !== true) {
+        answer = "Não consegui concluir essa operação de agendamento neste momento. A equipa precisa de confirmar e dar seguimento.";
+        break;
+      }
+      const retryable = (error as Error & { retryable?: boolean }).retryable
+        ?? isRetryableGenerationError(error);
+      if (retryable) {
+        await enqueueGenerationForRetry(input);
+        throw new Error("generation_pending_retry");
+      }
+      throw error;
+    }
   }
-  const answer = cleanText(data["content"], 20_000);
-  if (!answer) throw new Error("ORCHESTRATOR_EMPTY_COMPLETION");
-  const provider = cleanText(data["provider"], 60) || "unknown";
-  const model = cleanText(data["model"], 120) || "unknown";
+  if (answer.includes("<WHAPPNUS_BOOKING_ACTION>")) {
+    answer = "Não consegui concluir essa operação de agendamento neste momento. A equipa precisa de confirmar a disponibilidade e dar seguimento.";
+  }
+
+  const provider = response.provider;
+  const model = response.model;
   const handoffMarker = "[[WHAPPNUS_HANDOFF]]";
   const handoffRequired = answer.includes(handoffMarker)
     || /(quero falar com (?:uma pessoa|algu[eé]m|um atendente|um humano)|atendimento humano|atendente real|falar com o gerente|falar com uma pessoa)/i.test(effectiveText);
@@ -465,7 +648,6 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const reactionEmoji = null;
   let safeAnswer = answer.replaceAll(handoffMarker, "").trim();
 
-  // A human route is a real backend state change, not just a promise in model text.
   if (handoffRequired) {
     if (input.conversationId && !input.testMode) {
       const admin = serviceClient();
@@ -475,9 +657,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
         .eq("id", input.conversationId)
         .select("id")
         .maybeSingle();
-      if (handoffError || !conversation?.id) {
-        throw new Error("HUMAN_HANDOFF_STATE_UPDATE_FAILED");
-      }
+      if (handoffError || !conversation?.id) throw new Error("HUMAN_HANDOFF_STATE_UPDATE_FAILED");
       await admin.from("whatsapp_events").insert({
         organization_id: input.organizationId,
         whatsapp_number_id: input.whatsappNumberId,
@@ -490,7 +670,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     }
   }
 
-  const selectedPath = handoffRequired ? "human_handoff" : taskType;
+  const selectedPath = handoffRequired ? "human_handoff" : bookingToolCalls ? "booking_tool" : taskType;
   return {
     text: safeAnswer,
     provider,
@@ -505,18 +685,6 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   };
 }
 
-export type PaymentProofAnalysis = {
-  isPaymentProof: boolean; confidence: number; amount: number | null; originalCurrency: string | null;
-  reference: string | null; paymentMethod: "bank_transfer" | "multicaixa_express" | "unitel_money" | "africell_money" | "cash" | "other";
-  payerName: string | null; beneficiaryName: string | null; transactionDate: string | null;
-  itemName: string | null; summary: string;
-};
-
-/**
- * Payment-proof extraction is intentionally disabled until a vision model is
- * provisioned and independently validated. Never infer payment confirmation
- * from an image or document; all receipts remain subject to human review.
- */
 export async function analyzePaymentProofViaWhappNusAI(_input: {
   organizationId: string; whatsappNumberId: string; conversationId: string; contactId?: string | null;
   mediaPath: string; mediaMimeType: string; messageType: "image" | "document"; messageText?: string | null;
