@@ -119,7 +119,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
         authorization: "Bearer " + nativeAi.secret,
       },
       body: JSON.stringify(input),
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(22_000),
     });
   } catch (error) {
     if (isRetryableGenerationError(error)) {
@@ -180,7 +180,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
       authorization: "Bearer " + nativeAi.secret,
     },
     body: JSON.stringify(input),
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(22_000),
   });
   const raw = await response.text();
   let data: Record<string, unknown> = {};
