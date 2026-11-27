@@ -38,7 +38,7 @@ function parseAmount(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   let normalized = typeof value === "number" ? String(value) : value.replace(/[^0-9,.-]/g, "");
   if (typeof value === "string" && normalized.includes(",") && normalized.includes(".")) {
-    normalized = normalized.replace(/\\./g, "").replace(",", ".");
+    normalized = normalized.replace(/\./g, "").replace(",", ".");
   } else if (typeof value === "string" && normalized.includes(",")) {
     normalized = normalized.replace(",", ".");
   }
