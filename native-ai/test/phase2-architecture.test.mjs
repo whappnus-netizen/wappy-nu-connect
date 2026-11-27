@@ -115,11 +115,15 @@ test("Netlify scheduled worker invokes the authenticated Orchestrator queue proc
  assert.match(route,/claim_ai_generation_delivery/);
 });
 
-test("Ollama concurrency semaphore transfers slots without a race",async()=>{
+test("provider adapter delegates inference to the signed external Orchestrator",async()=>{
  const router=await read("src/provider-router.ts");
- assert.match(router,/if\(active<1\)/);
- assert.match(router,/if\(next\)\{next\(\);return;\}/);
- assert.doesNotMatch(router,/active\+\+;\s*return\s*\(\)=>release\(\);\s*\}\s*active\+\+/);
+ assert.match(router,/createHmac\("sha256"/);
+ assert.match(router,/X-Orchestrator-Key/);
+ assert.match(router,/X-Tenant-Timestamp/);
+ assert.match(router,/X-Tenant-Nonce/);
+ assert.match(router,/X-Tenant-Signature/);
+ assert.match(router,/\/v1\/chat\/completions/);
+ assert.doesNotMatch(router,/ollama|intelligenceRouterGenerate|AI_OLLAMA|AI_ROUTER/i);
 });
 
 test("expired generation leases at the retry limit become terminal failures",async()=>{
