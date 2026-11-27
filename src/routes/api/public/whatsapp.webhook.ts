@@ -3,11 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 /**
  * Webhook oficial da Meta / WhatsApp Cloud API.
  *
- * URL oficial de produção (configurar no Meta Developers):
- *   https://whappnus.online/api/public/whatsapp/webhook
- *
- * GET  → verificação (hub.challenge) com META_WEBHOOK_VERIFY_TOKEN
- * POST → recepção de mensagens/estados, com validação HMAC (META_APP_SECRET)
+ * GET  -> verificação (hub.challenge) com META_WEBHOOK_VERIFY_TOKEN
+ * POST -> valida assinatura Meta, encaminha eventos para background function
+ *        e responde rapidamente para evitar timeouts/reentregas do webhook.
  */
 export const Route = createFileRoute("/api/public/whatsapp/webhook")({
   server: {
@@ -41,51 +39,73 @@ export const Route = createFileRoute("/api/public/whatsapp/webhook")({
         }
 
         const admin = serviceClient();
-        let ingested = 0;
+        const workItems: Array<{
+          phoneNumberId: string;
+          message: WebhookMessage;
+          profileName: string | null;
+        }> = [];
 
         for (const entry of payload.entry ?? []) {
           for (const change of entry.changes ?? []) {
             const value = change.value;
-            if (!value?.metadata?.phone_number_id) continue;
-            const phoneNumberId = value.metadata.phone_number_id;
+            const phoneNumberId = value?.metadata?.phone_number_id;
+            if (!phoneNumberId) continue;
 
-            // Mensagens recebidas (cliente → empresa)
-            for (const msg of value.messages ?? []) {
+            // Mensagens recebidas: o processamento completo corre fora do webhook
+            // síncrono, através da mesma pipeline utilizada pelo QR/Baileys.
+            for (const message of value.messages ?? []) {
               const profileName =
-                value.contacts?.find((c) => c.wa_id === msg.from)?.profile?.name ?? null;
-              const { text, mediaId, type } = normalize(msg);
-              const { data: result, error } = await admin.rpc("ingest_whatsapp_message", {
-                _phone_number_id: phoneNumberId,
-                _from_wa_id: msg.from,
-                _profile_name: profileName,
-                _wa_message_id: msg.id,
-                _message_type: type,
-                _body: text,
-                _media_id: mediaId,
-                _sent_at: msg.timestamp
-                  ? new Date(Number(msg.timestamp) * 1000).toISOString()
-                  : new Date().toISOString(),
-              });
-              const outcome = (result ?? null) as { ok?: boolean; duplicate?: boolean; reason?: string } | null;
-              if (error) console.error("[wappy-nus] ingest_whatsapp_message falhou", error.message);
-              else if (!outcome?.ok) console.warn("[wappy-nus] webhook ignorado:", outcome?.reason ?? "unknown");
-              else if (!outcome.duplicate) ingested += 1;
-
+                value.contacts?.find((contact) => contact.wa_id === message.from)?.profile?.name ?? null;
+              workItems.push({ phoneNumberId, message, profileName });
             }
 
-            // Estados de entrega das mensagens enviadas
-            for (const st of value.statuses ?? []) {
-              if (!st.id || !st.status) continue;
+            // Estados de entrega das mensagens enviadas continuam a ser tratados
+            // directamente, sem passar pelo pipeline de mensagens recebidas.
+            for (const status of value.statuses ?? []) {
+              if (!status.id || !status.status) continue;
               const { error } = await admin.rpc("update_whatsapp_message_status", {
-                _wa_message_id: st.id,
-                _status: st.status,
+                _wa_message_id: status.id,
+                _status: status.status,
               });
-              if (error) console.error("[wappy-nus] update_whatsapp_message_status falhou", error);
+              if (error) console.error("[wappy-nus] update_whatsapp_message_status falhou", error.message);
             }
           }
         }
 
-        return Response.json({ received: true, ingested });
+        if (workItems.length === 0) {
+          return Response.json({ received: true, queued: 0 });
+        }
+
+        const workerSecret = process.env["WHAPPNUS_AI_WORKER_SECRET"];
+        if (!workerSecret) {
+          console.error("[wappy-nus] WHAPPNUS_AI_WORKER_SECRET não configurado para o worker inbound");
+          return Response.json({ received: false, error: "inbound_worker_not_configured" }, { status: 503 });
+        }
+
+        try {
+          const backgroundUrl = new URL("/.netlify/functions/whatsapp-inbound-background", request.url);
+          const accepted = await fetch(backgroundUrl, {
+            method: "POST",
+            headers: {
+              authorization: "Bearer " + workerSecret,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ messages: workItems }),
+          });
+
+          if (!accepted.ok) {
+            console.error("[wappy-nus] background inbound worker rejeitou o lote:", accepted.status);
+            return Response.json({ received: false, error: "inbound_worker_rejected" }, { status: 503 });
+          }
+        } catch (error) {
+          console.error(
+            "[wappy-nus] não foi possível encaminhar mensagens ao worker:",
+            (error as Error).message.slice(0, 180),
+          );
+          return Response.json({ received: false, error: "inbound_worker_unavailable" }, { status: 503 });
+        }
+
+        return Response.json({ received: true, queued: workItems.length });
       },
     },
   },
@@ -97,10 +117,10 @@ type WebhookMessage = {
   timestamp?: string;
   type?: string;
   text?: { body?: string };
-  image?: { id?: string; caption?: string };
-  audio?: { id?: string };
-  video?: { id?: string; caption?: string };
-  document?: { id?: string; filename?: string };
+  image?: { id?: string; caption?: string; mime_type?: string };
+  audio?: { id?: string; mime_type?: string };
+  video?: { id?: string; caption?: string; mime_type?: string };
+  document?: { id?: string; filename?: string; mime_type?: string };
   button?: { text?: string };
   interactive?: unknown;
 };
@@ -117,27 +137,3 @@ type WebhookPayload = {
     }>;
   }>;
 };
-
-const SUPPORTED = ["text", "image", "audio", "video", "document"] as const;
-
-function normalize(msg: WebhookMessage): { text: string | null; mediaId: string | null; type: string } {
-  const type = SUPPORTED.includes((msg.type ?? "text") as (typeof SUPPORTED)[number])
-    ? (msg.type as string)
-    : "system";
-  switch (msg.type) {
-    case "text":
-      return { text: msg.text?.body ?? null, mediaId: null, type: "text" };
-    case "image":
-      return { text: msg.image?.caption ?? null, mediaId: msg.image?.id ?? null, type: "image" };
-    case "audio":
-      return { text: null, mediaId: msg.audio?.id ?? null, type: "audio" };
-    case "video":
-      return { text: msg.video?.caption ?? null, mediaId: msg.video?.id ?? null, type: "video" };
-    case "document":
-      return { text: msg.document?.filename ?? null, mediaId: msg.document?.id ?? null, type: "document" };
-    case "button":
-      return { text: msg.button?.text ?? null, mediaId: null, type: "text" };
-    default:
-      return { text: msg.type ? `[${msg.type}]` : null, mediaId: null, type };
-  }
-}
