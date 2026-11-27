@@ -210,6 +210,13 @@ function orchestratorConfig(): { endpoint: string; apiKey: string; tenantSecret:
   };
 }
 
+function normalizeConfiguredModel(model: string): string {
+  const normalized = model.startsWith("google/") ? model.slice("google/".length) : model;
+  if (normalized === "gemini-2.5-flash") return "gemini-3.8-flash";
+  if (normalized === "gemini-2.5-pro") return "gemini-3.1-pro-preview";
+  return normalized;
+}
+
 function providerForModel(model: string): string | null {
   if (model.startsWith("gemini-")) return "gemini";
   if (model.startsWith("gpt-") || /^o\d/.test(model)) return "openai";
@@ -368,7 +375,8 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   }
 
   const orchestrator = orchestratorConfig();
-  const configuredModel = cleanText(ctx.agent?.["model"] ?? ctx.agent?.["preferred_model"], 120);
+  const configuredModelRaw = cleanText(ctx.agent?.["model"] ?? ctx.agent?.["preferred_model"], 120);
+  const configuredModel = configuredModelRaw ? normalizeConfiguredModel(configuredModelRaw) : "";
   const preferredProvider = configuredModel ? providerForModel(configuredModel) : null;
   if (configuredModel && !preferredProvider) throw new Error("AI_AGENT_MODEL_PROVIDER_UNKNOWN");
   const taskType = isAdvancedTask(effectiveText, input.messageType) ? "complex" : "customer_support";
