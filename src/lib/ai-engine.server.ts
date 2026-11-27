@@ -307,7 +307,7 @@ function isRetryableGenerationError(error: unknown): boolean {
     return (error as { retryable: boolean }).retryable;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /AbortError|TimeoutError|timed out|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\\d\\d)/i.test(message);
+  return /AbortError|TimeoutError|timed out|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5[0-9][0-9])/i.test(message);
 }
 
 async function consumeAiConversationCredit(input: GenerateInput): Promise<void> {
@@ -525,16 +525,18 @@ export type PaymentProofAnalysis = {
 };
 
 function parsePaymentProofObject(raw: string): Record<string, unknown> {
-  const match = raw.trim().match(/\\{[\\s\\S]*\\}/);
-  if (!match?.[0]) throw new Error("PAYMENT_PROOF_INVALID_JSON");
-  const parsed = JSON.parse(match[0]) as unknown;
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("PAYMENT_PROOF_INVALID_JSON");
+  const parsed = JSON.parse(raw.slice(start, end + 1)) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("PAYMENT_PROOF_INVALID_JSON");
   return parsed as Record<string, unknown>;
 }
 
 function nullablePaymentText(value: unknown, max = 180): string | null {
   if (typeof value !== "string") return null;
-  const normalized = value.trim().replace(/\\s+/g, " ");
+  const normalized = value.trim().replaceAll("\\n", " ").replaceAll("\\r", " ").replaceAll("\\t", " ")
+    .split(" ").filter(Boolean).join(" ");
   return normalized ? normalized.slice(0, max) : null;
 }
 
@@ -546,11 +548,11 @@ function parsePaymentAmount(value: unknown): number | null {
 
 function normalizePaymentMethod(value: unknown): PaymentProofAnalysis["paymentMethod"] {
   const method = String(value ?? "").toLowerCase();
-  if (/unitel/.test(method)) return "unitel_money";
-  if (/africell/.test(method)) return "africell_money";
-  if (/multicaixa|express|mcx/.test(method)) return "multicaixa_express";
-  if (/transfer|bank|banco|iban/.test(method)) return "bank_transfer";
-  if (/cash|dinheiro|numer[aá]rio/.test(method)) return "cash";
+  if (method.includes("unitel")) return "unitel_money";
+  if (method.includes("africell")) return "africell_money";
+  if (method.includes("multicaixa") || method.includes("express") || method.includes("mcx")) return "multicaixa_express";
+  if (method.includes("transfer") || method.includes("bank") || method.includes("banco") || method.includes("iban")) return "bank_transfer";
+  if (method.includes("cash") || method.includes("dinheiro") || method.includes("numerario")) return "cash";
   return "other";
 }
 
@@ -582,7 +584,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     "Não inventes valor, moeda, referência, nomes, data ou método. Se um campo não estiver visível, devolve null.",
     "Devolve APENAS JSON válido com estas chaves: isPaymentProof (boolean), confidence (0 a 1), amount (number ou null), currency (string ou null), reference (string ou null), paymentMethod (string), payerName (string ou null), beneficiaryName (string ou null), transactionDate (string ou null), itemName (string ou null), summary (string curta).",
     "Texto/legenda do cliente: " + (input.messageText?.trim() || "Sem legenda."),
-  ].join("\\n\\n");
+  ].join(String.fromCharCode(10, 10));
 
   const orchestrator = orchestratorConfig();
   const response = await fetch(orchestrator.endpoint, {
@@ -621,8 +623,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     const code = typeof detail["code"] === "string" ? detail["code"] : "ORCHESTRATOR_REQUEST_FAILED";
     throw new Error("PAYMENT_PROOF_ORCHESTRATOR_FAILED: " + code + " (HTTP " + response.status + ")");
   }
-  const content = typeof result["content"] === "string" ? result["content"] : "";
-  const extracted = parsePaymentProofObject(content);
+  const extracted = parsePaymentProofObject(typeof result["content"] === "string" ? result["content"] : "");
   const currency = nullablePaymentText(extracted["currency"], 8)?.toUpperCase() ?? null;
   const amount = parsePaymentAmount(extracted["amount"]);
   return {
@@ -638,6 +639,4 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     itemName: nullablePaymentText(extracted["itemName"], 200),
     summary: nullablePaymentText(extracted["summary"], 500) ?? "Anexo analisado; aguarda confirmação humana.",
   };
-}): Promise<PaymentProofAnalysis> {
-  throw new Error("ROUTER_VISION_NOT_CONFIGURED_PAYMENT_PROOF_REQUIRES_REVIEW");
 }
