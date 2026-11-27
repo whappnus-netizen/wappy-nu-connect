@@ -79,6 +79,7 @@ test("generation worker verifies queued tenant context before provider execution
  assert.match(worker,/payload\["organizationId"\] === job\.organization_id/);
  assert.match(worker,/payload\["whatsappNumberId"\] === job\.whatsapp_number_id/);
  assert.match(worker,/AI_GENERATION_JOB_TENANT_CONTEXT_MISMATCH/);
+ assert.match(worker,/delivery_enqueue_failed\|generation_finish_failed/);
 });
 
 test("deploy previews cannot call the production Orchestrator with production secrets",async()=>{
