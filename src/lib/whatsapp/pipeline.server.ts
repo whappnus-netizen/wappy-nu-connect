@@ -171,6 +171,7 @@ async function analyzeAndRecordPaymentProof(
       whatsappNumberId: number.id,
       conversationId,
       contactId,
+      messageId: incoming.id,
       mediaPath: incoming.mediaId,
       mediaMimeType: incoming.mediaMimeType,
       messageType: incoming.messageType as "image" | "document",
