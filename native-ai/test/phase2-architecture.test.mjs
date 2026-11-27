@@ -74,6 +74,13 @@ test("conversation history excludes the current WhatsApp provider message id",as
  assert.match(pipeline,/messageId: incoming\.waMessageId/);
 });
 
+test("generation worker verifies queued tenant context before provider execution",async()=>{
+ const worker=await read("../src/routes/api/public/ai.generation-complete.ts");
+ assert.match(worker,/payload\["organizationId"\] === job\.organization_id/);
+ assert.match(worker,/payload\["whatsappNumberId"\] === job\.whatsapp_number_id/);
+ assert.match(worker,/AI_GENERATION_JOB_TENANT_CONTEXT_MISMATCH/);
+});
+
 test("deploy previews cannot call the production Orchestrator with production secrets",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/process\.env\["CONTEXT"\]/);
