@@ -34,7 +34,7 @@ function retryable(error: unknown): boolean {
     return (error as { retryable: boolean }).retryable;
   }
   const message = error instanceof Error ? error.message : String(error);
-  return /generation_pending_retry|AbortError|TimeoutError|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\d\d)/i.test(message);
+  return /generation_pending_retry|delivery_enqueue_failed|generation_finish_failed|AbortError|TimeoutError|timeout|fetch failed|ECONN|socket|network|HTTP (408|425|429|5\d\d)/i.test(message);
 }
 
 export const Route = createFileRoute("/api/public/ai/generation-complete")({
