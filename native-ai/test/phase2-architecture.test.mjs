@@ -356,3 +356,11 @@ test("provider message ingestion is idempotent and keeps conversations scoped to
  assert.match(sql,/whatsapp_number_id = num\.id/);
  assert.match(sql,/active-conversation/);
 });
+
+test("backend signs the exact serialized Orchestrator request body with HMAC v2",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/createHash\("sha256"\)/);
+ assert.match(adapter,/X-Tenant-Body-SHA256/);
+ assert.match(adapter,/POST[\s\S]*\/v1\/chat\/completions/);
+ assert.match(adapter,/body: serializedBody/);
+});
