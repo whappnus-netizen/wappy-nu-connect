@@ -76,10 +76,13 @@ function BookingsPage() {
   const [allowCancel,setAllowCancel] = useState(true);
   const [allowReschedule,setAllowReschedule] = useState(true);
 
+  const rangeAnchor = Date.now() + weekOffset * 7 * 24 * 60 * 60 * 1000;
+  const rangeFrom = new Date(Math.min(Date.now() - 7 * 24 * 60 * 60 * 1000, rangeAnchor - 7 * 24 * 60 * 60 * 1000)).toISOString();
+  const rangeTo = new Date(Math.max(Date.now() + 45 * 24 * 60 * 60 * 1000, rangeAnchor + 14 * 24 * 60 * 60 * 1000)).toISOString();
   const workspace = useQuery({
-    queryKey:["booking-workspace",organizationId],
+    queryKey:["booking-workspace",organizationId,weekOffset],
     enabled:Boolean(organizationId),
-    queryFn:()=>getBookingWorkspace({data:{organizationId:organizationId!}}),
+    queryFn:()=>getBookingWorkspace({data:{organizationId:organizationId!,from:rangeFrom,to:rangeTo}}),
     refetchInterval:30000,
   });
   const data = workspace.data;
