@@ -39,7 +39,7 @@ BEGIN
 
   IF _wa_message_id IS NOT NULL THEN
     PERFORM pg_advisory_xact_lock(
-      hashtextextended(num.organization_id::text || ':wa-message:' || _wa_message_id, 0)
+      hashtextextended('wa-message:' || _wa_message_id, 0)
     );
 
     SELECT m.conversation_id, m.contact_id
