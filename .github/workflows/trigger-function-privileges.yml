@@ -1,0 +1,19 @@
+name: Trigger function privilege validation
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/*_restrict_trigger_function_execution.sql"
+      - "scripts/verify-trigger-function-privileges.mjs"
+      - ".github/workflows/trigger-function-privileges.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify trigger-only function privileges
+        run: node scripts/verify-trigger-function-privileges.mjs
