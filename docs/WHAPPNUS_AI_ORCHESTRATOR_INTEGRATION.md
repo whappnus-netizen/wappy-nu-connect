@@ -13,8 +13,8 @@
 Configurar no site `whappnus`, em context `all`, com scopes Builds e Functions:
 
 - `WHAPPNUS_ORCHESTRATOR_URL=https://whappnus-ai-orchestrator-production.up.railway.app`
-- `WHAPPNUS_ORCHESTRATOR_API_KEY=<segredo partilhado com ORCHESTRATOR_API_KEY no Railway>`
-- `WHAPPNUS_TENANT_SIGNING_SECRET=<segredo partilhado com TENANT_SIGNING_SECRET no Railway>`
+- `WHAPPNUS_ORCHESTRATOR_API_KEY=<segredo partilhado com ORCHESTRATOR_API_KEY no Railway>` (ou alias compatível `ORCHESTRATOR_API_KEY`)
+- `WHAPPNUS_TENANT_SIGNING_SECRET=<segredo partilhado com TENANT_SIGNING_SECRET no Railway>` (ou alias compatível `TENANT_SIGNING_SECRET`)
 - `WHAPPNUS_AI_WORKER_SECRET=<segredo interno exclusivo para o worker agendado>`
 
 Não usar prefixo `VITE_`, não colocar estes segredos no browser e não os versionar. As variáveis server-side do TanStack Start são injectadas durante o build; depois de as alterar é necessário novo deploy.
@@ -25,7 +25,7 @@ No Railway, o serviço WHAPPNUS-AI-ORCHESTRATOR recebe:
 - `REDIS_URL` (referência ao serviço Redis já provisionado)
 - Uma ou mais credenciais dos provedores, configuradas separadamente.
 
-Os dois primeiros segredos têm de coincidir exactamente com os valores correspondentes da Netlify. O segredo do worker é independente e não é enviado ao Orchestrator.
+Os dois primeiros segredos têm de coincidir exactamente com os valores correspondentes da Netlify. O backend dá prioridade aos nomes WHAPPNUS-prefixed; quando ausentes, aceita os nomes legacy `ORCHESTRATOR_API_KEY` e `TENANT_SIGNING_SECRET` para compatibilidade. O segredo do worker é independente e não é enviado ao Orchestrator.
 
 ## Health e readiness
 
