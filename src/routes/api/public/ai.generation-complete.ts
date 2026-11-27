@@ -41,6 +41,13 @@ export const Route = createFileRoute("/api/public/ai/generation-complete")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const context = String(process.env["CONTEXT"] ?? "").trim().toLowerCase();
+        const isNetlify = process.env["NETLIFY"] === "true";
+        if ((isNetlify && context !== "production" && context !== "dev") ||
+            (context && context !== "production" && context !== "dev")) {
+          return new Response("Not Found", { status: 404 });
+        }
+
         const secret = process.env["WHAPPNUS_AI_WORKER_SECRET"];
         const authorization = request.headers.get("authorization") ?? "";
         const bearer = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
