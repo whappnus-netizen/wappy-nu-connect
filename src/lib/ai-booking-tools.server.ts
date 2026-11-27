@@ -20,6 +20,9 @@ export type BookingToolContext = {
  bookingPermissions:BookingPermissions;
 };
 
+type AvailabilitySlot = { starts_at:string; ends_at:string; local_time:string; staff_id:string|null; staff_name:string; resource_id:string|null; resource_name:string };
+
+
 function localToUtc(date:string,time:string,timezone:string):Date {
  const dateParts=date.split("-").map(Number);
  const timeParts=time.split(":").map(Number);
@@ -86,7 +89,6 @@ async function getAvailability(ctx:BookingToolContext,serviceId:string,date:stri
  if(staffRows.error||resourceRows.error||staffRules.error||resourceRules.error)throw new Error("BOOKING_AVAILABILITY_LOOKUP_FAILED");
  const activeStaff=(staffRows.data??[]).filter(x=>x.is_active);
  const activeResources=(resourceRows.data??[]).filter(x=>x.is_active);
- type AvailabilitySlot = { starts_at:string; ends_at:string; local_time:string; staff_id:string|null; staff_name:string; resource_id:string|null; resource_name:string };
  const slots:AvailabilitySlot[]=[];
  const activeBookings=existing??[];
  const existingServiceIds=[...new Set(activeBookings.map(b=>b.service_id))];
