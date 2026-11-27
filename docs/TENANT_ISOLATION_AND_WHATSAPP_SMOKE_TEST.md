@@ -8,6 +8,7 @@ This is a controlled acceptance test. Do not use customer organizations, custome
 
 ## Preconditions
 
+- Apply migration 20261127110000_serialize_ai_conversation_usage_per_organization.sql through the approved Supabase migration process before relying on strict monthly AI conversation limits.
 - Two dedicated test organizations: ORG-A and ORG-B.
 - One dedicated WhatsApp test number connected to each organization.
 - One active agent per organization.
