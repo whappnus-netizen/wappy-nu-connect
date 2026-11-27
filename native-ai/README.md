@@ -1,24 +1,27 @@
 # WHAPPNUS Native AI Engine
 
-This service is the application-owned AI runtime for WHAPPNUS. Its source lives in the main `wappy-nu-connect` repository under `native-ai/`; it is not the legacy `WhappNus-AI-Engine` repository.
+This service is the application-owned business orchestration runtime for WHAPPNUS. Its source lives in the main `wappy-nu-connect` repository under `native-ai/`.
 
-## Runtime contract
+## Runtime responsibilities
 
-- Express API compatible with the current server-side WHAPPNUS adapter.
-- Supabase is the source of truth for tenants, agents, knowledge, history, credits, bookings, logs and durable generation jobs.
-- Ollama is the only generation provider; model defaults to `qwen2.5vl:3b`.
-- The browser never calls Ollama or receives the internal AI secret.
-- The app's server-side adapter calls this service with bearer authentication.
+- Supabase remains the source of truth for organizations, agents, knowledge, history, credits, bookings, logs and durable generation jobs.
+- This service retains business logic: agent selection, context construction, intent classification, knowledge ranking, billing checks, booking tools, payment-proof review, evaluation and delivery callbacks.
+- The independent WHAPPNUS AI Orchestrator is the only LLM provider gateway. This service signs each provider request with the organization ID, timestamp and one-time nonce.
+- Provider/model selection, retries, fallback, circuit breakers, tenant rate limits and replay protection belong to the external Orchestrator.
+- No Ollama or legacy Intelligence Router inference remains in this runtime.
 
-## Railway
+## Required Railway variables
 
-Set the service root directory to `native-ai`. Build with `npm install && npm run build`; start with `npm start`. Required runtime variables are validated in `src/config.ts`. Reuse the existing AI Engine's Supabase and Ollama variables through Railway variable references during the blue/green transition; do not copy secret values into source control.
+- Existing: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AI_INTERNAL_SECRET`, `AI_RESULT_CALLBACK_URL`.
+- New: `ORCHESTRATOR_URL`, `ORCHESTRATOR_API_KEY`, `TENANT_SIGNING_SECRET`.
+- Optional: `ORCHESTRATOR_TIMEOUT_MS`, `AI_MODEL`, `AI_TEMPERATURE`, `AI_MAX_OUTPUT_TOKENS`, queue and history limits.
 
-## Migration strategy
+The Orchestrator API key and tenant signing secret must match the corresponding secrets configured on the Orchestrator service. Store them only in Railway Variables; never commit them or send them in chat.
 
-The legacy service remains available for rollback. Both runtimes can share the existing idempotent Supabase queue during controlled rollout because `claim_ai_generation_job` uses row locking with `SKIP LOCKED`. Only after internal and real WhatsApp validation should Netlify's server-side engine URL be switched to this service and the legacy worker be retired.
+## Worker and queue
 
-## Known limitations pending completion
+`AI_WORKER_ENABLED` remains an explicit switch and defaults to false. Enable the worker only after the Orchestrator variables are present and the live signed smoke test passes. Netlify and this service can share the durable Supabase queue during a controlled rollout because `claim_ai_generation_job` uses row locking with `SKIP LOCKED`; both workers must use the same new provider gateway before concurrent operation is allowed.
 
-- Slow WhatsApp generations now use a durable delivery outbox, authenticated callback, and unique `ai_generation_job_id` on outbound messages. This still requires production migration and end-to-end delivery validation before it can be considered approved.
-- Qwen2.5-VL supports image understanding, but audio requires a local transcription service and PDFs/documents require extraction before model invocation.
+## Migration safety
+
+Do not delete Supabase credit, booking, knowledge, history, or delivery logic. This service is the business layer; the independent Orchestrator is the provider layer. Keep the old Railway deployment available for rollback until signed generation, payment-proof extraction, booking tools, queue retry and WhatsApp delivery have all passed end-to-end tests.
