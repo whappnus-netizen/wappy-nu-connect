@@ -150,7 +150,10 @@ test("backend retains tenant context, idempotent conversation billing and human-
  assert.match(adapter,/isPaymentProof: boolean/);
  assert.match(adapter,/reference: cleanText\(parsed/);
  assert.match(adapter,/beneficiaryName: cleanText\(parsed/);
- assert.match(adapter,/HUMAN_HANDOFF_STATE_UPDATE_FAILED/);
+ assert.doesNotMatch(adapter,/HUMAN_HANDOFF_STATE_UPDATE_FAILED|human_handoff_requested|handoffRequired/);
+ assert.doesNotMatch(adapter,/\.from\("conversations"\)\s*\.update\s*\(/);
+ assert.match(adapter,/LIMITE DE AUTORIZAÇÃO — REGRA INEGOCIÁVEL/);
+ assert.match(adapter,/modelRequestedHandoff/);
  assert.match(pipeline,/amount_aoa: analysis\.originalCurrency === "AOA" \? analysis\.amount : null/);
  assert.match(pipeline,/status: "pending_review"/);
  assert.match(pipeline,/originalAmount: analysis\.amount/);
