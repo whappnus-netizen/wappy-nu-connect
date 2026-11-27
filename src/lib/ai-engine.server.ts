@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { executeBookingAction, type BookingPermissions, type BookingToolContext } from "./ai-booking-tools.server";
 import { serviceClient } from "./whatsapp.server";
@@ -394,9 +394,31 @@ async function callOrchestrator(input: {
   const timestamp = String(Math.floor(Date.now() / 1000));
   const nonce = randomUUID();
   const secret = config.tenantSecret;
-  const signature = createHmac("sha256", secret)
-    .update(input.organizationId + ":" + timestamp + ":" + nonce)
-    .digest("hex");
+  const requestBody = {
+    request_id: randomUUID(),
+    organization_id: input.organizationId,
+    conversation_id: input.conversationId ?? null,
+    task_type: input.taskType,
+    messages: input.messages,
+    system_instructions: input.systemInstructions,
+    ...(input.preferredProvider ? { preferred_provider: input.preferredProvider } : {}),
+    ...(input.preferredModel ? { preferred_model: input.preferredModel } : {}),
+    capabilities_required: input.capabilitiesRequired ?? ["text"],
+    temperature: input.temperature ?? 0.35,
+    max_tokens: input.maxTokens ?? 700,
+    metadata: input.metadata ?? {},
+  };
+  const serializedBody = JSON.stringify(requestBody);
+  const bodyHash = createHash("sha256").update(serializedBody, "utf8").digest("hex");
+  const signatureMessage = [
+    "POST",
+    "/v1/chat/completions",
+    input.organizationId,
+    timestamp,
+    nonce,
+    bodyHash,
+  ].join(":");
+  const signature = createHmac("sha256", secret).update(signatureMessage).digest("hex");
   let response: Response;
   try {
     response = await fetch(config.endpoint, {
@@ -406,22 +428,10 @@ async function callOrchestrator(input: {
         "X-Orchestrator-Key": config.apiKey,
         "X-Tenant-Timestamp": timestamp,
         "X-Tenant-Nonce": nonce,
+        "X-Tenant-Body-SHA256": bodyHash,
         "X-Tenant-Signature": signature,
       },
-      body: JSON.stringify({
-        request_id: randomUUID(),
-        organization_id: input.organizationId,
-        conversation_id: input.conversationId ?? null,
-        task_type: input.taskType,
-        messages: input.messages,
-        system_instructions: input.systemInstructions,
-        ...(input.preferredProvider ? { preferred_provider: input.preferredProvider } : {}),
-        ...(input.preferredModel ? { preferred_model: input.preferredModel } : {}),
-        capabilities_required: input.capabilitiesRequired ?? ["text"],
-        temperature: input.temperature ?? 0.35,
-        max_tokens: input.maxTokens ?? 700,
-        metadata: input.metadata ?? {},
-      }),
+      body: serializedBody,
       signal: AbortSignal.timeout(25_000),
     });
   } catch (error) {
