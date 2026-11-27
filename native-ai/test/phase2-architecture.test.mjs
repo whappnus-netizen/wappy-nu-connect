@@ -7,8 +7,10 @@ const read=(path)=>readFile(new URL("../"+path,import.meta.url),"utf8");
 test("frontend AI adapter uses authenticated Orchestrator requests with tenant HMAC",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_URL/);
- assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_API_KEY/);\n assert.match(adapter,/process\\.env\\["ORCHESTRATOR_API_KEY"\\]/);
- assert.match(adapter,/WHAPPNUS_TENANT_SIGNING_SECRET/);\n assert.match(adapter,/process\\.env\\["TENANT_SIGNING_SECRET"\\]/);
+ assert.match(adapter,/WHAPPNUS_ORCHESTRATOR_API_KEY/);
+ assert.match(adapter,/process\.env\["ORCHESTRATOR_API_KEY"\]/);
+ assert.match(adapter,/WHAPPNUS_TENANT_SIGNING_SECRET/);
+ assert.match(adapter,/process\.env\["TENANT_SIGNING_SECRET"\]/);
  assert.match(adapter,/\/v1\/chat\/completions/);
  assert.match(adapter,/"X-Orchestrator-Key"/);
  assert.match(adapter,/createHmac\("sha256", secret\)/);
