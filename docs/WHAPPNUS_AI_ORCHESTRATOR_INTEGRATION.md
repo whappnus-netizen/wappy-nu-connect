@@ -93,3 +93,19 @@ Deploy previews Netlify (`CONTEXT=deploy-preview`/`branch-deploy`) são bloquead
 7. Teste do worker, idempotência e entrega pelo WhatsApp Engine.
 8. Teste de atendimento manual, IA desligada e handoff humano.
 9. Teste final com um número de teste antes de activar tráfego de clientes.
+
+
+## Política actual de modelos e fallback (fase de validação)
+
+- Modelo principal: Gemini 3.1 Flash Lite (gemini-3.1-flash-lite), tanto para tarefas normais como complexas enquanto o modo avançado estiver desactivado.
+- Gemini Pro (gemini-3.1-pro-preview) permanece preparado, mas só pode ser activado no Orchestrator com GEMINI_ADVANCED_ENABLED=true depois de confirmar quota e geração real.
+- O modelo principal é configurado por GEMINI_PRIMARY_MODEL; a antiga variável GEMINI_FLASH_MODEL deixa de controlar a selecção.
+- Fallback para OpenAI/Anthropic não é inferido pela existência de API keys. Apenas providers incluídos em FALLBACK_PROVIDER_ORDER podem ser utilizados.
+- Quota zero, quota esgotada ou saldo insuficiente não devem provocar retries. HTTP 429 de rate limit tem um orçamento de retry mais pequeno.
+- Antes de adicionar um provider ao fallback, executar uma geração real com a conta e o modelo exactos que serão utilizados em produção.
+
+## Estado da validação de isolamento
+
+O CI inclui uma regressão estática que verifica que o carregamento de agente/contexto usa organization_id e whatsapp_number_id, que o histórico é filtrado por organization_id e conversation_id, e que os anexos respeitam o prefixo da organização e do número.
+
+Esta regressão não substitui o teste runtime com duas organizações reais. O teste runtime deve ser executado com duas organizações de teste, dois agentes e números WhatsApp separados, seguindo o runbook docs/TENANT_ISOLATION_AND_WHATSAPP_SMOKE_TEST.md.
