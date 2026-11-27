@@ -20,6 +20,32 @@ test("frontend AI adapter uses authenticated Orchestrator requests with tenant H
  assert.doesNotMatch(adapter,/WHAPPNUS_ROUTER_URL|WHAPPNUS_ROUTER_API_KEY|NATIVE_AI_ENGINE_URL|AI_OLLAMA_BASE_URL/);
 });
 
+test("native AI provider adapter signs tenant requests and uses only the independent Orchestrator",async()=>{
+ const router=await read("src/provider-router.ts");
+ const config=await read("src/config.ts");
+ const orchestrator=await read("src/orchestrator.ts");
+ assert.match(router,/createHmac\("sha256"/);
+ assert.match(router,/X-Tenant-Timestamp/);
+ assert.match(router,/X-Tenant-Nonce/);
+ assert.match(router,/X-Tenant-Signature/);
+ assert.match(router,/X-Orchestrator-Key/);
+ assert.match(router,/organization_id:organizationId/);
+ assert.match(orchestrator,/createProvider\(input.organizationId\)/);
+ assert.match(config,/ORCHESTRATOR_URL/);
+ assert.doesNotMatch(router,/ollama|intelligenceRouterGenerate|AI_OLLAMA|AI_ROUTER/i);
+ assert.doesNotMatch(config,/AI_OLLAMA|AI_ROUTER|AI_PROVIDER/);
+});
+
+test("backend generation preserves plan billing and receipt extraction through Orchestrator",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
+ assert.match(adapter,/consume_ai_conversation/);
+ assert.match(adapter,/analyzePaymentProofViaWhappNusAI/);
+ assert.match(adapter,/payment_proof_extraction/);
+ assert.match(adapter,/ai_logs/);
+ assert.doesNotMatch(pipeline,/WHAPPNUS_ROUTER_URL/);
+});
+
 test("generation endpoint uses durable queue and idempotency",async()=>{
  const server=await read("src/server.ts");
  const queue=await read("src/generation-queue.ts");
@@ -28,7 +54,7 @@ test("generation endpoint uses durable queue and idempotency",async()=>{
  assert.match(queue,/idempotency_key/);
  assert.match(queue,/claim_ai_generation_job/);
  assert.match(queue,/finish_ai_generation_job/);
- assert.match(queue,/OLLAMA_CIRCUIT_OPEN/);
+ assert.match(queue,/ORCHESTRATOR/);
 });
 
 test("queue safely detaches stale or cross-tenant conversation references",async()=>{
