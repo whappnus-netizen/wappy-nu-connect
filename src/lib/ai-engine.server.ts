@@ -264,13 +264,15 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
   const extensionMime: Record<string, string> = {
     jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
-    ogg: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4",
-    aac: "audio/aac", amr: "audio/amr", wav: "audio/wav", webm: "audio/webm", flac: "audio/flac",
+    ogg: "audio/ogg", opus: "audio/opus", mp3: "audio/mp3", m4a: "audio/m4a",
+    aac: "audio/aac", wav: "audio/wav", aiff: "audio/aiff", webm: "audio/webm", flac: "audio/flac",
+    l16: "audio/l16", alaw: "audio/alaw", mulaw: "audio/mulaw",
     pdf: "application/pdf",
   };
   const allowedMime = new Set([
     "image/jpeg", "image/png", "image/webp", "image/gif",
-    "audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac", "audio/amr", "audio/wav", "audio/webm", "audio/flac",
+    "audio/ogg", "audio/opus", "audio/mp3", "audio/mpeg", "audio/m4a", "audio/mp4",
+    "audio/aac", "audio/wav", "audio/aiff", "audio/webm", "audio/flac", "audio/l16", "audio/alaw", "audio/mulaw",
     "application/pdf",
   ]);
   const candidates = [
@@ -278,7 +280,8 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
     blob.type?.split(";")[0]?.trim().toLowerCase() ?? "",
     extensionMime[extension] ?? "",
   ];
-  const mimeType = candidates.find((candidate) => allowedMime.has(candidate)) ?? "";
+  let mimeType = candidates.find((candidate) => allowedMime.has(candidate)) ?? "";
+  if (mimeType === "audio/mp4" && input.messageType === "audio") mimeType = "audio/m4a";
   if (!mimeType) throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
 
   if (input.messageType === "video") throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
@@ -290,7 +293,7 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
 
   const bytes = Buffer.from(await blob.arrayBuffer());
   const maxBytes = mediaType === "image" ? 5 * 1024 * 1024
-    : mediaType === "audio" ? 15 * 1024 * 1024 : 10 * 1024 * 1024;
+    : mediaType === "audio" ? 12 * 1024 * 1024 : 10 * 1024 * 1024;
   if (!bytes.length || bytes.length > maxBytes) throw new Error("AI_MEDIA_SIZE_INVALID");
 
   return { type: mediaType, mime_type: mimeType, data: bytes.toString("base64") };
