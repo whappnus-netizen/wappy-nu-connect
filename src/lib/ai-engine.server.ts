@@ -205,11 +205,11 @@ type ResolvedIncomingContent = {
 
 function orchestratorConfig(): { endpoint: string; apiKey: string; tenantSigningSecret: string } {
   const configured = process.env["WHAPPNUS_ORCHESTRATOR_URL"];
-  const apiKey = process.env["WHAPPNUS_ORCHESTRATOR_API_KEY"];
-  const tenantSigningSecret = process.env["WHAPPNUS_TENANT_SIGNING_SECRET"];
+  const apiKey = process.env["WHAPPNUS_ORCHESTRATOR_API_KEY"] || process.env["ORCHESTRATOR_API_KEY"];
+  const tenantSigningSecret = process.env["WHAPPNUS_TENANT_SIGNING_SECRET"] || process.env["TENANT_SIGNING_SECRET"];
   if (!configured) throw new Error("WHAPPNUS_ORCHESTRATOR_URL_NOT_CONFIGURED");
-  if (!apiKey || apiKey.length < 32) throw new Error("WHAPPNUS_ORCHESTRATOR_API_KEY_NOT_CONFIGURED");
-  if (!tenantSigningSecret || tenantSigningSecret.length < 32) throw new Error("WHAPPNUS_TENANT_SIGNING_SECRET_NOT_CONFIGURED");
+  if (!apiKey || apiKey.length < 32) throw new Error("ORCHESTRATOR_API_KEY_NOT_CONFIGURED");
+  if (!tenantSigningSecret || tenantSigningSecret.length < 32) throw new Error("TENANT_SIGNING_SECRET_NOT_CONFIGURED");
   const url = /^https?:\/\//i.test(configured) ? configured : "https://" + configured;
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error("WHAPPNUS_ORCHESTRATOR_URL_INVALID"); }
