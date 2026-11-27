@@ -15,7 +15,7 @@ function retryable(error:unknown):boolean{
   return (error as {retryable:boolean}).retryable;
  }
  const m=error instanceof Error?error.message:String(error);
- return /HTTP (408|425|429|5[0-9][0-9])\\b|timeout|AbortError|ECONN|fetch failed|socket|network/i.test(m);
+ return /HTTP (408|425|429|5[0-9][0-9])\b|timeout|AbortError|ECONN|fetch failed|socket|network/i.test(m);
 }
 
 export async function enqueueGeneration(input:GenerateRequest):Promise<string>{
