@@ -147,6 +147,7 @@ function CrmPage() {
               <div className="space-y-2">{stageDeals.length === 0 ? <p className="text-xs text-muted-foreground">Sem oportunidades.</p> : stageDeals.map((deal) => <article key={deal.id} className="space-y-3 rounded-lg border border-border bg-background p-3">
                 <p className="break-words text-sm font-medium">{deal.title}</p>
                 <p className="text-xs text-muted-foreground">{deal.amount !== null ? `${Number(deal.amount).toLocaleString("pt-AO")} ${deal.currency ?? "AOA"}` : "Sem valor definido"}</p>
+                {deal.conversation_id && <p className="text-xs text-muted-foreground">Ligada a uma conversa WhatsApp</p>}
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground" htmlFor={`deal-stage-${deal.id}`}>Mover para etapa</label>
                   <select id={`deal-stage-${deal.id}`} value={deal.stage_id ?? ""} disabled={moveDeal.isPending} onChange={(e) => { const destination = stages.find((candidate) => candidate.id === e.target.value); if (destination) moveDeal.mutate({ dealId: deal.id, stageId: destination.id, stageName: destination.name }); }} className="h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 text-xs">
