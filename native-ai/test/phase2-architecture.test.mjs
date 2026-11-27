@@ -27,6 +27,30 @@ test("backend normalizes legacy Gemini agent models without changing tenant reco
  assert.match(adapter,/return "gemini-3\.1-pro-preview"/);
 });
 
+test("main backend executes tenant-scoped booking tools with server-side permissions",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ const tools=await read("../src/lib/ai-booking-tools.server.ts");
+ assert.match(adapter,/loadBookingRuntime/);
+ assert.match(adapter,/buildBookingInstructions/);
+ assert.match(adapter,/parseBookingAction/);
+ assert.match(adapter,/executeBookingAction/);
+ assert.match(adapter,/WHAPPNUS_BOOKING_ACTION/);
+ assert.match(tools,/create_booking_v2/);
+ assert.match(tools,/update_booking_status_v1/);
+ assert.match(tools,/reschedule_booking_v1/);
+ assert.match(tools,/expire_pending_bookings_v1/);
+ assert.match(tools,/p_idempotency_key/);
+ assert.match(tools,/eq\("organization_id",ctx\.organizationId\)/);
+ assert.match(tools,/eq\("contact_id",ctx\.contactId\)/);
+});
+
+test("default Gemini Flash agents leave complex model tier selection to Orchestrator",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/configuredModel === "gemini-3\.8-flash" \? null : configuredModel/);
+ assert.match(adapter,/taskType = isAdvancedTask/);
+ assert.match(adapter,/preferredProvider/);
+});
+
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/loadIncomingAttachment/);
