@@ -890,7 +890,8 @@ export async function processIncomingMessage(
     .eq("is_ai", true)
     .gte("created_at", since);
   if ((count ?? 0) >= 6) {
-    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)
+      && await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body)) {
       await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
     }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
