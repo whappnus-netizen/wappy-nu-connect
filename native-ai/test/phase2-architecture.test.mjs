@@ -19,6 +19,14 @@ test("frontend AI adapter uses authenticated Orchestrator requests with tenant H
  assert.match(adapter,/X-Tenant-Signature/);
  assert.doesNotMatch(adapter,/WHAPPNUS_ROUTER_URL|WHAPPNUS_ROUTER_API_KEY|NATIVE_AI_ENGINE_URL|AI_OLLAMA_BASE_URL/);
 });
+test("backend normalizes legacy Gemini agent models without changing tenant records",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/model\.startsWith\("google\/"\)/);
+ assert.match(adapter,/gemini-2\.5-flash/);
+ assert.match(adapter,/return "gemini-3\.8-flash"/);
+ assert.match(adapter,/return "gemini-3\.1-pro-preview"/);
+});
+
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/loadIncomingAttachment/);
