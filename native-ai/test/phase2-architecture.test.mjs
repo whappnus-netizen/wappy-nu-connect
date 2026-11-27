@@ -317,3 +317,11 @@ test("generation queue serializes jobs for the same conversation across workers"
  assert.match(sql,/organization_id=j\.organization_id/);
  assert.match(sql,/whatsapp_number_id=j\.whatsapp_number_id/);
 });
+
+test("main backend loads tenant agent context and conversation history with organization boundaries",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/rpc\("ai_agent_context",\s*\{\s*_organization_id:\s*input\.organizationId,\s*_whatsapp_number_id:\s*input\.whatsappNumberId/);
+ assert.match(adapter,/\.eq\("organization_id",\s*input\.organizationId\)/);
+ assert.match(adapter,/\.eq\("conversation_id",\s*input\.conversationId\)/);
+ assert.match(adapter,/input\.organizationId\s*\+\s*"\/"\s*\+\s*input\.whatsappNumberId/);
+});
