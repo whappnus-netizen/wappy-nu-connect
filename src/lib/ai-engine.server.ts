@@ -562,7 +562,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   try {
     response = await callOrchestrator({
       organizationId: input.organizationId,
-      conversationId: input.conversationId,
+      conversationId: input.conversationId ?? null,
       taskType,
       messages,
       systemInstructions: systemPrompt,
@@ -615,7 +615,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     try {
       response = await callOrchestrator({
         organizationId: input.organizationId,
-        conversationId: input.conversationId,
+        conversationId: input.conversationId ?? null,
         taskType: "complex",
         messages,
         systemInstructions: systemPrompt,
