@@ -282,8 +282,6 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   if (mimeType === "audio/mpeg") mimeType = "audio/mp3";
   if (!mimeType) return null;
 
-  if (input.messageType === "video") throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
-
   const mediaType: OrchestratorAttachment["type"] = mimeType.startsWith("image/")
     ? "image" : mimeType.startsWith("audio/") ? "audio" : "document";
   if (input.messageType === "image" && mediaType !== "image") return null;
