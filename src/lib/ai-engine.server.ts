@@ -470,9 +470,9 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
 
   const meta = data["whappnus"] && typeof data["whappnus"] === "object"
     ? data["whappnus"] as Record<string, unknown> : {};
-  const selectedPath = typeof meta["selected_path"] === "string" ? meta["selected_path"] : (typeof data["provider"] === "string" ? data["provider"] : "unknown");
+  const intent = typeof meta["intent"] === "string" ? meta["intent"] : "customer_support";
   const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null;
-  const confidence = 0;
+  const confidence = 0.35;
   const reactionEmoji = null;
   const handoffMarker = "[[WHAPPNUS_HANDOFF]]";
   const handoffRequired = meta["handoff_required"] === true || answer.includes(handoffMarker);
@@ -503,13 +503,65 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     }
   }
 
+  const latencyMs = Date.now() - started;
+  const safeMessageId = typeof input.messageId === "string" && /^[0-9a-fA-F-]{36}$/.test(input.messageId)
+    ? input.messageId
+    : null;
+  const providerName = typeof data["provider"] === "string" ? data["provider"] : "whappnus-ai-orchestrator";
+  const modelName = typeof data["model"] === "string" ? data["model"] : "configured-model";
+  const admin = serviceClient();
+  const logResult = await admin.from("ai_logs").insert({
+    organization_id: input.organizationId,
+    conversation_id: input.conversationId ?? null,
+    message_id: safeMessageId,
+    agent_id: agentId,
+    event_type: "generation",
+    status: "success",
+    provider: providerName,
+    model: modelName,
+    intent,
+    latency_ms: latencyMs,
+    metadata: {
+      confidence,
+      usedKnowledge: ctx.knowledge.length,
+      availableKnowledge: ctx.knowledge.length,
+      historyMessages: recent.length,
+      promptChars: systemPrompt.length,
+      testMode: Boolean(input.testMode),
+      multimodal: Boolean(resolvedContent.mediaPart),
+    },
+  });
+  if (logResult.error) console.warn("[ai] ai_logs insert failed:", logResult.error.message.slice(0, 180));
+
+  const flags: string[] = [];
+  if (!safeAnswer.trim()) flags.push("empty");
+  if (safeAnswer.length > 1800) flags.push("too_long_for_whatsapp");
+  if (ctx.knowledge.length === 0 && /(preço|preco|valor|horário|horario|endereço|endereco)/i.test(input.text)) {
+    flags.push("business_fact_without_retrieved_knowledge");
+  }
+  const score = Math.max(0, Number((1 - (flags.includes("empty") ? 0.8 : 0) -
+    (flags.includes("too_long_for_whatsapp") ? 0.15 : 0) -
+    (flags.includes("business_fact_without_retrieved_knowledge") ? 0.2 : 0)).toFixed(3)));
+  const evaluationResult = await admin.from("ai_evaluations").insert({
+    organization_id: input.organizationId,
+    conversation_id: input.conversationId ?? null,
+    message_id: safeMessageId,
+    agent_id: agentId,
+    score,
+    flags,
+  });
+  if (evaluationResult.error && !evaluationResult.error.message.includes("relation") &&
+      !evaluationResult.error.message.includes("column")) {
+    console.warn("[ai] ai_evaluations insert failed:", evaluationResult.error.message.slice(0, 180));
+  }
+
   return {
     text: safeAnswer,
-    provider: typeof data["provider"] === "string" ? data["provider"] : "whappnus-ai-orchestrator",
-    model: typeof data["model"] === "string" ? data["model"] : "configured-model",
-    intent: selectedPath,
+    provider: providerName,
+    model: modelName,
+    intent,
     confidence,
-    latencyMs: Date.now() - started,
+    latencyMs,
     usedKnowledge: ctx.knowledge.length,
     agentId,
     reactionEmoji,
@@ -535,14 +587,23 @@ function parsePaymentProofObject(raw: string): Record<string, unknown> {
 
 function nullablePaymentText(value: unknown, max = 180): string | null {
   if (typeof value !== "string") return null;
-  const normalized = value.trim().replaceAll("\\n", " ").replaceAll("\\r", " ").replaceAll("\\t", " ")
+  const normalized = value.trim()
+    .split(String.fromCharCode(10)).join(" ")
+    .split(String.fromCharCode(13)).join(" ")
+    .split(String.fromCharCode(9)).join(" ")
     .split(" ").filter(Boolean).join(" ");
   return normalized ? normalized.slice(0, max) : null;
 }
 
 function parsePaymentAmount(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
-  const parsed = typeof value === "number" ? value : Number(value.replace(/[^0-9,.-]/g, "").replace(",", "."));
+  let normalized = typeof value === "number" ? String(value) : value.replace(/[^0-9,.-]/g, "");
+  if (typeof value === "string" && normalized.includes(",") && normalized.includes(".")) {
+    normalized = normalized.replace(/\\./g, "").replace(",", ".");
+  } else if (typeof value === "string" && normalized.includes(",")) {
+    normalized = normalized.replace(",", ".");
+  }
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : null;
 }
 
