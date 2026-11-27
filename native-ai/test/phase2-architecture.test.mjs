@@ -58,6 +58,13 @@ test("agent media toggles are enforced before sending attachments to providers",
  assert.match(adapter,/config\["audioUnderstanding"\] !== false/);
 });
 
+test("conversation history excludes the current WhatsApp provider message id",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
+ assert.match(adapter,/row\.wa_message_id === currentWaMessageId/);
+ assert.match(pipeline,/messageId: incoming\.waMessageId/);
+});
+
 test("payment proof inference is credit-gated and limited to payment-related messages",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
