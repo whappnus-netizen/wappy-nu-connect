@@ -32,6 +32,38 @@ else console.info(JSON.stringify({event:"ai_worker_disabled",service:"whappnus-n
 
 function authorized(req:express.Request){return req.header("authorization")==="Bearer "+config.AI_INTERNAL_SECRET;}
 
+
+app.post("/v1/generate-direct",async(req,res)=>{
+ if(!authorized(req))return res.status(401).json({ok:false,error:"unauthorized",retryable:false});
+ const b=req.body as Partial<GenerateRequest>;
+ if(!b.organizationId||!b.whatsappNumberId||typeof b.text!=="string"||!b.text.trim()){
+  return res.status(400).json({ok:false,error:"organizationId, whatsappNumberId and text are required",retryable:false});
+ }
+ const key=String(b.organizationId)+":"+String(b.fromWaId??"unknown");
+ if(!allow(key,config.AI_RATE_LIMIT_PER_MINUTE)){
+  return res.status(429).json({ok:false,error:"rate_limited",retryable:true});
+ }
+ try{
+  const input={...b,text:b.text.trim()} as GenerateRequest;
+  const result=await generateReply(input);
+  return res.json({ok:true,...result});
+ }catch(e){
+  const error=e as Error&{retryable?:boolean};
+  const message=error instanceof Error?error.message:"AI_GENERATION_FAILED";
+  if(message==="AUTO_REPLY_DISABLED"||message==="NO_ACTIVE_AGENT"){
+   return res.status(409).json({ok:false,error:message,retryable:false});
+  }
+  if(["SUBSCRIPTION_REQUIRED","ACCOUNT_SUSPENDED","AI_CONVERSATIONS_EXHAUSTED","PLAN_HAS_NO_AI_CONVERSATIONS"].includes(message)){
+   return res.status(402).json({ok:false,error:message,retryable:false});
+  }
+  const retry=typeof error.retryable==="boolean"
+   ? error.retryable
+   : /timeout|AbortError|ECONN|fetch failed|socket|network|HTTP (408|425|429|5[0-9][0-9])/i.test(message);
+  console.error(JSON.stringify({event:"ai_direct_generation_failed",organizationId:b.organizationId,error:message.slice(0,180),retryable:retry}));
+  return res.status(retry?503:422).json({ok:false,error:message.slice(0,180),retryable:retry});
+ }
+});
+
 app.post("/v1/generate",async(req,res)=>{
  if(!authorized(req))return res.status(401).json({ok:false,error:"unauthorized"});
  const b=req.body as Partial<GenerateRequest>;
@@ -98,7 +130,7 @@ app.post("/v1/payment-proof/analyze",async(req,res)=>{
 app.post("/v1/group-generate",async(req,res)=>{
  const sharedSecret=process.env.GROUP_AI_SHARED_SECRET;
  if(!authorized(req)&&(!sharedSecret||req.header("authorization")!=="Bearer "+sharedSecret))return res.status(401).json({ok:false,error:"unauthorized"});
- const b=req.body as {systemPrompt?:unknown;publicGroupRules?:unknown;privateDmRules?:unknown;prompt?:unknown};
+ const b=req.body as {systemPrompt?:unknown;publicGroupRules?:unknown;privateDmRules?:unknown;prompt?:unknown;organizationId?:unknown};
  const systemPrompt=typeof b.systemPrompt==="string"?b.systemPrompt.trim():"";
  const publicGroupRules=typeof b.publicGroupRules==="string"?b.publicGroupRules.trim():"";
  const privateDmRules=typeof b.privateDmRules==="string"?b.privateDmRules.trim():"";
@@ -106,7 +138,8 @@ app.post("/v1/group-generate",async(req,res)=>{
  if(systemPrompt.length<20||!prompt||prompt.length>12000)return res.status(400).json({ok:false,error:"systemPrompt and prompt are required"});
  const system="És a IA de conteúdo do WhappNus Group Commander. Produz apenas a mensagem final, sem comentários sobre a tarefa.\n\nINSTRUÇÃO PRINCIPAL:\n"+systemPrompt+"\n\nREGRAS PARA GRUPOS:\n"+publicGroupRules+"\n\nREGRAS PARA CONVERSAS PRIVADAS (não as executar dentro do grupo):\n"+privateDmRules+"\n\nSegurança: não inventes preços, factos, provas ou promessas; não peças dados privados num grupo; não respondas a pessoas específicas como se fosse uma conversa privada; respeita a finalidade comercial e as regras de consentimento.";
  try {
-  const result=await createProvider().generate([{role:"system",content:system},{role:"user",content:prompt}],{model:config.AI_MODEL,temperature:config.AI_TEMPERATURE,maxTokens:config.AI_MAX_OUTPUT_TOKENS});
+  const groupOrganizationId=typeof b.organizationId==="string"&&b.organizationId.trim()?b.organizationId.trim():"whappnus-group-commander";
+  const result=await createProvider(groupOrganizationId).generate([{role:"system",content:system},{role:"user",content:prompt}],{model:config.AI_MODEL,temperature:config.AI_TEMPERATURE,maxTokens:config.AI_MAX_OUTPUT_TOKENS});
   const text=String(result.text??"").trim();
   if(!text)return res.status(502).json({ok:false,error:"empty_generation"});
   return res.json({ok:true,text:text.slice(0,12000),provider:result.provider,model:result.model});
@@ -115,5 +148,5 @@ app.post("/v1/group-generate",async(req,res)=>{
   return res.status(503).json({ok:false,error:"group_generation_failed"});
  }
 });
-app.get("/v1/capabilities",(_req,res)=>res.json({ok:true,providers:["ollama"],capabilities:["intent-classification","agent-selection","prompt-orchestration","natural-conversation","sales-guidance","conversation-context","knowledge-ranking","training-examples","local-text-inference","local-image-understanding","provider-abstraction","durable-generation-queue","idempotent-generation","circuit-breaker","structured-ai-logs"]}));
+app.get("/v1/capabilities",(_req,res)=>res.json({ok:true,providers:["gemini","openai","anthropic"],capabilities:["intent-classification","agent-selection","prompt-orchestration","natural-conversation","sales-guidance","conversation-context","knowledge-ranking","training-examples","text","image","audio","document","provider-fallback","durable-generation-queue","idempotent-generation","tenant-isolation","structured-ai-logs"]}));
 app.listen(config.PORT,()=>console.log("WhappNus AI Engine listening on :"+config.PORT));

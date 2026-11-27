@@ -11,8 +11,11 @@ let workerBusy=false;
 let deliveryWorkerBusy=false;
 
 function retryable(error:unknown):boolean{
+ if(error&&typeof error==="object"&&"retryable" in error&&typeof (error as {retryable?:unknown}).retryable==="boolean"){
+  return (error as {retryable:boolean}).retryable;
+ }
  const m=error instanceof Error?error.message:String(error);
- return /Ollama HTTP (408|425|429|5\d\d)\b|INTELLIGENCE_ROUTER_HTTP_(408|409|425|429|5\d\d)\b|OLLAMA_CIRCUIT_OPEN|OLLAMA_HALF_OPEN_BUSY|timeout|AbortError|ECONN|fetch failed|socket|network/i.test(m);
+ return /HTTP (408|425|429|5[0-9][0-9])\b|timeout|AbortError|ECONN|fetch failed|socket|network/i.test(m);
 }
 
 export async function enqueueGeneration(input:GenerateRequest):Promise<string>{

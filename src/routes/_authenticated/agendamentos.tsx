@@ -76,10 +76,13 @@ function BookingsPage() {
   const [allowCancel,setAllowCancel] = useState(true);
   const [allowReschedule,setAllowReschedule] = useState(true);
 
+  const rangeAnchor = Date.now() + weekOffset * 7 * 24 * 60 * 60 * 1000;
+  const rangeFrom = new Date(Math.min(Date.now() - 7 * 24 * 60 * 60 * 1000, rangeAnchor - 7 * 24 * 60 * 60 * 1000)).toISOString();
+  const rangeTo = new Date(Math.max(Date.now() + 45 * 24 * 60 * 60 * 1000, rangeAnchor + 14 * 24 * 60 * 60 * 1000)).toISOString();
   const workspace = useQuery({
-    queryKey:["booking-workspace",organizationId],
+    queryKey:["booking-workspace",organizationId,weekOffset],
     enabled:Boolean(organizationId),
-    queryFn:()=>getBookingWorkspace({data:{organizationId:organizationId!}}),
+    queryFn:()=>getBookingWorkspace({data:{organizationId:organizationId!,from:rangeFrom,to:rangeTo}}),
     refetchInterval:30000,
   });
   const data = workspace.data;
@@ -319,7 +322,7 @@ function BookingRow({booking,fmt,serviceName,contactName,canOperate,busy,onStatu
     <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarClock className="size-5"/></div>
     <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{serviceName}</p><Badge variant={statusVariants[booking.status]??"outline"}>{statusLabels[booking.status]??booking.status}</Badge></div>
       <p className="mt-1 text-sm text-muted-foreground">{contactName} · {fmt(booking.starts_at)}</p>
-      <p className="text-xs text-muted-foreground">{booking.booking_code} · {booking.source==="ai"?"Criado pela IA":booking.source==="dashboard"?"Criado no painel":"Criado pela equipa"}</p>
+      <p className="text-xs text-muted-foreground">{booking.booking_code} · {["ai","whatsapp_ai"].includes(booking.source)?"Criado pela IA":booking.source==="dashboard"?"Criado no painel":"Criado pela equipa"}</p>
     </div>
     {canOperate&&<div className="flex flex-wrap gap-2">
       {booking.status==="pending_confirmation"&&<Button size="sm" disabled={busy} onClick={()=>onStatus("confirmed")}><CheckCircle2 className="size-3.5"/>Aprovar</Button>}

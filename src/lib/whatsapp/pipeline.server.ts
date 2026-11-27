@@ -98,6 +98,7 @@ async function recordDetectedPaymentProof(input: {
   const extractionData = {
     confidence: analysis.confidence,
     mimeType: incoming.mediaMimeType,
+    originalAmount: analysis.amount,
     originalCurrency: analysis.originalCurrency,
     reference: analysis.reference,
     duplicateReference,
@@ -111,7 +112,7 @@ async function recordDetectedPaymentProof(input: {
     organization_id: input.organizationId,
     contact_id: input.contactId,
     conversation_id: input.conversationId,
-    amount_aoa: analysis.amount,
+    amount_aoa: analysis.originalCurrency === "AOA" ? analysis.amount : null,
     currency: "AOA",
     description,
     item_name: itemName,
@@ -170,6 +171,7 @@ async function analyzeAndRecordPaymentProof(
       whatsappNumberId: number.id,
       conversationId,
       contactId,
+      messageId: incoming.waMessageId,
       mediaPath: incoming.mediaId,
       mediaMimeType: incoming.mediaMimeType,
       messageType: incoming.messageType as "image" | "document",
@@ -827,7 +829,8 @@ export async function processIncomingMessage(
             detail: { automationRuleId: selectedRule.id, automation: true, triggerType: selectedRule.trigger_type, steps: executionSteps.length },
           });
           if (selectedReason !== "welcome_automation") {
-            if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+            if (res.conversation_id && ["image", "document"].includes(incoming.messageType)
+                && await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body)) {
               await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
             }
             return { ...base, aiReplied: false, aiSkippedReason: selectedReason };
@@ -865,7 +868,8 @@ export async function processIncomingMessage(
   if (skip) {
     // A validação documental é uma tarefa de backoffice: pode ocorrer mesmo
     // quando a IA de atendimento está desligada nesta conversa.
-    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)
+      && await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body)) {
       await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
     }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
@@ -887,7 +891,8 @@ export async function processIncomingMessage(
     .eq("is_ai", true)
     .gte("created_at", since);
   if ((count ?? 0) >= 6) {
-    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)) {
+    if (res.conversation_id && ["image", "document"].includes(incoming.messageType)
+      && await hasRecentPaymentContext(number.organization_id, res.conversation_id, incoming.body)) {
       await analyzeAndRecordPaymentProof(number, incoming, res.conversation_id, res.contact_id ?? null);
     }
     await logWhatsAppEvent(number.organization_id, "ai_skipped", {
@@ -1006,7 +1011,7 @@ export async function processIncomingMessage(
       });
       // A geração que excede a espera HTTP fica na fila durável e será entregue
       // pelo callback autenticado. Não enviar fallback antes da resposta final.
-      if (errorCode === "generation_pending_retry" && process.env["WHAPPNUS_ROUTER_URL"]) {
+      if (errorCode === "generation_pending_retry") {
         await proofFallbackPromise;
         await logWhatsAppEvent(number.organization_id, "ai_skipped", {
           whatsappNumberId: number.id, provider: incoming.provider,

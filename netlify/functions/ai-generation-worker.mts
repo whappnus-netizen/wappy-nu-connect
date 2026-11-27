@@ -4,8 +4,8 @@ export default async (_request: Request, context: ScheduledContext): Promise<Res
   const runtime = globalThis as typeof globalThis & {
     Netlify?: { env?: { get: (name: string) => string | undefined } };
   };
-  const secret = runtime.Netlify?.env?.get("WHAPPNUS_ROUTER_API_KEY")
-    ?? process.env["WHAPPNUS_ROUTER_API_KEY"];
+  const secret = runtime.Netlify?.env?.get("WHAPPNUS_AI_WORKER_SECRET")
+    ?? process.env["WHAPPNUS_AI_WORKER_SECRET"];
   const siteUrl = context.site?.url ?? process.env["URL"];
   if (!secret || !siteUrl) {
     console.error("[ai-generation-worker] missing server runtime configuration");

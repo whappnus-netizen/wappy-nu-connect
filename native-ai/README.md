@@ -1,24 +1,30 @@
-# WHAPPNUS Native AI Engine
+# Optional Native AI Engine Runtime
 
-This service is the application-owned AI runtime for WHAPPNUS. Its source lives in the main `wappy-nu-connect` repository under `native-ai/`; it is not the legacy `WhappNus-AI-Engine` repository.
+**This directory is not part of the current production request path.** The live WHAPPNUS backend runs its business orchestration in the main application and calls the independent WHAPPNUS AI Orchestrator directly from `src/lib/ai-engine.server.ts`.
 
-## Runtime contract
+The current production Railway project contains the AI Orchestrator and Redis; it does not contain a deployed Native AI Engine service. The Netlify production configuration also does not define `WHAPPNUS_NATIVE_AI_URL` or `WHAPPNUS_NATIVE_AI_SECRET`. Do not add those dependencies or deploy this service as part of the current migration.
 
-- Express API compatible with the current server-side WHAPPNUS adapter.
-- Supabase is the source of truth for tenants, agents, knowledge, history, credits, bookings, logs and durable generation jobs.
-- Ollama is the only generation provider; model defaults to `qwen2.5vl:3b`.
-- The browser never calls Ollama or receives the internal AI secret.
-- The app's server-side adapter calls this service with bearer authentication.
+## What this optional runtime contains
 
-## Railway
+This folder retains an independently buildable runtime prototype with:
+- Tenant-scoped agent context, knowledge and conversation history.
+- Conversation-credit checks.
+- Booking tools and permissions.
+- Payment-proof extraction for human review.
+- Durable generation and delivery queue support.
+- An Orchestrator provider adapter using tenant HMAC signatures.
 
-Set the service root directory to `native-ai`. Build with `npm install && npm run build`; start with `npm start`. Required runtime variables are validated in `src/config.ts`. Reuse the existing AI Engine's Supabase and Ollama variables through Railway variable references during the blue/green transition; do not copy secret values into source control.
+The main backend now has tenant-scoped booking tools in `src/lib/ai-booking-tools.server.ts`, idempotent conversation-credit checks, direct Orchestrator requests, and multimodal payment-proof extraction. Extracted receipts are stored as `pending_review`; the backend never confirms a payment automatically. The payment-proof extractor in this optional folder is not part of the production path. Do not assume code in this folder is called by the main Netlify request path.
 
-## Migration strategy
+## Provider gateway
 
-The legacy service remains available for rollback. Both runtimes can share the existing idempotent Supabase queue during controlled rollout because `claim_ai_generation_job` uses row locking with `SKIP LOCKED`. Only after internal and real WhatsApp validation should Netlify's server-side engine URL be switched to this service and the legacy worker be retired.
+When this optional runtime is used independently, the WHAPPNUS AI Orchestrator remains its only LLM provider gateway. It must use:
+- `ORCHESTRATOR_URL`
+- `ORCHESTRATOR_API_KEY`
+- `TENANT_SIGNING_SECRET`
 
-## Known limitations pending completion
+Never restore Ollama or the deprecated Intelligence Router as a provider fallback.
 
-- Slow WhatsApp generations now use a durable delivery outbox, authenticated callback, and unique `ai_generation_job_id` on outbound messages. This still requires production migration and end-to-end delivery validation before it can be considered approved.
-- Qwen2.5-VL supports image understanding, but audio requires a local transcription service and PDFs/documents require extraction before model invocation.
+## Worker safety
+
+`AI_WORKER_ENABLED` defaults to false. Do not enable it while the Netlify worker is consuming the same Supabase generation queue unless both consumers are intentionally configured and verified for the same runtime contract.
