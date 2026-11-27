@@ -109,3 +109,12 @@ Deploy previews Netlify (`CONTEXT=deploy-preview`/`branch-deploy`) são bloquead
 O CI inclui uma regressão estática que verifica que o carregamento de agente/contexto usa organization_id e whatsapp_number_id, que o histórico é filtrado por organization_id e conversation_id, e que os anexos respeitam o prefixo da organização e do número.
 
 Esta regressão não substitui o teste runtime com duas organizações reais. O teste runtime deve ser executado com duas organizações de teste, dois agentes e números WhatsApp separados, seguindo o runbook docs/TENANT_ISOLATION_AND_WHATSAPP_SMOKE_TEST.md.
+
+
+## Controlo concorrente da quota de conversas
+
+A função consume_ai_conversation foi corrigida numa migração pendente para usar um advisory transaction lock por organização, em vez de um lock por organização + conversa. O lock anterior permitia que duas primeiras mensagens de conversas diferentes, recebidas em simultâneo, lessem o mesmo contador e consumissem ambas a última unidade disponível.
+
+Migração preparada: supabase/migrations/20261127110000_serialize_ai_conversation_usage_per_organization.sql.
+
+Esta migração está apenas no branch/PR; não foi aplicada à base de dados de produção. Aplicá-la pelo processo aprovado do Supabase e validar com duas conversas simultâneas antes de depender dos limites mensais.
