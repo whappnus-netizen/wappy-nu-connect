@@ -50,15 +50,15 @@ function nativeAiConfig(): { endpoint: string; paymentProofEndpoint: string; sec
   if (!configured) throw new Error("WHAPPNUS_NATIVE_AI_URL_NOT_CONFIGURED");
   if (!secret) throw new Error("WHAPPNUS_NATIVE_AI_SECRET_NOT_CONFIGURED");
   let base: URL;
-  try { base = new URL(/^https?:\\/\\//i.test(configured) ? configured : "https://" + configured); }
+  try { base = new URL(/^https?:\/\//i.test(configured) ? configured : "https://" + configured); }
   catch { throw new Error("WHAPPNUS_NATIVE_AI_URL_INVALID"); }
   if (base.protocol !== "https:" && base.hostname !== "localhost" && base.hostname !== "127.0.0.1") {
     throw new Error("WHAPPNUS_NATIVE_AI_HTTPS_REQUIRED");
   }
-  base.pathname = base.pathname.replace(/\\/$/, "");
+  base.pathname = base.pathname.replace(/\/$/, "");
   base.search = "";
   base.hash = "";
-  const root = base.toString().replace(/\\/$/, "");
+  const root = base.toString().replace(/\/$/, "");
   return {
     endpoint: root + "/v1/generate-direct",
     paymentProofEndpoint: root + "/v1/payment-proof/analyze",
