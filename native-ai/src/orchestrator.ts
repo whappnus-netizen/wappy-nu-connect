@@ -15,17 +15,17 @@ function parseBookingAction(text:string):unknown|null {
 }
 
 async function loadInboundAttachment(input: GenerateRequest): Promise<MediaAttachment | null> {
- if (!input.mediaPath || !input.messageType || input.messageType === "text" || input.messageType === "system") return null;
+ if (!input.mediaPath || !input.messageType || input.messageType === "text" || input.messageType === "system" || input.messageType === "video") return null;
  // Only fetch paths inside this tenant's own WhatsApp media folder.
  const expectedPrefix = input.organizationId + "/" + input.whatsappNumberId + "/";
  if (!input.mediaPath.startsWith(expectedPrefix) || input.mediaPath.includes("..")) {
   throw new Error("INVALID_MEDIA_PATH");
  }
- const allowed = new Set(["image/jpeg","image/png","image/webp","image/gif","audio/ogg","audio/mpeg","audio/mp4","audio/aac","audio/amr","audio/wav","application/pdf","video/mp4","video/3gpp"]);
+ const allowed = new Set(["image/jpeg","image/png","image/webp","image/gif","audio/ogg","audio/mpeg","audio/mp4","audio/wav","audio/webm","audio/flac","application/pdf"]);
  const extensionMime: Record<string,string> = {
   jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",gif:"image/gif",
-  ogg:"audio/ogg",mp3:"audio/mpeg",m4a:"audio/mp4",aac:"audio/aac",amr:"audio/amr",wav:"audio/wav",
-  pdf:"application/pdf",mp4:"video/mp4","3gp":"video/3gpp"
+  ogg:"audio/ogg",mp3:"audio/mpeg",m4a:"audio/mp4",wav:"audio/wav",webm:"audio/webm",flac:"audio/flac",
+  pdf:"application/pdf"
  };
  const ext = input.mediaPath.split(".").pop()?.toLowerCase() ?? "";
  const mimeType = input.mediaMimeType && allowed.has(input.mediaMimeType)
@@ -35,7 +35,9 @@ async function loadInboundAttachment(input: GenerateRequest): Promise<MediaAttac
  const { data, error } = await supabase.storage.from("whatsapp-incoming-media").download(input.mediaPath);
  if (error || !data) throw new Error("MEDIA_DOWNLOAD_FAILED");
  const bytes = Buffer.from(await data.arrayBuffer());
- if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("MEDIA_TOO_LARGE_FOR_AI");
+ const maxBytes = mimeType.startsWith("image/") ? 5 * 1024 * 1024
+  : mimeType === "application/pdf" ? 10 * 1024 * 1024 : 15 * 1024 * 1024;
+ if (!bytes.length || bytes.length > maxBytes) throw new Error("MEDIA_TOO_LARGE_FOR_AI");
  return { type: input.messageType, mimeType, data: bytes.toString("base64") };
 }
 
