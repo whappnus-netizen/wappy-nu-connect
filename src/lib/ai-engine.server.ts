@@ -330,6 +330,20 @@ async function enqueueGenerationForRetry(input: GenerateInput): Promise<void> {
   if (job.status === "failed") throw new Error("AI_GENERATION_JOB_PREVIOUSLY_FAILED");
 }
 
+async function consumeAiConversation(input: GenerateInput): Promise<void> {
+  if (input.testMode) return;
+  if (!input.conversationId) throw new Error("AI_CONVERSATION_ID_REQUIRED");
+  const { data, error } = await serviceClient().rpc("consume_ai_conversation", {
+    p_organization_id: input.organizationId,
+    p_conversation_id: input.conversationId,
+  });
+  if (error) throw new Error("AI_CONVERSATION_LIMIT_CHECK_FAILED");
+  const result = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  if (result["allowed"] === false) {
+    throw new Error(typeof result["reason"] === "string" ? result["reason"] : "AI_CONVERSATIONS_EXHAUSTED");
+  }
+}
+
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
   const started = Date.now();
   const [ctx, history, attachment] = await Promise.all([
@@ -338,6 +352,7 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
     loadIncomingAttachment(input),
   ]);
   const effectiveText = resolveIncomingText(input, attachment);
+  await consumeAiConversation(input);
   const systemPrompt = buildTenantSystemPrompt(
     ctx,
     input.profileName,
@@ -527,5 +542,5 @@ export async function analyzePaymentProofViaWhappNusAI(_input: {
   organizationId: string; whatsappNumberId: string; conversationId: string; contactId?: string | null;
   mediaPath: string; mediaMimeType: string; messageType: "image" | "document"; messageText?: string | null;
 }): Promise<PaymentProofAnalysis> {
-  throw new Error("ROUTER_VISION_NOT_CONFIGURED_PAYMENT_PROOF_REQUIRES_REVIEW");
+  throw new Error("PAYMENT_PROOF_REQUIRES_HUMAN_REVIEW");
 }
