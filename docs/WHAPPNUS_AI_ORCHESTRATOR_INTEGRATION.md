@@ -12,7 +12,7 @@
 
 Configurar no site `whappnus`, em context `all`, com scopes Builds e Functions:
 
-- `WHAPPNUS_ORCHESTRATOR_URL=https://whappnus-ai-orchestrator-production.up.railway.app`
+- `WHAPPNUS_ORCHESTRATOR_URL=whappnus-ai-orchestrator-production.up.railway.app` (o backend normaliza para HTTPS; também aceita a URL completa)
 - `WHAPPNUS_ORCHESTRATOR_API_KEY=<segredo partilhado com ORCHESTRATOR_API_KEY no Railway>` (ou alias compatível `ORCHESTRATOR_API_KEY`)
 - `WHAPPNUS_TENANT_SIGNING_SECRET=<segredo partilhado com TENANT_SIGNING_SECRET no Railway>` (ou alias compatível `TENANT_SIGNING_SECRET`)
 - `WHAPPNUS_AI_WORKER_SECRET=<segredo interno exclusivo para o worker agendado>`
@@ -67,8 +67,18 @@ O worker agendado da Netlify continua a consumir a fila durável existente no Su
 - O backend carrega agente, conhecimento e histórico com filtros de `organization_id`.
 - A chave HMAC é gerada por nós e guardada apenas em variáveis privadas.
 - Os logs não devem conter mensagens, payloads binários ou segredos.
-- Não remover as antigas variáveis do Router até a nova versão estar publicada e validada. Depois, confirmar que nenhum outro serviço as utiliza e retirar as variáveis obsoletas numa alteração separada.
+- O backend de produção já não referencia o Router antigo nem exige `WHAPPNUS_NATIVE_AI_URL`; a pasta `native-ai/` é opcional e não está implantada no Railway. Se existirem variáveis antigas do Router noutros serviços, confirmar os consumidores antes de as remover numa alteração separada.
 - As chaves Gemini/OpenAI/Anthropic são colocadas apenas no serviço Orchestrator no Railway, nunca na Netlify.
+
+
+## Regras de negócio preservadas no backend
+
+- Antes da geração e da análise de comprovativos, o backend chama o RPC idempotente `consume_ai_conversation`. O RPC é definido no Supabase e não é alterado por esta integração; várias chamadas na mesma conversa não descontam conversas adicionais.
+- As ferramentas de agendamento vivem em `src/lib/ai-booking-tools.server.ts`. Só são activadas quando `booking_settings.enabled` está activo e as permissões do agente permitem a operação. Cada leitura/escrita é limitada por organização e, quando aplicável, pelo contacto. Criação, cancelamento e remarcação usam RPCs do Supabase e não dependem de texto livre do modelo.
+- O backend executa análise multimodal de comprovativos apenas quando existe contexto recente de pagamento. A extracção é guardada em `customer_payments` como `pending_review`; nunca confirma nem aprova automaticamente uma transacção.
+- `amount_aoa` só recebe um valor quando a moeda original foi identificada como AOA. Montantes em moeda estrangeira ou sem moeda legível ficam sem conversão automática, com o valor/moeda originais preservados nos dados de extracção.
+- As opções `imageUnderstanding` e `audioUnderstanding` do agente são verificadas no backend antes de anexos serem enviados ao fornecedor.
+- A transferência humana desactiva `conversations.ai_enabled` na organização e conversa correctas; o marcador interno é removido antes de enviar a resposta ao cliente.
 
 ## Testes obrigatórios antes de activar atendimento real
 
