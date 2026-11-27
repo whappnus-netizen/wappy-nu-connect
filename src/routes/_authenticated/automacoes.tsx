@@ -19,6 +19,19 @@ export const Route = createFileRoute("/_authenticated/automacoes")({
 type TriggerType = "keyword_match" | "conversation_created" | "outside_business_hours" | "auto_assignment" | "auto_crm_lead";
 type AutomationStep = { id: string; kind: "text" | "image" | "audio" | "video" | "document"; content: string; file: File | null; durationMs?: number | undefined; previewUrl?: string | undefined };
 type StoredAutomationStep = { id: string; kind: "text" | "image" | "audio" | "video" | "document"; text?: string; caption?: string; storagePath?: string; mimeType?: string; fileName?: string; durationMs?: number };
+
+const allowedDocumentMimeTypes = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/zip",
+]);
 type Rule = {
   id: string;
   name: string;
@@ -116,8 +129,12 @@ function AutomationsPage() {
           // Alguns navegadores não preenchem File.type em todos os ficheiros; inferir pelo sufixo conhecido.
           const extension = file.name.toLowerCase().split(".").pop() ?? "";
           const inferredMimeTypes: Record<string, string> = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", txt: "text/plain", csv: "text/csv", zip: "application/zip", mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", "3gp": "video/3gpp", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", ogg: "audio/ogg", mp3: "audio/mpeg", wav: "audio/wav", m4a: "audio/mp4", aac: "audio/aac", amr: "audio/amr" };
-          const mimeType = file.type.toLowerCase().split(";")[0]?.trim() || inferredMimeTypes[extension] || "application/octet-stream";
-          const allowedMime = step.kind === "image" ? mimeType.startsWith("image/") : step.kind === "audio" ? mimeType.startsWith("audio/") : step.kind === "video" ? mimeType.startsWith("video/") : step.kind === "document" ? true : false;
+          const detectedMimeType = file.type.toLowerCase().split(";")[0]?.trim() || "";
+          const resolvedMimeType = !detectedMimeType || detectedMimeType === "application/octet-stream"
+            ? inferredMimeTypes[extension] || detectedMimeType || "application/octet-stream"
+            : detectedMimeType;
+          const mimeType = resolvedMimeType === "application/x-zip-compressed" ? "application/zip" : resolvedMimeType;
+          const allowedMime = step.kind === "image" ? mimeType.startsWith("image/") : step.kind === "audio" ? mimeType.startsWith("audio/") : step.kind === "video" ? mimeType.startsWith("video/") : step.kind === "document" ? allowedDocumentMimeTypes.has(mimeType) : false;
           if (!allowedMime) throw new Error(`Escolha um ficheiro ${step.kind} válido.`);
           if (file.size <= 0 || file.size > 20 * 1024 * 1024) throw new Error("Cada ficheiro deve ter até 20 MB.");
           const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || (step.kind === "image" ? "imagem" : step.kind === "audio" ? "audio" : step.kind === "video" ? "video" : "documento");
