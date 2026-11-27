@@ -1,27 +1,30 @@
-# WHAPPNUS Native AI Engine
+# Optional Native AI Engine Runtime
 
-This service is the application-owned business orchestration runtime for WHAPPNUS. Its source lives in the main `wappy-nu-connect` repository under `native-ai/`.
+**This directory is not part of the current production request path.** The live WHAPPNUS backend runs its business orchestration in the main application and calls the independent WHAPPNUS AI Orchestrator directly from `src/lib/ai-engine.server.ts`.
 
-## Runtime responsibilities
+The current production Railway project contains the AI Orchestrator and Redis; it does not contain a deployed Native AI Engine service. The Netlify production configuration also does not define `WHAPPNUS_NATIVE_AI_URL` or `WHAPPNUS_NATIVE_AI_SECRET`. Do not add those dependencies or deploy this service as part of the current migration.
 
-- Supabase remains the source of truth for organizations, agents, knowledge, history, credits, bookings, logs and durable generation jobs.
-- This service retains business logic: agent selection, context construction, intent classification, knowledge ranking, billing checks, booking tools, payment-proof review, evaluation and delivery callbacks.
-- The independent WHAPPNUS AI Orchestrator is the only LLM provider gateway. This service signs each provider request with the organization ID, timestamp and one-time nonce.
-- Provider/model selection, retries, fallback, circuit breakers, tenant rate limits and replay protection belong to the external Orchestrator.
-- No Ollama or legacy Intelligence Router inference remains in this runtime.
+## What this optional runtime contains
 
-## Required Railway variables
+This folder retains an independently buildable runtime prototype with:
+- Tenant-scoped agent context, knowledge and conversation history.
+- Conversation-credit checks.
+- Booking tools and permissions.
+- Payment-proof extraction for human review.
+- Durable generation and delivery queue support.
+- An Orchestrator provider adapter using tenant HMAC signatures.
 
-- Existing: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AI_INTERNAL_SECRET`, `AI_RESULT_CALLBACK_URL`.
-- New: `ORCHESTRATOR_URL`, `ORCHESTRATOR_API_KEY`, `TENANT_SIGNING_SECRET`.
-- Optional: `ORCHESTRATOR_TIMEOUT_MS`, `AI_MODEL`, `AI_TEMPERATURE`, `AI_MAX_OUTPUT_TOKENS`, queue and history limits.
+Those features are not automatically active in the main Netlify request path merely because this folder exists. Before moving any of them into production, integrate and test the feature in the main backend or provision this runtime as a separate service with its own reviewed deployment and complete environment configuration.
 
-The Orchestrator API key and tenant signing secret must match the corresponding secrets configured on the Orchestrator service. Store them only in Railway Variables; never commit them or send them in chat.
+## Provider gateway
 
-## Worker and queue
+When this optional runtime is used independently, the WHAPPNUS AI Orchestrator remains its only LLM provider gateway. It must use:
+- `ORCHESTRATOR_URL`
+- `ORCHESTRATOR_API_KEY`
+- `TENANT_SIGNING_SECRET`
 
-`AI_WORKER_ENABLED` remains an explicit switch and defaults to false. Enable the worker only after the Orchestrator variables are present and the live signed smoke test passes. Netlify and this service can share the durable Supabase queue during a controlled rollout because `claim_ai_generation_job` uses row locking with `SKIP LOCKED`; both workers must use the same new provider gateway before concurrent operation is allowed.
+Never restore Ollama or the deprecated Intelligence Router as a provider fallback.
 
-## Migration safety
+## Worker safety
 
-Do not delete Supabase credit, booking, knowledge, history, or delivery logic. This service is the business layer; the independent Orchestrator is the provider layer. Keep the old Railway deployment available for rollback until signed generation, payment-proof extraction, booking tools, queue retry and WhatsApp delivery have all passed end-to-end tests.
+`AI_WORKER_ENABLED` defaults to false. Do not enable it while the Netlify worker is consuming the same Supabase generation queue unless both consumers are intentionally configured and verified for the same runtime contract.
