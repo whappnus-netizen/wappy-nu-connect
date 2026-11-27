@@ -19,6 +19,16 @@ test("frontend AI adapter uses authenticated Orchestrator requests with tenant H
  assert.match(adapter,/X-Tenant-Signature/);
  assert.doesNotMatch(adapter,/WHAPPNUS_ROUTER_URL|WHAPPNUS_ROUTER_API_KEY|NATIVE_AI_ENGINE_URL|AI_OLLAMA_BASE_URL/);
 });
+test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/loadIncomingAttachment/);
+ assert.match(adapter,/capabilities_required:/);
+ assert.match(adapter,/AI_MEDIA_SIZE_INVALID/);
+ assert.ok(adapter.includes('"image/jpeg"'));
+ assert.ok(adapter.includes('"audio/ogg"'));
+ assert.ok(adapter.includes('"application/pdf"'));
+ assert.match(adapter,/Buffer\.from\(await blob\.arrayBuffer\(\)\)/);
+});
 
 test("native AI provider adapter signs tenant requests and uses only the independent Orchestrator",async()=>{
  const router=await read("src/provider-router.ts");
@@ -36,14 +46,18 @@ test("native AI provider adapter signs tenant requests and uses only the indepen
  assert.doesNotMatch(config,/AI_OLLAMA|AI_ROUTER|AI_PROVIDER/);
 });
 
-test("backend generation preserves plan billing and receipt extraction through Orchestrator",async()=>{
+test("backend retains tenant context, idempotent conversation billing and human-reviewed receipts",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
+ assert.match(adapter,/loadTenantContext/);
+ assert.match(adapter,/loadConversationHistory/);
+ assert.match(adapter,/buildTenantSystemPrompt/);
  assert.match(adapter,/consume_ai_conversation/);
- assert.match(adapter,/analyzePaymentProofViaWhappNusAI/);
- assert.match(adapter,/payment_proof_extraction/);
- assert.match(adapter,/ai_logs/);
- assert.doesNotMatch(pipeline,/WHAPPNUS_ROUTER_URL/);
+ assert.match(adapter,/PAYMENT_PROOF_REQUIRES_HUMAN_REVIEW/);
+ assert.match(adapter,/HUMAN_HANDOFF_STATE_UPDATE_FAILED/);
+ assert.match(pipeline,/requireActiveSubscription/);
+ assert.match(pipeline,/analyzePaymentProofViaWhappNusAI/);
+ assert.doesNotMatch(adapter,/WHAPPNUS_NATIVE_AI_URL|WHAPPNUS_NATIVE_AI_SECRET|WHAPPNUS_ROUTER_URL/);
 });
 
 test("generation endpoint uses durable queue and idempotency",async()=>{
@@ -115,7 +129,7 @@ test("Netlify scheduled worker invokes the authenticated Orchestrator queue proc
  assert.match(route,/claim_ai_generation_delivery/);
 });
 
-test("provider adapter delegates inference to the signed external Orchestrator",async()=>{
+test("optional native AI runtime adapter delegates inference to the signed external Orchestrator",async()=>{
  const router=await read("src/provider-router.ts");
  assert.match(router,/createHmac\("sha256"/);
  assert.match(router,/X-Orchestrator-Key/);
