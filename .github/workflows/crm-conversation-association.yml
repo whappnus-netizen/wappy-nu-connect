@@ -1,0 +1,23 @@
+name: CRM conversation association
+
+on:
+  pull_request:
+    paths:
+      - "src/lib/whatsapp/pipeline.server.ts"
+      - "src/lib/crm-backfill.functions.ts"
+      - "src/routes/_authenticated/inbox.tsx"
+      - "src/routes/_authenticated/crm.tsx"
+      - "supabase/migrations/*_add_deal_conversation_link.sql"
+      - "scripts/verify-crm-conversation-association.mjs"
+      - ".github/workflows/crm-conversation-association.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify CRM conversation links
+        run: node scripts/verify-crm-conversation-association.mjs
