@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
+import { Buffer } from "node:buffer";
 import { serviceClient } from "./whatsapp.server";
 
 type GenerateInput = {
@@ -490,36 +491,6 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   }
 
   const selectedPath = handoffRequired ? "human_handoff" : taskType;
-  const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null;
-  const confidence = 0;
-  const reactionEmoji = null;
-  let safeAnswer = answer;
-
-  // A human route is a real backend state change, not just a promise in model text.
-  if (meta["handoff_required"] === true) {
-    if (input.conversationId && !input.testMode) {
-      const admin = serviceClient();
-      const { data: conversation, error: handoffError } = await admin.from("conversations")
-        .update({ ai_enabled: false })
-        .eq("organization_id", input.organizationId)
-        .eq("id", input.conversationId)
-        .select("id")
-        .maybeSingle();
-      if (handoffError || !conversation?.id) {
-        throw new Error("HUMAN_HANDOFF_STATE_UPDATE_FAILED");
-      }
-      await admin.from("whatsapp_events").insert({
-        organization_id: input.organizationId,
-        whatsapp_number_id: input.whatsappNumberId,
-        event_type: "ai_skipped",
-        detail: { reason: "human_handoff_requested", conversation_id: input.conversationId },
-      });
-      safeAnswer = "Entendi. Este assunto precisa de acompanhamento humano. Pausei as respostas automáticas nesta conversa para que a equipa possa continuar o atendimento por aqui.";
-    } else {
-      safeAnswer = "Este pedido foi classificado para acompanhamento humano. No modo de teste, nenhuma transferência nem alteração da conversa foi efectuada.";
-    }
-  }
-
   return {
     text: safeAnswer,
     provider,
