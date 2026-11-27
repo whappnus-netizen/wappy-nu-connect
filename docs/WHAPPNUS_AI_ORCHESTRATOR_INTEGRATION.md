@@ -129,3 +129,10 @@ O provider QR continua a chamar processIncomingMessage directamente através do 
 A rota Meta deixou de chamar directamente a RPC legada ingest_whatsapp_message. A ingestão comum é feita por ingest_provider_message, com a migração 20261127113000_harden_ingest_provider_message.sql a tornar a deduplicação concorrente segura e a separar conversas por organização/contacto/número WhatsApp.
 
 A Background Function está bloqueada em Deploy Previews; só production/dev pode processar mensagens. A variável WHAPPNUS_AI_WORKER_SECRET já é utilizada pelo worker agendado de geração e tem de estar disponível no scope Functions.
+
+
+## Autenticação HMAC v2
+
+O backend agora assina os bytes exactos do JSON enviado ao Orchestrator, incluindo método HTTP e path, através de X-Tenant-Body-SHA256 + X-Tenant-Signature. O Orchestrator valida o hash do corpo bruto antes de consumir o nonce ou chamar o provider.
+
+O rollout é compatível por fases: primeiro Orchestrator com TENANT_BODY_SIGNATURE_REQUIRED=false, depois Backend v2, depois testes reais, e só no final TENANT_BODY_SIGNATURE_REQUIRED=true no Railway. Nunca activar a flag antes de o backend v2 estar em produção. Ver docs/TENANT_REQUEST_AUTH_V2.md.
