@@ -762,6 +762,7 @@ export async function processIncomingMessage(
                 const { error: createDealError } = await admin.from("deals").insert({
                   organization_id: number.organization_id,
                   contact_id: res.contact_id,
+                  conversation_id: res.conversation_id,
                   stage_id: firstStage.id,
                   owner_id: currentAssignedTo,
                   title,
