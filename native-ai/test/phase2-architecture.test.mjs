@@ -325,3 +325,11 @@ test("main backend loads tenant agent context and conversation history with orga
  assert.match(adapter,/\.eq\("conversation_id",\s*input\.conversationId\)/);
  assert.match(adapter,/input\.organizationId\s*\+\s*"\/"\s*\+\s*input\.whatsappNumberId/);
 });
+
+test("AI conversation quota consumption serializes distinct conversations within one organization",async()=>{
+ const sql=await read("supabase/migrations/20261127110000_serialize_ai_conversation_usage_per_organization.sql");
+ assert.match(sql,/pg_advisory_xact_lock\([\s\S]*p_organization_id::text\s*\|\|\s*':ai_conversations'/);
+ assert.match(sql,/count\(DISTINCT\(metadata->>'conversation_id'\)\)/i);
+ assert.match(sql,/INSERT INTO public\.ai_credit_ledger/);
+ assert.doesNotMatch(sql,/p_organization_id::text\s*\|\|\s*':'\s*\|\|\s*p_conversation_id/);
+});
