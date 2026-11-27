@@ -264,7 +264,7 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
   const extensionMime: Record<string, string> = {
     jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
-    ogg: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", mp4: "audio/mp4",
+    ogg: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4",
     aac: "audio/aac", amr: "audio/amr", wav: "audio/wav", webm: "audio/webm", flac: "audio/flac",
     pdf: "application/pdf",
   };
@@ -280,6 +280,8 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   ];
   const mimeType = candidates.find((candidate) => allowedMime.has(candidate)) ?? "";
   if (!mimeType) throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
+
+  if (input.messageType === "video") throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
 
   const mediaType: OrchestratorAttachment["type"] = mimeType.startsWith("image/")
     ? "image" : mimeType.startsWith("audio/") ? "audio" : "document";
