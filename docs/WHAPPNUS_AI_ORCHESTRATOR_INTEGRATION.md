@@ -27,6 +27,14 @@ No Railway, o serviço WHAPPNUS-AI-ORCHESTRATOR recebe:
 
 Os dois primeiros segredos têm de coincidir exactamente com os valores correspondentes da Netlify. O segredo do worker é independente e não é enviado ao Orchestrator.
 
+## Health e readiness
+
+O Orchestrator expõe dois endpoints públicos de diagnóstico:
+- `GET /health`: confirma que o processo HTTP está activo e responde com `status: ok`.
+- `GET /ready`: indica a prontidão dos provedores; devolve `ready` quando pelo menos um provedor está configurado e `degraded` quando nenhum está configurado.
+
+Estes endpoints não substituem um teste autenticado de geração. A resposta `ready` também não garante que uma chamada real ao fornecedor terá sucesso.
+
 ## Contrato de autenticação
 
 O backend faz server-to-server `POST /v1/chat/completions`:
