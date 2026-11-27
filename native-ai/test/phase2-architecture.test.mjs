@@ -74,6 +74,13 @@ test("conversation history excludes the current WhatsApp provider message id",as
  assert.match(pipeline,/messageId: incoming\.waMessageId/);
 });
 
+test("deploy previews cannot call the production Orchestrator with production secrets",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/process\.env\["CONTEXT"\]/);
+ assert.match(adapter,/context !== "production" && context !== "dev"/);
+ assert.match(adapter,/AI_ORCHESTRATOR_DISABLED_OUTSIDE_PRODUCTION_CONTEXT/);
+});
+
 test("conversation credit checks fail closed unless Supabase explicitly allows",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/result\["allowed"\] !== true/);
