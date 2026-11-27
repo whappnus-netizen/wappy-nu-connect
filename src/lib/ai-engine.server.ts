@@ -757,8 +757,15 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     messageType: input.messageType,
     testMode: false,
   };
-  const [ctx, history, attachment] = await Promise.all([
-    loadTenantContext(request),
+  const ctx = await loadTenantContext(request);
+  if (!mediaUnderstandingEnabled(ctx.agent, input.messageType)) {
+    return {
+      isPaymentProof: false, confidence: 0, amount: null, originalCurrency: null,
+      paymentMethod: "other", reference: null, payerName: null, beneficiaryName: null,
+      transactionDate: null, itemName: null, summary: "A análise de imagem está desactivada neste agente",
+    };
+  }
+  const [history, attachment] = await Promise.all([
     loadConversationHistory(request),
     loadIncomingAttachment(request),
   ]);
