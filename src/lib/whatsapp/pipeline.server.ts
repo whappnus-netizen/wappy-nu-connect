@@ -1177,7 +1177,7 @@ export async function sendOutgoingMessage(input: {
     outgoingMedia = {
       kind: input.media.kind,
       url: signed.signedUrl,
-      mimeType: input.media.mimeType,
+      mimeType: normalizedMimeType,
       ...(input.media.caption !== undefined ? { caption: input.media.caption } : {}),
       ...(input.media.fileName !== undefined ? { fileName: input.media.fileName } : {}),
       storagePath: input.media.storagePath,
