@@ -43,7 +43,7 @@ function CrmPage() {
     queryFn: async () => {
       const [stagesRes, dealsRes, contactsRes] = await Promise.all([
         supabase.from("pipeline_stages").select("id, name, position").eq("organization_id", orgId!).order("position"),
-        supabase.from("deals").select("id, title, amount, currency, stage_id, contact_id, status").eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(300),
+        supabase.from("deals").select("id, title, amount, currency, stage_id, contact_id, conversation_id, status").eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(300),
         supabase.from("contacts").select("id, full_name, phone_e164").eq("organization_id", orgId!).order("created_at", { ascending: false }).limit(300),
       ]);
       if (stagesRes.error) throw new Error(`Etapas do CRM: ${stagesRes.error.message}`);
