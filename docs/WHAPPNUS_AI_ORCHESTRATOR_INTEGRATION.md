@@ -118,3 +118,14 @@ A função consume_ai_conversation foi corrigida numa migração pendente para u
 Migração preparada: supabase/migrations/20261127110000_serialize_ai_conversation_usage_per_organization.sql.
 
 Esta migração está apenas no branch/PR; não foi aplicada à base de dados de produção. Aplicá-la pelo processo aprovado do Supabase e validar com duas conversas simultâneas antes de depender dos limites mensais.
+
+
+## Unificação do inbound WhatsApp (Meta + QR)
+
+A rota Meta valida a assinatura x-hub-signature-256 e encaminha as mensagens recebidas para a Netlify Background Function whatsapp-inbound-background. O webhook responde rapidamente; a função valida WHAPPNUS_AI_WORKER_SECRET, resolve phone_number_id para um whatsapp_numbers activo e chama processIncomingMessage.
+
+O provider QR continua a chamar processIncomingMessage directamente através do endpoint do bridge. Assim, ambos convergem na mesma pipeline de ingestão, contexto do agente, automações, IA e envio.
+
+A rota Meta deixou de chamar directamente a RPC legada ingest_whatsapp_message. A ingestão comum é feita por ingest_provider_message, com a migração 20261127113000_harden_ingest_provider_message.sql a tornar a deduplicação concorrente segura e a separar conversas por organização/contacto/número WhatsApp.
+
+A Background Function está bloqueada em Deploy Previews; só production/dev pode processar mensagens. A variável WHAPPNUS_AI_WORKER_SECRET já é utilizada pelo worker agendado de geração e tem de estar disponível no scope Functions.
