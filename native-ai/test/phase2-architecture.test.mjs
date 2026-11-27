@@ -83,7 +83,7 @@ test("video MP4 is not misclassified as an audio attachment",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/messageType === "video"/);
  assert.doesNotMatch(adapter,/mp4: "audio\/mp4"/);
- assert.match(adapter,/m4a: "audio\/m4a"/);
+ assert.doesNotMatch(adapter,/m4a: "audio\/m4a"/);
 });
 
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
