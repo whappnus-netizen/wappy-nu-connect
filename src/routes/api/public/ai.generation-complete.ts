@@ -11,6 +11,13 @@ type GenerationJob = {
   conversation_id: string | null;
 };
 
+function jobContextMatches(job: GenerationJob): boolean {
+  const payload = job.request_payload;
+  return payload["organizationId"] === job.organization_id
+    && payload["whatsappNumberId"] === job.whatsapp_number_id
+    && (payload["conversationId"] ?? null) === job.conversation_id;
+}
+
 function safeEqual(a: string, b: string): boolean {
   const encoder = new TextEncoder();
   const left = encoder.encode(a);
@@ -58,8 +65,19 @@ export const Route = createFileRoute("/api/public/ai/generation-complete")({
 
         const job = (Array.isArray(claim.data) ? claim.data[0] : claim.data) as GenerationJob | null;
         if (job?.id) {
-          try {
-            const result = await generateViaWhappNusAI(job.request_payload as Parameters<typeof generateViaWhappNusAI>[0]);
+          if (!jobContextMatches(job)) {
+            const finish = await admin.rpc("finish_ai_generation_job", {
+              _job_id: job.id,
+              _worker_id: workerId,
+              _status: "failed",
+              _result: null,
+              _error_code: "AI_GENERATION_JOB_TENANT_CONTEXT_MISMATCH",
+            });
+            if (finish.error) console.error("[ai-worker] tenant-mismatch job could not be finalized:", finish.error.message);
+            generated = "failed";
+          } else {
+            try {
+              const result = await generateViaWhappNusAI(job.request_payload as Parameters<typeof generateViaWhappNusAI>[0]);
             const deliveryStatus = job.conversation_id && job.request_payload["testMode"] !== true ? "queued" : "skipped";
             const deliveryUpdate = await admin.from("ai_generation_jobs").update({
               delivery_status: deliveryStatus,
@@ -87,7 +105,8 @@ export const Route = createFileRoute("/api/public/ai/generation-complete")({
             });
             if (finish.error) console.error("[ai-worker] generation finish failed:", finish.error.message);
             generated = retryable(error) ? "retry_queued" : "failed";
-            console.error("[ai-worker] generation job failed:", { jobId: job.id, error: message.slice(0, 180) });
+              console.error("[ai-worker] generation job failed:", { jobId: job.id, error: message.slice(0, 180) });
+            }
           }
         }
 
