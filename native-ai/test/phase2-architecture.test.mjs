@@ -72,6 +72,11 @@ test("conversation history excludes the current WhatsApp provider message id",as
  assert.match(pipeline,/messageId: incoming\.waMessageId/);
 });
 
+test("conversation credit checks fail closed unless Supabase explicitly allows",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/result\["allowed"\] !== true/);
+});
+
 test("payment proof inference is credit-gated and limited to payment-related messages",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
