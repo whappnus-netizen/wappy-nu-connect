@@ -83,6 +83,7 @@ test("payment proof inference is credit-gated and limited to payment-related mes
  const adapter=await read("../src/lib/ai-engine.server.ts");
  const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
  assert.match(adapter,/await consumeAiConversation\(request\)/);
+ assert.match(adapter,/mediaUnderstandingEnabled\(ctx\.agent, input\.messageType\)/);
  assert.match(pipeline,/hasRecentPaymentContext\(number\.organization_id/);
 });
 
