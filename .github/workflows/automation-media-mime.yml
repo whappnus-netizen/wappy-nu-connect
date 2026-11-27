@@ -1,0 +1,21 @@
+name: Automation media MIME validation
+
+on:
+  pull_request:
+    paths:
+      - "src/routes/_authenticated/automacoes.tsx"
+      - "src/lib/whatsapp/pipeline.server.ts"
+      - "supabase/migrations/*_allow_document_mime_types_for_automation_media.sql"
+      - "scripts/verify-automation-document-mime.mjs"
+      - ".github/workflows/automation-media-mime.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify document MIME alignment
+        run: node scripts/verify-automation-document-mime.mjs
