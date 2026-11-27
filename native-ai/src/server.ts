@@ -32,6 +32,38 @@ else console.info(JSON.stringify({event:"ai_worker_disabled",service:"whappnus-n
 
 function authorized(req:express.Request){return req.header("authorization")==="Bearer "+config.AI_INTERNAL_SECRET;}
 
+
+app.post("/v1/generate-direct",async(req,res)=>{
+ if(!authorized(req))return res.status(401).json({ok:false,error:"unauthorized",retryable:false});
+ const b=req.body as Partial<GenerateRequest>;
+ if(!b.organizationId||!b.whatsappNumberId||typeof b.text!=="string"||!b.text.trim()){
+  return res.status(400).json({ok:false,error:"organizationId, whatsappNumberId and text are required",retryable:false});
+ }
+ const key=String(b.organizationId)+":"+String(b.fromWaId??"unknown");
+ if(!allow(key,config.AI_RATE_LIMIT_PER_MINUTE)){
+  return res.status(429).json({ok:false,error:"rate_limited",retryable:true});
+ }
+ try{
+  const input={...b,text:b.text.trim()} as GenerateRequest;
+  const result=await generateReply(input);
+  return res.json({ok:true,...result});
+ }catch(e){
+  const error=e as Error&{retryable?:boolean};
+  const message=error instanceof Error?error.message:"AI_GENERATION_FAILED";
+  if(message==="AUTO_REPLY_DISABLED"||message==="NO_ACTIVE_AGENT"){
+   return res.status(409).json({ok:false,error:message,retryable:false});
+  }
+  if(["SUBSCRIPTION_REQUIRED","ACCOUNT_SUSPENDED","AI_CONVERSATIONS_EXHAUSTED","PLAN_HAS_NO_AI_CONVERSATIONS"].includes(message)){
+   return res.status(402).json({ok:false,error:message,retryable:false});
+  }
+  const retry=typeof error.retryable==="boolean"
+   ? error.retryable
+   : /timeout|AbortError|ECONN|fetch failed|socket|network|HTTP (408|425|429|5[0-9][0-9])/i.test(message);
+  console.error(JSON.stringify({event:"ai_direct_generation_failed",organizationId:b.organizationId,error:message.slice(0,180),retryable:retry}));
+  return res.status(retry?503:422).json({ok:false,error:message.slice(0,180),retryable:retry});
+ }
+});
+
 app.post("/v1/generate",async(req,res)=>{
  if(!authorized(req))return res.status(401).json({ok:false,error:"unauthorized"});
  const b=req.body as Partial<GenerateRequest>;
