@@ -259,12 +259,12 @@ async function resolveIncomingContent(input: GenerateInput): Promise<ResolvedInc
 
   const rawMime = input.mediaMimeType || file.type || "";
   const mime = rawMime.split(";")[0]?.trim().toLowerCase() ?? "";
-  const allowed: Record<string, Set<string>> = {
+  const allowed: Record<"image" | "audio" | "document", Set<string>> = {
     image: new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]),
     audio: new Set(["audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4", "audio/webm", "audio/flac"]),
     document: new Set(["application/pdf"]),
   };
-  const maxBytes: Record<string, number> = {
+  const maxBytes: Record<"image" | "audio" | "document", number> = {
     image: 5 * 1024 * 1024,
     audio: 15 * 1024 * 1024,
     document: 10 * 1024 * 1024,
