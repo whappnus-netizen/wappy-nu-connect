@@ -84,6 +84,8 @@ test("video MP4 is not misclassified as an audio attachment",async()=>{
  assert.match(adapter,/messageType === "video"/);
  assert.doesNotMatch(adapter,/mp4: "audio\/mp4"/);
  assert.doesNotMatch(adapter,/m4a: "audio\/m4a"/);
+ assert.match(adapter,/if \(!mimeType\) return null/);
+ assert.match(adapter,/if \(!bytes\.length \|\| bytes\.length > maxBytes\) return null/);
 });
 
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
