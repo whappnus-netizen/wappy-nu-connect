@@ -14,7 +14,8 @@ const checks = [
   [
     "Model handoff marker is handled as output only",
     source.includes('const modelRequestedHandoff = answer.includes(handoffMarker);') &&
-      source.includes("const safeAnswer = customerRequestedHuman || modelRequestedHandoff"),
+      source.includes("const safeAnswer = customerRequestedHuman || modelRequestedHandoff || modelClaimsOperationalControl") &&
+      source.includes("const modelClaimsOperationalControl ="),
   ],
   [
     "The final system prompt explicitly denies operational authority",
