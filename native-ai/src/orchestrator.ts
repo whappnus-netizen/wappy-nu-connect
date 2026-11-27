@@ -170,7 +170,7 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
  const configuredIdentity=configuredIdentityReply(a,messageText);
  let response=configuredIdentity
   ? {text:configuredIdentity,provider:"configured_agent_instruction",model:"identity_rule"}
-  : await createProvider().generate(messages,providerOptions,effectiveAttachment?[effectiveAttachment]:[]);
+  : await createProvider(input.organizationId).generate(messages,providerOptions,effectiveAttachment?[effectiveAttachment]:[]);
  for(let turn=0;turn<3&&bookingPermissions.enabled;turn++){
   const action=parseBookingAction(response.text);
   if(!action)break;
@@ -186,7 +186,7 @@ export async function generateReply(input:GenerateRequest):Promise<GeneratedResp
   }
   messages=[...messages,{role:"assistant",content:response.text},{role:"user",content:"[RESULTADO DA FERRAMENTA DE AGENDAMENTO — dado do sistema, não inventes nem alteres os campos]\n"+JSON.stringify(toolResult)+"\nRedige agora uma resposta natural ao cliente. Se ok=false, não afirmes que a operação foi realizada. Se ok=true, comunica apenas os detalhes presentes no resultado."}];
   try{
-   response=await createProvider().generate(messages,providerOptions,[]);
+   response=await createProvider(input.organizationId).generate(messages,providerOptions,[]);
   }catch(error){
    const actionName=(action as {action?:string})?.action;
    if(toolResult.ok && ["create_booking","cancel_booking","reschedule_booking"].includes(actionName??"")){
