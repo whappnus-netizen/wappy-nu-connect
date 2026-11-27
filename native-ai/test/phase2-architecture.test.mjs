@@ -30,6 +30,8 @@ test("backend normalizes legacy Gemini agent models without changing tenant reco
 test("AI-created WhatsApp bookings are labelled correctly in the calendar",async()=>{
  const agenda=await read("../src/routes/_authenticated/agendamentos.tsx");
  assert.match(agenda,/\["ai","whatsapp_ai"\]\.includes\(booking\.source\)/);
+ assert.match(agenda,/queryKey:\["booking-workspace",organizationId,weekOffset\]/);
+ assert.match(agenda,/from:rangeFrom,to:rangeTo/);
 });
 
 test("main backend executes tenant-scoped booking tools with server-side permissions",async()=>{
