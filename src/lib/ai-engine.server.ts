@@ -264,15 +264,13 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   const extension = path.split(".").pop()?.toLowerCase() ?? "";
   const extensionMime: Record<string, string> = {
     jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
-    ogg: "audio/ogg", opus: "audio/opus", mp3: "audio/mp3", m4a: "audio/m4a",
-    aac: "audio/aac", wav: "audio/wav", aiff: "audio/aiff", webm: "audio/webm", flac: "audio/flac",
-    l16: "audio/l16", alaw: "audio/alaw", mulaw: "audio/mulaw",
+    ogg: "audio/ogg", mp3: "audio/mp3", aac: "audio/aac",
+    wav: "audio/wav", aiff: "audio/aiff", webm: "audio/webm", flac: "audio/flac",
     pdf: "application/pdf",
   };
   const allowedMime = new Set([
     "image/jpeg", "image/png", "image/webp", "image/gif",
-    "audio/ogg", "audio/opus", "audio/mp3", "audio/mpeg", "audio/m4a", "audio/mp4",
-    "audio/aac", "audio/wav", "audio/aiff", "audio/webm", "audio/flac", "audio/l16", "audio/alaw", "audio/mulaw",
+    "audio/ogg", "audio/mp3", "audio/mpeg", "audio/aac", "audio/wav", "audio/aiff", "audio/webm", "audio/flac",
     "application/pdf",
   ]);
   const candidates = [
@@ -281,7 +279,7 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
     extensionMime[extension] ?? "",
   ];
   let mimeType = candidates.find((candidate) => allowedMime.has(candidate)) ?? "";
-  if (mimeType === "audio/mp4" && input.messageType === "audio") mimeType = "audio/m4a";
+  if (mimeType === "audio/mpeg") mimeType = "audio/mp3";
   if (!mimeType) throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
 
   if (input.messageType === "video") throw new Error("AI_MEDIA_UNSUPPORTED_MIME");
