@@ -27,6 +27,11 @@ test("backend normalizes legacy Gemini agent models without changing tenant reco
  assert.match(adapter,/return "gemini-3\.1-pro-preview"/);
 });
 
+test("AI-created WhatsApp bookings are labelled correctly in the calendar",async()=>{
+ const agenda=await read("../src/routes/_authenticated/agendamentos.tsx");
+ assert.match(agenda,/\["ai","whatsapp_ai"\]\.includes\(booking\.source\)/);
+});
+
 test("main backend executes tenant-scoped booking tools with server-side permissions",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  const tools=await read("../src/lib/ai-booking-tools.server.ts");
