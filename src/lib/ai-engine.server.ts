@@ -699,11 +699,12 @@ export async function generateViaWhappNusAI(input: GenerateInput): Promise<Gener
   const handoffMarker = "[[WHAPPNUS_HANDOFF]]";
   const customerRequestedHuman = /(quero falar com (?:uma pessoa|algu[eé]m|um atendente|um humano)|atendimento humano|atendente real|falar com o gerente|falar com uma pessoa)/i.test(effectiveText);
   const modelRequestedHandoff = answer.includes(handoffMarker);
+  const modelClaimsOperationalControl = /(?:vou|já|acabei de)\\s+(?:transferir|encaminhar|pausar|desactivar|desativar|encerrar|marcar como pendente|atribuir|assumir o atendimento)|(?:transferi|encaminhei|pausei|desactivei|desativei|encerrei|notifiquei a equipa|a equipa foi notificada)/i.test(answer);
   const agentId = typeof ctx.agent?.["id"] === "string" ? ctx.agent["id"] : null;
   const confidence = 0;
   const reactionEmoji = null;
   const cleanAnswer = answer.replaceAll(handoffMarker, "").trim();
-  const safeAnswer = customerRequestedHuman || modelRequestedHandoff
+  const safeAnswer = customerRequestedHuman || modelRequestedHandoff || modelClaimsOperationalControl
     ? "Compreendo que prefiras falar com uma pessoa. Não consigo efectuar uma transferência automática nem alterar o estado desta conversa. Posso continuar a ajudar por aqui; qual é a questão que precisas de resolver?"
     : cleanAnswer || "Podes explicar-me um pouco melhor o que precisas? Quero ajudar-te da forma mais correcta.";
 
