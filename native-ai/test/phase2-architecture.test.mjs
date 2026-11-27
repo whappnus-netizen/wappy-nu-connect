@@ -85,8 +85,13 @@ test("backend retains tenant context, idempotent conversation billing and human-
  assert.match(adapter,/loadConversationHistory/);
  assert.match(adapter,/buildTenantSystemPrompt/);
  assert.match(adapter,/consume_ai_conversation/);
- assert.match(adapter,/PAYMENT_PROOF_REQUIRES_HUMAN_REVIEW/);
+ assert.match(adapter,/isPaymentProof: boolean/);
+ assert.match(adapter,/reference: cleanText\(parsed/);
+ assert.match(adapter,/beneficiaryName: cleanText\(parsed/);
  assert.match(adapter,/HUMAN_HANDOFF_STATE_UPDATE_FAILED/);
+ assert.match(pipeline,/amount_aoa: analysis\.originalCurrency === "AOA" \? analysis\.amount : null/);
+ assert.match(pipeline,/status: "pending_review"/);
+ assert.match(pipeline,/originalAmount: analysis\.amount/);
  assert.match(pipeline,/requireActiveSubscription/);
  assert.match(pipeline,/analyzePaymentProofViaWhappNusAI/);
  assert.doesNotMatch(adapter,/WHAPPNUS_NATIVE_AI_URL|WHAPPNUS_NATIVE_AI_SECRET|WHAPPNUS_ROUTER_URL/);
