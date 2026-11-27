@@ -71,6 +71,8 @@ O worker agendado da Netlify continua a consumir a fila durável existente no Su
 - As chaves Gemini/OpenAI/Anthropic são colocadas apenas no serviço Orchestrator no Railway, nunca na Netlify.
 
 
+Deploy previews Netlify (`CONTEXT=deploy-preview`/`branch-deploy`) são bloqueados antes de carregar contexto, consumir créditos ou chamar o Orchestrator. Apenas `production` e desenvolvimento local (`dev`) podem executar inferência. Isto evita que previews com variáveis de produção usem quotas, dados ou a fila de clientes reais.
+
 ## Regras de negócio preservadas no backend
 
 - Antes da geração e da análise de comprovativos, o backend chama o RPC idempotente `consume_ai_conversation`. O RPC é definido no Supabase e não é alterado por esta integração; várias chamadas na mesma conversa não descontam conversas adicionais.
