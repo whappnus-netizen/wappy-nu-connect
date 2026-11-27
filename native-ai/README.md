@@ -14,7 +14,7 @@ This folder retains an independently buildable runtime prototype with:
 - Durable generation and delivery queue support.
 - An Orchestrator provider adapter using tenant HMAC signatures.
 
-Those features are not automatically active in the main Netlify request path merely because this folder exists. Before moving any of them into production, integrate and test the feature in the main backend or provision this runtime as a separate service with its own reviewed deployment and complete environment configuration.
+The main backend now has its own tenant-scoped booking tools in `src/lib/ai-booking-tools.server.ts`, plus conversation-credit checks and the direct Orchestrator request path. The payment-proof extractor in this optional folder is still not active in production; the main backend deliberately keeps payment confirmation under human review. Do not assume code in this folder is called by the main Netlify request path.
 
 ## Provider gateway
 
