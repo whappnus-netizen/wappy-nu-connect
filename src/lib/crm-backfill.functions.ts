@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const inputSchema = z.object({ organizationId: z.string().uuid() });
 
-type ConversationContact = { contact_id: string | null; assigned_to: string | null; created_at: string };
+type ConversationContact = { id: string; contact_id: string | null; assigned_to: string | null; created_at: string };
 type DealContact = { contact_id: string | null };
 type StageRow = { id: string; name: string };
 type ContactRow = { id: string; full_name: string | null; profile_name: string | null };
@@ -14,7 +14,7 @@ async function loadBackfillContext(organizationId: string) {
   const admin = serviceClient();
 
   const [conversationsResult, dealsResult, stageResult, organizationResult] = await Promise.all([
-    admin.from("conversations").select("contact_id, assigned_to, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }),
+    admin.from("conversations").select("id, contact_id, assigned_to, created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }),
     admin.from("deals").select("contact_id").eq("organization_id", organizationId),
     admin.from("pipeline_stages").select("id, name").eq("organization_id", organizationId).order("position", { ascending: true }).limit(1).maybeSingle(),
     admin.from("organizations").select("currency").eq("id", organizationId).maybeSingle(),
@@ -31,7 +31,11 @@ async function loadBackfillContext(organizationId: string) {
   const represented = new Set(existingDeals.map((row) => row.contact_id).filter((id): id is string => Boolean(id)));
   const candidateIds = contactIds.filter((id) => !represented.has(id));
   const assignedOwnerByContact = new Map<string, string>();
+  const conversationIdByContact = new Map<string, string>();
   for (const row of conversations) {
+    if (row.contact_id && !conversationIdByContact.has(row.contact_id)) {
+      conversationIdByContact.set(row.contact_id, row.id);
+    }
     if (row.contact_id && row.assigned_to && !assignedOwnerByContact.has(row.contact_id)) {
       assignedOwnerByContact.set(row.contact_id, row.assigned_to);
     }
@@ -46,6 +50,7 @@ async function loadBackfillContext(organizationId: string) {
     stage: stageResult.data as StageRow,
     currency: (organizationResult.data as { currency?: string } | null)?.currency || "AOA",
     assignedOwnerByContact,
+    conversationIdByContact,
   };
 }
 
@@ -90,6 +95,7 @@ export const syncExistingConversationDeals = createServerFn({ method: "POST" })
       const { error: insertError } = await context.admin.from("deals").insert({
         organization_id: context.organizationId,
         contact_id: contact.id,
+        conversation_id: context.conversationIdByContact.get(contact.id) ?? null,
         stage_id: context.stage.id,
         owner_id: context.assignedOwnerByContact.get(contact.id) ?? null,
         title,
