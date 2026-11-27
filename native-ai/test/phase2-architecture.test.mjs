@@ -333,3 +333,26 @@ test("AI conversation quota consumption serializes distinct conversations within
  assert.match(sql,/INSERT INTO public\.ai_credit_ledger/);
  assert.doesNotMatch(sql,/p_organization_id::text\s*\|\|\s*':'\s*\|\|\s*p_conversation_id/);
 });
+
+test("Meta Cloud API webhook dispatches inbound messages through the shared background pipeline",async()=>{
+ const route=await read("../src/routes/api/public/whatsapp.webhook.ts");
+ const worker=await read("../netlify/functions/whatsapp-inbound-background.mts");
+ assert.match(route,/verifyWebhookSignature/);
+ assert.match(route,/whatsapp-inbound-background/);
+ assert.match(route,/WHAPPNUS_AI_WORKER_SECRET/);
+ assert.match(route,/update_whatsapp_message_status/);
+ assert.doesNotMatch(route,/ingest_whatsapp_message/);
+ assert.match(worker,/metaProvider\.handleIncomingMessage/);
+ assert.match(worker,/processIncomingMessage\(number\.id, incoming\)/);
+ assert.match(worker,/\.eq\("phone_number_id", item\.phoneNumberId\)/);
+ assert.match(worker,/\.is\("deleted_at", null\)/);
+ assert.match(worker,/background: true/);
+});
+
+test("provider message ingestion is idempotent and keeps conversations scoped to a WhatsApp number",async()=>{
+ const sql=await read("../supabase/migrations/20261127113000_harden_ingest_provider_message.sql");
+ assert.match(sql,/wa-message:/);
+ assert.match(sql,/ON CONFLICT \(wa_message_id\) DO NOTHING/);
+ assert.match(sql,/whatsapp_number_id = num\.id/);
+ assert.match(sql,/active-conversation/);
+});
