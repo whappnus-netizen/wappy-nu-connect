@@ -98,6 +98,7 @@ async function recordDetectedPaymentProof(input: {
   const extractionData = {
     confidence: analysis.confidence,
     mimeType: incoming.mediaMimeType,
+    originalAmount: analysis.amount,
     originalCurrency: analysis.originalCurrency,
     reference: analysis.reference,
     duplicateReference,
@@ -111,7 +112,7 @@ async function recordDetectedPaymentProof(input: {
     organization_id: input.organizationId,
     contact_id: input.contactId,
     conversation_id: input.conversationId,
-    amount_aoa: analysis.amount,
+    amount_aoa: analysis.originalCurrency === "AOA" ? analysis.amount : null,
     currency: "AOA",
     description,
     item_name: itemName,
