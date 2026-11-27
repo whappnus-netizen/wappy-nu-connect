@@ -8,7 +8,7 @@ This is a controlled acceptance test. Do not use customer organizations, custome
 
 ## Preconditions
 
-- Apply migration 20261127110000_serialize_ai_conversation_usage_per_organization.sql through the approved Supabase migration process before relying on strict monthly AI conversation limits.
+- Apply migration 20261127113015_serialize_ai_conversation_usage_per_organization.sql through the approved Supabase migration process before relying on strict monthly AI conversation limits.
 - Two dedicated test organizations: ORG-A and ORG-B.
 - One dedicated WhatsApp test number connected to each organization.
 - One active agent per organization.
@@ -56,7 +56,7 @@ Do not copy message contents or personal data into logs or this document.
 4. Re-enable AI on ORG-A and verify normal operation resumes.
 5. Trigger a controlled transient generation failure on the test environment and confirm the durable queue retains the original organization and WhatsApp number.
 
-Before the runtime test, apply both pending migrations through the approved Supabase process: 20261127110000_serialize_ai_conversation_usage_per_organization.sql and 20261127113000_harden_ingest_provider_message.sql. Confirm WHAPPNUS_AI_WORKER_SECRET is configured for Netlify Functions; the Meta webhook dispatches inbound work to the authenticated background function.
+Before the runtime test, apply both pending migrations through the approved Supabase process: 20261127113015_serialize_ai_conversation_usage_per_organization.sql and 20261127113019_harden_ingest_provider_message.sql. Confirm WHAPPNUS_AI_WORKER_SECRET is configured for Netlify Functions; the Meta webhook dispatches inbound work to the authenticated background function.
 
 ## Test D — inbound to outbound WhatsApp path
 
