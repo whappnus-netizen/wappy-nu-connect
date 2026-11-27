@@ -51,6 +51,20 @@ test("default Gemini Flash agents leave complex model tier selection to Orchestr
  assert.match(adapter,/preferredProvider/);
 });
 
+test("agent media toggles are enforced before sending attachments to providers",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ assert.match(adapter,/mediaUnderstandingEnabled/);
+ assert.match(adapter,/config\["imageUnderstanding"\] !== false/);
+ assert.match(adapter,/config\["audioUnderstanding"\] !== false/);
+});
+
+test("payment proof inference is credit-gated and limited to payment-related messages",async()=>{
+ const adapter=await read("../src/lib/ai-engine.server.ts");
+ const pipeline=await read("../src/lib/whatsapp/pipeline.server.ts");
+ assert.match(adapter,/await consumeAiConversation\(request\)/);
+ assert.match(pipeline,/hasRecentPaymentContext\(number\.organization_id/);
+});
+
 test("direct backend adapter validates and forwards image audio and PDF attachments",async()=>{
  const adapter=await read("../src/lib/ai-engine.server.ts");
  assert.match(adapter,/loadIncomingAttachment/);
