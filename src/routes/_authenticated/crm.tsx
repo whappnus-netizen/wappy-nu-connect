@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/crm")({
 });
 
 type Stage = { id: string; name: string; position: number };
-type Deal = { id: string; title: string; amount: number | null; currency: string | null; stage_id: string | null; contact_id: string | null; status: string };
+type Deal = { id: string; title: string; amount: number | null; currency: string | null; stage_id: string | null; contact_id: string | null; conversation_id: string | null; status: string };
 type Contact = { id: string; full_name: string | null; phone_e164: string };
 
 function CrmPage() {
