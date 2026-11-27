@@ -13,6 +13,19 @@ import { analyzePaymentProofViaWhappNusAI, generateViaWhappNusAI } from "../ai-e
 import type { NormalizedIncoming, OutgoingMedia, SessionRef } from "./provider.server";
 import { providerByName } from "./registry.server";
 
+const AUTOMATION_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/zip",
+]);
+
 export type WhatsAppEventType =
   | "qr_generated"
   | "qr_scanned"
@@ -1151,10 +1164,11 @@ export async function sendOutgoingMessage(input: {
     if (!input.media.storagePath.startsWith(expectedPrefix) || input.media.storagePath.includes("..")) {
       throw new Error("Caminho de mídia inválido para esta organização.");
     }
-    if ((input.media.kind === "image" && !input.media.mimeType.startsWith("image/")) ||
-        (input.media.kind === "audio" && !input.media.mimeType.startsWith("audio/")) ||
-        (input.media.kind === "video" && !input.media.mimeType.startsWith("video/")) ||
-        (input.media.kind === "document" && !input.media.mimeType)) {
+    const normalizedMimeType = input.media.mimeType.toLowerCase().split(";")[0]?.trim() ?? "";
+    if ((input.media.kind === "image" && !normalizedMimeType.startsWith("image/")) ||
+        (input.media.kind === "audio" && !normalizedMimeType.startsWith("audio/")) ||
+        (input.media.kind === "video" && !normalizedMimeType.startsWith("video/")) ||
+        (input.media.kind === "document" && !AUTOMATION_DOCUMENT_MIME_TYPES.has(normalizedMimeType))) {
       throw new Error("Tipo de mídia inválido.");
     }
     const { data: signed, error: signError } = await admin.storage
