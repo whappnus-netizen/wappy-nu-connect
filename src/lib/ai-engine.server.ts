@@ -294,6 +294,14 @@ async function loadIncomingAttachment(input: GenerateInput): Promise<Orchestrato
   return { type: mediaType, mime_type: mimeType, data: bytes.toString("base64") };
 }
 
+function mediaUnderstandingEnabled(agent: Record<string, unknown> | null, messageType?: GenerateInput["messageType"]): boolean {
+  const config = agent?.["config"] && typeof agent["config"] === "object"
+    ? agent["config"] as Record<string, unknown> : {};
+  if (messageType === "image") return config["imageUnderstanding"] !== false;
+  if (messageType === "audio") return config["audioUnderstanding"] !== false;
+  return true;
+}
+
 function resolveIncomingText(input: GenerateInput, attachment: OrchestratorAttachment | null): string {
   const caption = cleanText(input.text, 4000);
   if (input.messageType === "video") {
@@ -512,11 +520,12 @@ async function consumeAiConversation(input: GenerateInput): Promise<void> {
 
 export async function generateViaWhappNusAI(input: GenerateInput): Promise<GenerateResult> {
   const started = Date.now();
-  const [ctx, history, attachment] = await Promise.all([
+  const [ctx, history] = await Promise.all([
     loadTenantContext(input),
     loadConversationHistory(input),
-    loadIncomingAttachment(input),
   ]);
+  const attachment = mediaUnderstandingEnabled(ctx.agent, input.messageType)
+    ? await loadIncomingAttachment(input) : null;
   const effectiveText = resolveIncomingText(input, attachment);
   await consumeAiConversation(input);
   const bookingRuntime = await loadBookingRuntime(input, ctx.agent);
