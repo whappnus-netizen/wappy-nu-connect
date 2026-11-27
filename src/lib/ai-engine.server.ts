@@ -744,7 +744,7 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
     mediaPath: input.mediaPath,
     mediaMimeType: input.mediaMimeType,
     messageType: input.messageType,
-    testMode: true,
+    testMode: false,
   };
   const [ctx, history, attachment] = await Promise.all([
     loadTenantContext(request),
@@ -754,10 +754,11 @@ export async function analyzePaymentProofViaWhappNusAI(input: {
   if (!attachment || !["image", "document"].includes(attachment.type)) {
     return {
       isPaymentProof: false, confidence: 0, amount: null, originalCurrency: null,
-      paymentMethod: "other", transactionReference: null, recipientName: null,
+      paymentMethod: "other", reference: null, payerName: null, beneficiaryName: null,
       transactionDate: null, itemName: null, summary: "Anexo indisponível para análise",
     };
   }
+  await consumeAiConversation(request);
 
   const agent = ctx.agent ?? {};
   const businessContext = [
