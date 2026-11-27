@@ -6,7 +6,7 @@ When a team member selects **Criar oportunidade no CRM**, the app:
 1. Requires a contact associated with the conversation.
 2. Checks whether that contact already has an open opportunity in the organization.
 3. Uses the first configured pipeline stage.
-4. Creates an open opportunity linked to the same contact, with the organization's currency.
-5. Refreshes the CRM query.
+4. Creates an open opportunity linked to the same contact and originating conversation, with the organization's currency.
+5. Refreshes the CRM query. The CRM displays when an opportunity is linked to a WhatsApp conversation.
 
-The CRM creation form also allows associating an existing contact with a manually created opportunity. Both paths preserve organization isolation through the existing RLS policies.
+The CRM creation form also allows associating an existing contact with a manually created opportunity. Both paths preserve organization isolation through the existing RLS policies. Backfilled opportunities link to the latest conversation for that contact; manually created CRM opportunities remain unlinked unless created from an Inbox conversation.

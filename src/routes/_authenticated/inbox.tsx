@@ -274,6 +274,7 @@ function InboxPage() {
         organization_id: orgId,
         title: `Novo lead — ${contactLabel}`,
         contact_id: active.contact_id,
+        conversation_id: active.id,
         stage_id: stage.id,
         currency: membership?.organizations?.currency ?? "AOA",
         status: "open",
