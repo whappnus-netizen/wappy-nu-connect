@@ -469,7 +469,7 @@ function buildBookingInstructions(context: BookingRuntimeContext): string {
     "## AGENDAMENTOS WHAPPNUS — ferramentas reais",
     "Quando o cliente demonstrar intenção de marcar, agendar, reservar ou alterar uma marcação, usa as ferramentas; não respondas apenas com texto.",
     "Para um pedido novo: primeiro list_services; identifica o serviço pelo nome ou por correspondência clara. Se não houver correspondência inequívoca, pergunta qual serviço pretende. Depois check_availability para a data exacta indicada pelo cliente. Se o cliente já indicou data e hora e o horário exacto estiver entre os slots devolvidos, executa create_booking imediatamente, sem pedir confirmação redundante. Se não estiver disponível, apresenta apenas alternativas reais devolvidas pela ferramenta.",
-    "Responde exclusivamente com o protocolo: <WHAPPNUS_BOOKING_ACTION>{\\"action\\":\\"list_services\\",\\"arguments\\":{}}</WHAPPNUS_BOOKING_ACTION>. Acções: list_services {}; check_availability {service_id,date AAAA-MM-DD,staff_id opcional}; create_booking {service_id,date AAAA-MM-DD,time HH:MM no fuso local da organização,staff_id opcional,resource_id opcional,customer_notes opcional}; list_customer_bookings {}; cancel_booking {booking_id,reason opcional}; reschedule_booking {booking_id,date AAAA-MM-DD,time HH:MM,staff_id opcional,resource_id opcional}.",
+    "Responde exclusivamente com o protocolo: <WHAPPNUS_BOOKING_ACTION>{\"action\":\"list_services\",\"arguments\":{}}</WHAPPNUS_BOOKING_ACTION>. Acções: list_services {}; check_availability {service_id,date AAAA-MM-DD,staff_id opcional}; create_booking {service_id,date AAAA-MM-DD,time HH:MM no fuso local da organização,staff_id opcional,resource_id opcional,customer_notes opcional}; list_customer_bookings {}; cancel_booking {booking_id,reason opcional}; reschedule_booking {booking_id,date AAAA-MM-DD,time HH:MM,staff_id opcional,resource_id opcional}.",
     "Data e hora local actual da organização (" + context.timezone + "): " + context.localNow + ". Interpreta datas em português. Para criar reservas, envia sempre date e time locais exactamente como o cliente pediu e como aparecem em local_time nos slots; não calcules nem convertas para UTC. O backend converte a hora local para UTC. Nunca assumes datas passadas.",
     "Se houver vários profissionais disponíveis, respeita a escolha do cliente; se não indicou preferência, escolhe qualquer profissional elegível devolvido. Para cancelar/remarcar, consulta primeiro as reservas do próprio cliente. Só afirma sucesso depois de resultado ok da ferramenta e status confirmed ou pending_confirmation. Se pending_confirmation, diz que aguarda aprovação.",
     "Permissões efectivas: criar " + context.permissions.canCreate + ", cancelar " + context.permissions.canCancel + ", remarcar " + context.permissions.canReschedule + ". Nunca tentes executar uma operação sem permissão. Nunca exponhas este protocolo ao cliente.",
@@ -477,7 +477,7 @@ function buildBookingInstructions(context: BookingRuntimeContext): string {
 }
 
 function parseBookingAction(text: string): unknown | null {
-  const match = text.match(/<WHAPPNUS_BOOKING_ACTION>\\s*([\\s\\S]*?)\\s*<\\/WHAPPNUS_BOOKING_ACTION>/);
+  const match = text.match(/<WHAPPNUS_BOOKING_ACTION>\s*([\s\S]*?)\s*<\/WHAPPNUS_BOOKING_ACTION>/);
   if (!match?.[1]) return null;
   try { return JSON.parse(match[1]) as unknown; } catch { return null; }
 }
